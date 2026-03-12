@@ -1,145 +1,205 @@
 import pygame
 import sys
-
-from levels import level1
-from levels import level2
-from levels import level3
-from levels import level4
+from settings import *
 
 pygame.init()
+pygame.mixer.init()
 
-WIDTH, HEIGHT = 1280, 720
-
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("North Pole Protocol")
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+pygame.display.set_caption("Christmas Pixel Adventure")
 
 clock = pygame.time.Clock()
 
-title_font = pygame.font.SysFont("arial",70)
-button_font = pygame.font.SysFont("arial",35)
+# Load assets
+background = pygame.image.load("assets/backgrounds/Menubackground.png")
+background = pygame.transform.scale(background, (SCREEN_WIDTH, SCREEN_HEIGHT))
 
-STATE_MENU = "menu"
-STATE_LEVEL_SELECT = "level_select"
-STATE_LEVEL = "level"
+font_title = pygame.font.Font("assets/fonts/PressStart2P.ttf", 40)
+font_menu = pygame.font.Font("assets/fonts/PressStart2P.ttf", 30)
+font_small = pygame.font.Font("assets/fonts/PressStart2P.ttf", 20)
 
-current_state = STATE_MENU
-active_level = 0
+# Background music
+pygame.mixer.music.load("assets/audio/BackgroundMusic.mp3")
+pygame.mixer.music.play(-1)
+
+# Game states
+state = "MENU"
+
+menu_options = ["Start Game", "Select Level", "Quit Game"]
+level_options = ["Level 1", "Level 2", "Level 3", "Level 4", "Back"]
+
+selected_index = 0
+current_level = ""
 
 
-def draw_button(rect,text):
+def draw_text(text, font, color, x, y):
+    surface = font.render(text, True, color)
+    rect = surface.get_rect(center=(x, y))
+    screen.blit(surface, rect)
+    return rect
 
-    mx,my = pygame.mouse.get_pos()
 
-    color = (0,200,0)
+def draw_menu(options, selected):
+    boxes = []
 
-    if rect.collidepoint(mx,my):
-        color = (0,255,120)
+    button_width = 420
+    button_height = 70
+    spacing = 90
 
-    pygame.draw.rect(screen,color,rect,border_radius=12)
+    start_y = 300
 
-    label = button_font.render(text,True,(0,0,0))
+    for i, option in enumerate(options):
 
-    screen.blit(label,(rect.x+rect.width//2-label.get_width()//2,
-                       rect.y+rect.height//2-label.get_height()//2))
+        rect = pygame.Rect(0, 0, button_width, button_height)
+        rect.center = (SCREEN_WIDTH // 2, start_y + i * spacing)
+
+        mouse_pos = pygame.mouse.get_pos()
+
+        if rect.collidepoint(mouse_pos):
+            selected = i
+
+        if i == selected:
+            text_color = (255, 255, 0)
+            border = (0, 255, 0)
+        else:
+            text_color = (255, 255, 255)
+            border = (150, 150, 150)
+
+        pygame.draw.rect(screen, (0, 0, 0), rect)
+        pygame.draw.rect(screen, border, rect, 3)
+
+        text = font_menu.render(option, True, text_color)
+        text_rect = text.get_rect(center=rect.center)
+        screen.blit(text, text_rect)
+
+        boxes.append(rect)
+
+    return selected, boxes
 
 
 running = True
 
 while running:
 
-    screen.fill((15,20,40))
+    screen.blit(background, (0,0))
+
+    if state == "MENU":
+        draw_text("Christmas Pixel Adventure", font_title, (255,255,255), SCREEN_WIDTH//2, 150)
+        selected_index, boxes = draw_menu(menu_options, selected_index)
+
+    elif state == "LEVEL_SELECT":
+        draw_text("Select Level", font_title, (255,255,255), SCREEN_WIDTH//2, 150)
+        selected_index, boxes = draw_menu(level_options, selected_index)
+
+    elif state == "LEVEL_PREVIEW":
+        draw_text("Level Loaded", font_title, (255,255,255), SCREEN_WIDTH//2, 200)
+        draw_text(current_level, font_menu, (255,255,0), SCREEN_WIDTH//2, 350)
+        draw_text("Press ESC to return", font_small, (255,255,255), SCREEN_WIDTH//2, 500)
+
+    pygame.display.update()
 
     for event in pygame.event.get():
 
         if event.type == pygame.QUIT:
             running = False
 
+        if event.type == pygame.KEYDOWN:
+
+            if state != "LEVEL_PREVIEW":
+
+                if event.key == pygame.K_DOWN:
+                    selected_index = (selected_index + 1) % len(menu_options if state == "MENU" else level_options)
+
+                if event.key == pygame.K_UP:
+                    selected_index = (selected_index - 1) % len(menu_options if state == "MENU" else level_options)
+
+                if event.key == pygame.K_RETURN:
+
+                    if state == "MENU":
+
+                        if selected_index == 0:
+                            current_level = "Start / Continue Game"
+                            state = "LEVEL_PREVIEW"
+
+                        elif selected_index == 1:
+                            state = "LEVEL_SELECT"
+                            selected_index = 0
+
+                        elif selected_index == 2:
+                            running = False
+
+                    elif state == "LEVEL_SELECT":
+
+                        if selected_index == 0:
+                            current_level = "Level 1"
+                            state = "LEVEL_PREVIEW"
+
+                        elif selected_index == 1:
+                            current_level = "Level 2"
+                            state = "LEVEL_PREVIEW"
+
+                        elif selected_index == 2:
+                            current_level = "Level 3"
+                            state = "LEVEL_PREVIEW"
+
+                        elif selected_index == 3:
+                            current_level = "Level 4"
+                            state = "LEVEL_PREVIEW"
+
+                        elif selected_index == 4:
+                            state = "MENU"
+                            selected_index = 0
+
+            if event.key == pygame.K_ESCAPE:
+                state = "MENU"
+                selected_index = 0
+
         if event.type == pygame.MOUSEBUTTONDOWN:
 
-            mx,my = pygame.mouse.get_pos()
+            mouse_pos = pygame.mouse.get_pos()
 
-            if current_state == STATE_MENU:
+            for i, rect in enumerate(boxes):
 
-                if start_btn.collidepoint(mx,my):
-                    current_state = STATE_LEVEL_SELECT
+                if rect.collidepoint(mouse_pos):
 
-            elif current_state == STATE_LEVEL_SELECT:
+                    selected_index = i
 
-                for i,rect in enumerate(level_buttons):
+                    if state == "MENU":
 
-                    if rect.collidepoint(mx,my):
+                        if i == 0:
+                            current_level = "Start / Continue Game"
+                            state = "LEVEL_PREVIEW"
 
-                        active_level = i+1
-                        current_state = STATE_LEVEL
+                        elif i == 1:
+                            state = "LEVEL_SELECT"
+                            selected_index = 0
 
-                if back_btn.collidepoint(mx,my):
-                    current_state = STATE_MENU
+                        elif i == 2:
+                            running = False
 
-            elif current_state == STATE_LEVEL:
+                    elif state == "LEVEL_SELECT":
 
-                if back_btn.collidepoint(mx,my):
-                    current_state = STATE_LEVEL_SELECT
+                        if i == 0:
+                            current_level = "Level 1"
+                            state = "LEVEL_PREVIEW"
 
+                        elif i == 1:
+                            current_level = "Level 2"
+                            state = "LEVEL_PREVIEW"
 
-    # ---------- MENU ----------
+                        elif i == 2:
+                            current_level = "Level 3"
+                            state = "LEVEL_PREVIEW"
 
-    if current_state == STATE_MENU:
+                        elif i == 3:
+                            current_level = "Level 4"
+                            state = "LEVEL_PREVIEW"
 
-        title = title_font.render("NORTH POLE PROTOCOL",True,(255,255,255))
+                        elif i == 4:
+                            state = "MENU"
+                            selected_index = 0
 
-        screen.blit(title,(WIDTH//2-title.get_width()//2,180))
-
-        start_btn = pygame.Rect(WIDTH//2-120,400,240,70)
-
-        draw_button(start_btn,"START GAME")
-
-
-    # ---------- LEVEL SELECT ----------
-
-    elif current_state == STATE_LEVEL_SELECT:
-
-        title = title_font.render("SELECT LEVEL",True,(255,255,255))
-
-        screen.blit(title,(WIDTH//2-title.get_width()//2,120))
-
-        level_buttons = []
-
-        for i in range(4):
-
-            rect = pygame.Rect(260+i*200,350,140,70)
-
-            level_buttons.append(rect)
-
-            draw_button(rect,f"LEVEL {i+1}")
-
-        back_btn = pygame.Rect(20,20,120,50)
-
-        draw_button(back_btn,"BACK")
-
-
-    # ---------- LEVEL ----------
-
-    elif current_state == STATE_LEVEL:
-
-        if active_level == 1:
-            level1.run(screen)
-
-        elif active_level == 2:
-            level2.run(screen)
-
-        elif active_level == 3:
-            level3.run(screen)
-
-        elif active_level == 4:
-            level4.run(screen)
-
-        back_btn = pygame.Rect(20,20,120,50)
-
-        draw_button(back_btn,"BACK")
-
-
-    pygame.display.flip()
-
-    clock.tick(60)
+    clock.tick(FPS)
 
 pygame.quit()
+sys.exit()
