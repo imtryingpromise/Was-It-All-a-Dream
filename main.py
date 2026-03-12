@@ -5,6 +5,8 @@ from settings import *
 pygame.init()
 pygame.mixer.init()
 
+from levels.level4 import run_level4
+
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Christmas Pixel Adventure")
 
@@ -143,8 +145,7 @@ while running:
                             state = "LEVEL_PREVIEW"
 
                         elif selected_index == 3:
-                            current_level = "Level 4"
-                            state = "LEVEL_PREVIEW"
+                            run_level4(screen)
 
                         elif selected_index == 4:
                             state = "MENU"
@@ -192,8 +193,7 @@ while running:
                             state = "LEVEL_PREVIEW"
 
                         elif i == 3:
-                            current_level = "Level 4"
-                            state = "LEVEL_PREVIEW"
+                            run_level4(screen)
 
                         elif i == 4:
                             state = "MENU"
