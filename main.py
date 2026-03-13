@@ -5,6 +5,8 @@ from settings import *
 pygame.init()
 pygame.mixer.init()
 
+# IMPORT LEVELS
+from levels.level1 import run_level1
 from levels.level4 import run_level4
 
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -133,8 +135,7 @@ while running:
                     elif state == "LEVEL_SELECT":
 
                         if selected_index == 0:
-                            current_level = "Level 1"
-                            state = "LEVEL_PREVIEW"
+                            run_level1(screen)
 
                         elif selected_index == 1:
                             current_level = "Level 2"
@@ -181,8 +182,7 @@ while running:
                     elif state == "LEVEL_SELECT":
 
                         if i == 0:
-                            current_level = "Level 1"
-                            state = "LEVEL_PREVIEW"
+                            run_level1(screen)
 
                         elif i == 1:
                             current_level = "Level 2"
