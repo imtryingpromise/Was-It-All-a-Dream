@@ -14,18 +14,18 @@ FPS = 60
 # Sky / Cloud colour palette
 WHITE        = (255, 255, 255)
 BLACK        = (0,   0,   0)
-SKY_TOP      = (200, 235, 255)
-SKY_MID      = (160, 210, 245)
-SKY_BOT      = (100, 170, 225)
-CLOUD_WHITE  = (235, 248, 255)
-CLOUD_SHADOW = (190, 220, 242)
-SUN_YELLOW   = (255, 225,  70)
-SUN_ORANGE   = (255, 175,  40)
-PLAT_CLOUD   = (220, 238, 255)   # standard cloud platform
-PLAT_MOVE    = ( 90, 210, 140)   # moving
-PLAT_GLITCH  = (185, 145, 255)   # glitch
-PLAT_FALL    = (255, 120, 110)   # collapsing
-PLAT_TELE    = (255, 175,  70)   # teleport
+SKY_TOP      = (74,  144, 200)   # deep blue at altitude (SVG #4A90C8)
+SKY_MID      = (114, 174, 221)   # SVG #72AEDD
+SKY_BOT      = (190, 224, 245)   # SVG #BEE0F5
+CLOUD_WHITE  = (208, 234, 255)   # SVG #D0EAFF  — cloud platform tint
+CLOUD_SHADOW = (128, 184, 224)   # SVG #80B8E0
+SUN_YELLOW   = (255, 215,  64)   # SVG #FFD740
+SUN_ORANGE   = (255, 153,   0)   # SVG #FF9900
+PLAT_CLOUD   = (208, 234, 255)   # standard cloud platform  #D0EAFF
+PLAT_MOVE    = (136, 221, 136)   # moving  #88DD88
+PLAT_GLITCH  = (200, 168, 255)   # glitch  #C8A8FF
+PLAT_FALL    = (255, 152, 152)   # collapsing  #FF9898
+PLAT_TELE    = (255, 184,  96)   # teleport  #FFB860
 GRAY         = (160, 170, 185)
 DARK_GRAY    = ( 70,  80,  95)
 RED          = (220,  60,  60)
@@ -36,20 +36,20 @@ CYAN         = ( 80, 220, 255)
 GOLD         = (255, 200,  50)
 BROWN        = (160, 110,  60)
 DARK_BROWN   = (110,  70,  30)
-MUSHROOM_RED = (220,  60,  60)
+MUSHROOM_RED = (204,  34,  34)   # SVG #CC2222
 DARK_BG      = (155, 205, 250)
 GRID_COLOR   = (140, 190, 235)
 
-# Physics  (identical to level4)
+# Physics
 GRAVITY        = 0.6
-JUMP_VELOCITY  = -13
+JUMP_VELOCITY  = -15
 MOVE_SPEED     = 5
 SPRINT_SPEED   = 8
 MAX_FALL_SPEED = 15
 STOMP_BOUNCE   = -10
 
-# Death Y — below the lowest platform tier
-DEATH_Y = 900
+# Death Y — below the spawn cloud
+DEATH_Y = 980
 
 # Unreal Mode
 UNREAL_DURATION    = 480
@@ -131,7 +131,7 @@ class Camera:
         # Horizontal: keep player ~1/3 from left
         tx = target_rect.centerx - self.width // 3
         self.offset_x += (tx - self.offset_x) * 0.1
-        # Vertical: centre player — full Y tracking (no clamp) for vertical map
+        # Vertical: centre player — full Y tracking for vertical map
         ty = target_rect.centery - self.height // 2
         self.offset_y += (ty - self.offset_y) * 0.08
 
@@ -578,7 +578,7 @@ class FlyingMonster:
         self.rect = pygame.Rect(x, y, self.WIDTH, self.HEIGHT)
         self.pl, self.pr = pl, pr; self.speed = speed
         self.amplitude = amplitude; self.dir = 1
-        self.color = color or (100, 160, 255); self.alive = True
+        self.color = color or (85, 119, 238); self.alive = True
         self.death_timer = 0; self.phase = random.uniform(0, math.pi * 2); self.tick = 0
 
     def update(self):
@@ -723,100 +723,227 @@ class BgCloud:
 
 
 # ---------------------------------------------------------------------------
-# Level builder — VERTICAL ASCENDING map (5 tiers, climbing upward)
+# Level builder — redesigned to match level1_climb_map_v2.svg
 #
-# The map is tall (~2800px) and the player climbs from y=700 up to y=-1800.
-# Each section is a vertical tier ~600-700px taller (lower y = higher up).
+# SVG coordinate space: 680 wide × 980 tall.
+#   SVG y=900  → spawn (bottom)        → game world y ≈ 860
+#   SVG y=84   → exit platform (top)   → game world y ≈ -2540
+#
+# The SVG uses two columns (left ≈ x140–160, right ≈ x420–460).
+# In the game world we map those proportionally:
+#   SVG x / 680 * game_width  where game_width ≈ 640 (0–640 visible range)
+#
+# Vertical scale: (900 - 84) = 816 SVG units → (860 - (-2540)) = 3400 game units
+#   scale_y ≈ 3400 / 816 ≈ 4.17
+#
+# Conversion helpers (origin at SVG y=900 → game y=860):
+#   game_x = svg_x / 680 * 640
+#   game_y = 860 - (900 - svg_y) * 4.17
+#
+# Tier boundaries (game world y, approx):
+#   Tier 1  staircase intro      y  860 →  140
+#   Tier 2  glitch islands       y  140 → -740
+#   Tier 3  moving platforms     y -740 →-1490
+#   Tier 4  teleport + collapse  y-1490 →-2160
+#   Tier 5  summit gauntlet      y-2160 →-2620
+#   Exit door                    y      ≈-2640
 # ---------------------------------------------------------------------------
+
+# SVG → game coordinate helpers
+_SVG_W  = 680
+_SVG_H  = 980
+_GAME_W = 640        # usable horizontal game space (x 0..640)
+_SPAWN_SVG_Y = 900   # SVG y of spawn
+_SPAWN_GAME_Y = 860  # game y of spawn
+_SCALE_Y = 4.17      # vertical stretch factor
+
+def _gx(svg_x):
+    """Map SVG x to game x."""
+    return int(svg_x / _SVG_W * _GAME_W)
+
+def _gy(svg_y):
+    """Map SVG y to game y (higher SVG y = lower in game = larger y)."""
+    return int(_SPAWN_GAME_Y - (_SPAWN_SVG_Y - svg_y) * _SCALE_Y)
+
+def _pw(svg_w):
+    """Map SVG platform width to game width."""
+    return max(80, int(svg_w / _SVG_W * _GAME_W))
+
+# Standard platform height in game units
+_PH = 26
+
+
 def create_level_1():
+    """
+    Platform layout verified against physics:
+      JUMP_VELOCITY = -15, GRAVITY = 0.6
+      Max jump height = 187.5 px
+      All vertical gaps capped at 120 px (well within safe margin).
+      Bridge platforms inserted at every tier transition to fill gaps.
+    """
     plats, cps, mons, pws = [], [], [], []
 
-    # ── TIER 1 — Staircase intro (y 700 → 200) ──────────────────────────
+    # ══════════════════════════════════════════════════════════════════════
+    # TIER 1 — Staircase intro
+    # Stairs ascend left→right.  Each step is ~120 px above the last.
+    # step1 y lowered from _gy(844)=626 to 648 so gap from spawn (768) = 120.
+    # ══════════════════════════════════════════════════════════════════════
+
     # Wide spawn cloud
-    plats.append(Platform(100, 680, 260, 28, PLAT_CLOUD))
-    # Ascending stair steps — gentle gaps
-    plats.append(Platform(80,  580, 160, 28, PLAT_CLOUD))
-    plats.append(Platform(300, 490, 160, 28, PLAT_CLOUD))
-    plats.append(Platform(120, 400, 160, 28, PLAT_CLOUD))
-    plats.append(Platform(340, 310, 160, 28, PLAT_CLOUD))
-    plats.append(Platform(140, 220, 200, 28, PLAT_CLOUD))   # wide landing
+    plats.append(Platform(_gx(70),  768,        _pw(260), _PH + 2, PLAT_CLOUD))
+    # Step 1 — lowered to y=648 (gap from spawn = 120 ✓)
+    plats.append(Platform(_gx(100), 648,        _pw(100), _PH, PLAT_CLOUD))
+    # Step 2 — y=530  (gap 118 ✓)
+    plats.append(Platform(_gx(220), 530,        _pw(100), _PH, PLAT_CLOUD))
+    # Step 3 — y=409  (gap 121 ✓)
+    plats.append(Platform(_gx(340), 409,        _pw(100), _PH, PLAT_CLOUD))
+    # Wide landing + CP1 — y=301  (gap 108 ✓)
+    plats.append(Platform(_gx(460), 301,        _pw(110), _PH, PLAT_CLOUD))
 
     # Intro mushroom on spawn cloud
-    mons.append(MushroomMonster(160, 652, 110, 330, speed=1.0))
-    # Spiky patrol on mid step
-    mons.append(Monster(310, 282, 300, 460, speed=1.3, color=(255, 110, 90)))
+    mons.append(MushroomMonster(_gx(145), 768 - 28, _gx(90),  _gx(280), speed=1.0))
 
-    cps.append(Checkpoint(190, 220))                         # CP1 on wide landing
-    pws.append(Powerup(330, 280))                            # orb near CP1
+    # CP1 on top-right landing
+    cps.append(Checkpoint(_gx(475), 301))
 
-    # ── TIER 2 — Glitch zigzag (y 220 → -280) ───────────────────────────
-    plats.append(GlitchPlatform(380, 140, 130, 26, on_time=100, off_time=65, offset=0))
-    plats.append(GlitchPlatform(140,  50, 130, 26, on_time=90,  off_time=70, offset=35))
-    plats.append(GlitchPlatform(400, -60, 130, 26, on_time=85,  off_time=65, offset=20))
-    plats.append(Platform(      120,-170, 150, 26, PLAT_CLOUD))   # safe rest
-    plats.append(GlitchPlatform(380,-270, 130, 26, on_time=95,  off_time=60, offset=55))
-    plats.append(GlitchPlatform(120,-370, 130, 26, on_time=80,  off_time=70, offset=10))
-    plats.append(Platform(      350,-470, 180, 26, PLAT_CLOUD))   # wide landing
+    # ── Bridge T1 → T2 ────────────────────────────────────────────────
+    # landing y=301 → T2 safe_L y=84  gap=217 → 1 bridge at y=193 (gaps 108+109 ✓)
+    plats.append(Platform(_gx(260), 193, _pw(110), _PH, PLAT_CLOUD))
 
-    mons.append(FlyingMonster(260,  80, 100, 440, speed=1.0, amplitude=35, color=(110, 160, 255)))
-    mons.append(MushroomMonster(140, -198, 120, 240, speed=1.2))
-    mons.append(FlyingMonster(260, -310, 100, 450, speed=1.1, amplitude=30, color=(110, 160, 255)))
+    # ══════════════════════════════════════════════════════════════════════
+    # TIER 2 — Glitch islands (alternating left / right, 108 px apart)
+    # Path (bottom→top): safe_L(84)→gR2(-24)→gL2(-132)→safe_R(-240)→gL1(-349)→gR1(-457)
+    # CP2 on glitch_L2, powerup centre
+    # ══════════════════════════════════════════════════════════════════════
 
-    cps.append(Checkpoint(390, -470))                        # CP2
-    pws.append(Powerup(200, -420))
+    # Left safe rest — y=84   (gap from bridge 193 = 109 ✓)
+    plats.append(Platform(      _gx(140),  84,  _pw(140), _PH, PLAT_CLOUD))
+    # Right glitch — y=-24  (gap 108 ✓)
+    plats.append(GlitchPlatform(_gx(420), -24,  _pw(120), _PH, on_time=95,  off_time=60, offset=55))
+    # Left glitch (CP2) — y=-132  (gap 108 ✓)
+    plats.append(GlitchPlatform(_gx(140), -132, _pw(120), _PH, on_time=85,  off_time=65, offset=20))
+    # Right safe rest — y=-240  (gap 108 ✓)
+    plats.append(Platform(      _gx(420), -240, _pw(120), _PH, PLAT_CLOUD))
+    # Left glitch — y=-349  (gap 109 ✓)
+    plats.append(GlitchPlatform(_gx(140), -349, _pw(120), _PH, on_time=90,  off_time=70, offset=35))
+    # Right glitch — y=-457  (gap 108 ✓)
+    plats.append(GlitchPlatform(_gx(420), -457, _pw(120), _PH, on_time=100, off_time=65, offset=0))
 
-    # ── TIER 3 — Moving platform maze (y -470 → -970) ────────────────────
-    plats.append(MovingPlatform(120, -560, 320, -560, 130, 26, speed=1.3))   # H mover
-    plats.append(Platform(      400, -640,  150, 26, PLAT_CLOUD))
-    plats.append(MovingPlatform(120, -720, 120, -870, 130, 26, speed=1.0))   # V mover
-    plats.append(MovingPlatform(380, -760, 560, -760, 130, 26, speed=1.5))   # H mover
-    plats.append(Platform(      100, -870,  130, 26, PLAT_CLOUD))
-    plats.append(MovingPlatform(360, -920, 360,-1050, 130, 26, speed=0.9))   # V mover
-    plats.append(Platform(      100,-1030,  160, 26, PLAT_CLOUD))            # rest
-    plats.append(MovingPlatform(340,-1080, 540,-1080, 130, 26, speed=1.6))   # fast H
+    # Flying monster mid-tier
+    mons.append(FlyingMonster(_gx(310), -200, _gx(100), _gx(560), speed=1.1, amplitude=35, color=(85, 119, 238)))
+    # Mushroom on right safe rest
+    mons.append(MushroomMonster(_gx(435), -240 - 28, _gx(420), _gx(520), speed=1.2))
 
-    mons.append(Monster(410, -668, 400, 530, speed=1.4, color=(255, 110, 90)))
-    mons.append(MushroomMonster(115, -898, 100, 200, speed=1.5))
-    mons.append(FlyingMonster(330, -790, 100, 570, speed=1.2, amplitude=40, color=(110, 160, 255)))
+    # CP2 on left glitch at y=-132
+    cps.append(Checkpoint(_gx(160), -132))
+    # Powerup centre between columns
+    pws.append(Powerup(_gx(308), -290))
 
-    cps.append(Checkpoint(380, -1080))                       # CP3 (rides moving plat)
-    pws.append(Powerup(200, -1000))
+    # ── Bridge T2 → T3 ────────────────────────────────────────────────
+    # gR1 y=-457 → T3 safe_L2 y=-682  gap=225 → 1 bridge at y=-569 (gaps 112+113 ✓)
+    plats.append(Platform(_gx(260), -569, _pw(110), _PH, PLAT_CLOUD))
 
-    # ── TIER 4 — Teleport + collapsing chaos (y -1080 → -1680) ───────────
-    plats.append(TeleportPlatform(  100,-1160,  100,-1060, 120, 26, interval=140))
-    plats.append(CollapsingPlatform(360,-1240,  120, 26, delay=48))
-    plats.append(GlitchPlatform(    100,-1330,  120, 26, on_time=75, off_time=55, offset=0))
-    plats.append(TeleportPlatform(  360,-1410,  460,-1310, 120, 26, interval=120))
-    plats.append(CollapsingPlatform(100,-1500,  110, 26, delay=40))
-    plats.append(CollapsingPlatform(340,-1580,  110, 26, delay=38))
-    plats.append(Platform(          100,-1660,  150, 26, PLAT_CLOUD))        # safe island
-    plats.append(TeleportPlatform(  360,-1740,  360,-1640, 110, 26, interval=110))
-    plats.append(Platform(          100,-1820,  180, 28, PLAT_CLOUD))        # wide rest
+    # ══════════════════════════════════════════════════════════════════════
+    # TIER 3 — Moving platform maze
+    # Path: safe_L2(-682)→mRH(-791)→safe_L(-899)→mRV(-1008)→mLH(-1116)
+    # CP3 on right fast H-mover, powerup centre
+    # ══════════════════════════════════════════════════════════════════════
 
-    mons.append(FlyingMonster(230,-1180,  80, 470, speed=1.4, amplitude=45, color=(110, 160, 255)))
-    mons.append(MushroomMonster(110,-1688,  100, 220, speed=1.7))
-    mons.append(Monster(365,-1608,  340, 420, speed=1.5, color=(255, 110, 90)))
+    # Left safe rest 2 — y=-682  (gap from bridge -569 = 113 ✓)
+    plats.append(Platform(_gx(140), -682, _pw(130), _PH, PLAT_CLOUD))
+    # Right H-mover — y=-791  (gap 109 ✓) — CP3 here
+    plats.append(MovingPlatform(_gx(420), -791, _gx(560), -791, _pw(120), _PH, speed=1.6))
+    # Left safe rest — y=-899  (gap 108 ✓)
+    plats.append(Platform(      _gx(140), -899, _pw(110), _PH, PLAT_CLOUD))
+    # Right V-mover — y=-1008  (gap 109 ✓)
+    plats.append(MovingPlatform(_gx(420), -1008, _gx(420), -1086, _pw(120), _PH, speed=1.0))
+    # Left H-mover — y=-1116  (gap 108 ✓)
+    plats.append(MovingPlatform(_gx(140), -1116, _gx(320), -1116, _pw(120), _PH, speed=1.3))
 
-    cps.append(Checkpoint(150,-1820))                        # CP4
-    pws.append(Powerup(340,-1760))
+    # Mushroom on left safe rest
+    mons.append(MushroomMonster(_gx(148), -899 - 28, _gx(140), _gx(240), speed=1.4))
+    # Spiky patrol near right mover
+    mons.append(Monster(_gx(432), -791 - 26, _gx(420), _gx(530), speed=1.4, color=(255, 68, 51)))
 
-    # ── TIER 5 — Final gauntlet diagonal ascent (y -1820 → -2500) ────────
-    plats.append(GlitchPlatform(    380,-1900,  110, 26, on_time=70, off_time=55, offset=0))
-    plats.append(MovingPlatform(    120,-1980,  120,-2110, 110, 26, speed=1.4))
-    plats.append(CollapsingPlatform(380,-2060,  100, 26, delay=36))
-    plats.append(GlitchPlatform(    120,-2150,  100, 26, on_time=75, off_time=60, offset=25))
-    plats.append(TeleportPlatform(  380,-2220,  460,-2140, 110, 26, interval=100))
-    plats.append(MovingPlatform(    120,-2300,  300,-2300, 100, 26, speed=1.9))
-    plats.append(CollapsingPlatform(400,-2380,  100, 26, delay=30))
-    plats.append(GlitchPlatform(    120,-2460,  110, 26, on_time=80, off_time=45, offset=10))
-    plats.append(Platform(          330,-2540,  200, 30, PLAT_CLOUD))        # final platform
+    # CP3 on right H-mover
+    cps.append(Checkpoint(_gx(440), -791))
+    # Powerup centre
+    pws.append(Powerup(_gx(308), -950))
 
-    mons.append(FlyingMonster(250,-1930,  80, 480, speed=1.6, amplitude=50, color=(110, 160, 255)))
-    mons.append(MushroomMonster(345,-2568,  330, 500, speed=1.9))
-    mons.append(FlyingMonster(250,-2250,  80, 480, speed=1.5, amplitude=45, color=(110, 160, 255)))
-    mons.append(Monster(135,-2488,  120, 200, speed=1.6, color=(255, 110, 90)))
+    # ── Bridge T3 → T4 ────────────────────────────────────────────────
+    # mLH y=-1116 → T4 safe_L y=-1291  gap=175 → 1 bridge at y=-1203 (gaps 87+88 ✓)
+    plats.append(Platform(_gx(260), -1203, _pw(110), _PH, PLAT_CLOUD))
 
-    exit_door = ExitDoor(400, -2610)
+    # ══════════════════════════════════════════════════════════════════════
+    # TIER 4 — Teleport + collapse chaos
+    # Path: safe_L(-1291)→collR(-1391)→teleL(-1491)→gR(-1591)→collL(-1692)→teleR(-1792)
+    # CP4 on left safe rest, powerup centre
+    # ══════════════════════════════════════════════════════════════════════
+
+    # Left safe rest — y=-1291  (gap from bridge -1203 = 88 ✓)  CP4 here
+    plats.append(Platform(         _gx(150), -1291, _pw(130), _PH, PLAT_CLOUD))
+    # Right collapse — y=-1391  (gap 100 ✓)
+    plats.append(CollapsingPlatform(_gx(420), -1391, _pw(110), _PH, delay=40))
+    # Left teleport — y=-1491  (gap 100 ✓)
+    plats.append(TeleportPlatform(  _gx(140), -1491, _gx(240), -1400, _pw(110), _PH, interval=120))
+    # Right glitch — y=-1591  (gap 100 ✓)
+    plats.append(GlitchPlatform(    _gx(420), -1591, _pw(110), _PH, on_time=75, off_time=55, offset=0))
+    # Left collapse — y=-1692  (gap 101 ✓)
+    plats.append(CollapsingPlatform(_gx(140), -1692, _pw(110), _PH, delay=48))
+    # Right teleport — y=-1792  (gap 100 ✓)
+    plats.append(TeleportPlatform(  _gx(430), -1792, _gx(530), -1700, _pw(110), _PH, interval=140))
+
+    # Flying monster mid-tier
+    mons.append(FlyingMonster(_gx(308), -1540, _gx(80), _gx(560), speed=1.4, amplitude=45, color=(85, 119, 238)))
+    # Spiky patrol on right collapse
+    mons.append(Monster(_gx(432), -1391 - 26, _gx(420), _gx(520), speed=1.5, color=(255, 68, 51)))
+
+    # CP4 on left safe rest
+    cps.append(Checkpoint(_gx(165), -1291))
+    # Powerup centre
+    pws.append(Powerup(_gx(308), -1540))
+
+    # ── Bridge T4 → T5 ────────────────────────────────────────────────
+    # teleR y=-1792 → T5 teleL y=-2084  gap=292 → 2 bridges (gaps 97+97+98 ✓)
+    plats.append(Platform(_gx(160), -1889, _pw(110), _PH, PLAT_CLOUD))
+    plats.append(Platform(_gx(420), -1986, _pw(110), _PH, PLAT_CLOUD))
+
+    # ══════════════════════════════════════════════════════════════════════
+    # TIER 5 — Summit gauntlet (tight zigzag)
+    # Path: teleL(-2084)→mR(-2184)→collL(-2275)→gR(-2367)→bridge(-2454)→exit(-2542)
+    # CP5 on right glitch, powerup between platforms
+    # ══════════════════════════════════════════════════════════════════════
+
+    # Left teleport — y=-2084  (gap from bridge2 -1986 = 98 ✓)
+    plats.append(TeleportPlatform(  _gx(150), -2084, _gx(250), -2010, _pw(110), _PH, interval=100))
+    # Right fast mover — y=-2184  (gap 100 ✓)
+    plats.append(MovingPlatform(    _gx(420), -2184, _gx(540), -2184, _pw(110), _PH, speed=1.9))
+    # Left collapse — y=-2275  (gap 91 ✓)
+    plats.append(CollapsingPlatform(_gx(160), -2275, _pw(100), _PH, delay=38))
+    # Right glitch (CP5) — y=-2367  (gap 92 ✓)
+    plats.append(GlitchPlatform(    _gx(420), -2367, _pw(100), _PH, on_time=70, off_time=55, offset=0))
+
+    # ── Bridge T5 → exit ─────────────────────────────────────────────
+    # gR y=-2367 → exit y=-2542  gap=175 → 1 bridge at y=-2454 (gaps 87+88 ✓)
+    plats.append(Platform(_gx(255), -2454, _pw(110), _PH, PLAT_CLOUD))
+
+    # Exit-approach platform — y=-2542  (gap 88 ✓)
+    plats.append(Platform(_gx(255), -2542, _pw(130), _PH + 4, PLAT_CLOUD))
+
+    # Flying monster pair
+    mons.append(FlyingMonster(_gx(295), -2230, _gx(80), _gx(560), speed=1.6, amplitude=50, color=(85, 119, 238)))
+    mons.append(MushroomMonster(_gx(268), -2542 - 28, _gx(255), _gx(370), speed=1.9))
+
+    # CP5 on right glitch
+    cps.append(Checkpoint(_gx(435), -2367))
+    # Powerup between T5 platforms
+    pws.append(Powerup(_gx(308), -2320))
+
+    # ══════════════════════════════════════════════════════════════════════
+    # EXIT DOOR — above exit platform
+    # ══════════════════════════════════════════════════════════════════════
+    exit_door = ExitDoor(_gx(295), -2620)
+
     return plats, cps, mons, pws, exit_door
 
 
@@ -828,11 +955,11 @@ LEVELS = [create_level_1]
 # ---------------------------------------------------------------------------
 def make_bg_clouds():
     clouds = []
-    rng = random.Random(42)   # fixed seed — same clouds every run
+    rng = random.Random(42)
     for _ in range(80):
         clouds.append(BgCloud(
             rng.randint(-200, 800),
-            rng.randint(-2700, 800),
+            rng.randint(-3000, 900),
             rng.randint(28, 65),
             rng.uniform(0.05, 0.2),
         ))
@@ -875,7 +1002,10 @@ class Game:
     def load_level(self, index=0):
         (self.platforms, self.checkpoints, self.monsters,
          self.powerups, self.exit_door) = LEVELS[index % len(LEVELS)]()
-        self.player = Player(230, 644)        # start on spawn cloud
+        # Spawn player on the wide spawn cloud (left side, bottom)
+        spawn_x = _gx(100)
+        spawn_y = 768 - 40   # spawn platform top is y=768
+        self.player = Player(spawn_x, spawn_y)
         self.camera = Camera(SCREEN_WIDTH, SCREEN_HEIGHT)
         self.particles.clear(); self.rings.clear()
         self.flashes.clear(); self.score_popups.clear()
@@ -1063,17 +1193,36 @@ class Game:
         pygame.display.flip()
 
     def _draw_background(self):
-        # Sky gradient bands
-        for i in range(8):
-            t = i / 7
-            col = lerp_color(SKY_TOP, SKY_BOT, t)
-            pygame.draw.rect(self.screen, col, (0, i * SCREEN_HEIGHT // 8, SCREEN_WIDTH, SCREEN_HEIGHT // 8 + 2))
+        # Sky gradient — deep blue at top (high altitude), light blue at bottom (low)
+        # Match SVG palette: top #4A90C8 → bottom #D8EEF8
+        band_colors = [
+            (74,  144, 200),   # SVG #4A90C8  highest altitude
+            (114, 174, 221),   # SVG #72AEDD
+            (157, 203, 238),   # SVG #9DCBEE
+            (190, 224, 245),   # SVG #BEE0F5
+            (216, 238, 248),   # SVG #D8EEF8  lowest visible
+        ]
+        bands = len(band_colors)
+        for i, col in enumerate(band_colors):
+            pygame.draw.rect(self.screen, col,
+                             (0, i * SCREEN_HEIGHT // bands, SCREEN_WIDTH, SCREEN_HEIGHT // bands + 2))
 
-        # Sun fixed top-right
+        # Sun fixed top-right (near exit — matches SVG)
         pulse = abs(math.sin(self.tick * 0.03)) * 6
-        pygame.draw.circle(self.screen, SUN_ORANGE, (SCREEN_WIDTH - 110, 70), int(36 + pulse))
-        pygame.draw.circle(self.screen, SUN_YELLOW, (SCREEN_WIDTH - 110, 70), 28)
+        pygame.draw.circle(self.screen, SUN_ORANGE, (SCREEN_WIDTH - 110, 70), int(34 + pulse))
+        pygame.draw.circle(self.screen, SUN_YELLOW, (SCREEN_WIDTH - 110, 70), 22)
         pygame.draw.circle(self.screen, WHITE,      (SCREEN_WIDTH - 122, 58), 9)
+
+        # Stars (visible at high altitude — twinkle)
+        stars = [(80, 20), (160, 35), (260, 15), (380, 28), (450, 12)]
+        for sx, sy in stars:
+            brightness = int(140 + 115 * abs(math.sin(self.tick * 0.04 + sx * 0.1)))
+            # Only show when camera is high up (low offset_y means high altitude)
+            alt_ratio = max(0.0, min(1.0, -self.camera.offset_y / 2000))
+            if alt_ratio > 0.3:
+                alpha = int(brightness * (alt_ratio - 0.3) / 0.7)
+                star_col = (alpha, alpha, alpha)
+                pygame.draw.circle(self.screen, star_col, (sx, sy), 2)
 
         # Parallax background clouds
         for c in self.bg_clouds:
@@ -1109,14 +1258,15 @@ class Game:
         if self.player.kill_count > 0:
             self.screen.blit(self.small_font.render(f"Kills: {self.player.kill_count}", True, ORANGE), (SCREEN_WIDTH - 150, 30))
 
-        # Altitude bar (left side) — shows how high the player has climbed
-        max_alt = 2600   # world units from spawn to exit
-        alt = max(0, min(max_alt, 680 - self.player.rect.centery))
+        # Altitude bar (left side)
+        max_alt = 3400
+        alt = max(0, min(max_alt, _gy(900) - self.player.rect.centery))
         ratio = alt / max_alt
         bh = 200; bx = 12; by = SCREEN_HEIGHT // 2 - bh // 2
         pygame.draw.rect(self.screen, DARK_GRAY, (bx, by, 10, bh), 1)
         fill_h = int(bh * ratio)
-        pygame.draw.rect(self.screen, lerp_color(SKY_BOT, SUN_YELLOW, ratio), (bx, by + bh - fill_h, 10, fill_h))
+        pygame.draw.rect(self.screen, lerp_color(SKY_BOT, SUN_YELLOW, ratio),
+                         (bx, by + bh - fill_h, 10, fill_h))
         self.screen.blit(self.tiny_font.render("ALT", True, DARK_GRAY), (bx - 2, by - 14))
 
         if self.player.is_unreal:
@@ -1130,7 +1280,8 @@ class Game:
             self.screen.blit(self.tiny_font.render(f"UNREAL  {rem:.1f}s", True, WHITE), (bx2 + 4, by2 + 1))
             pygame.draw.rect(self.screen, rainbow_color(self.tick, 0.15), (bx2 - 2, by2 - 2, bw + 4, bh2 + 4), 2)
 
-        self.screen.blit(self.small_font.render("R-Respawn  ESC-Settings", True, CLOUD_SHADOW), (10, SCREEN_HEIGHT - 22))
+        self.screen.blit(self.small_font.render("R-Respawn  ESC-Settings", True, CLOUD_SHADOW),
+                         (10, SCREEN_HEIGHT - 22))
 
         if not self.player.alive:
             txt = self.font.render("Respawning...", True, RED)
@@ -1158,10 +1309,12 @@ class Game:
                 self.screen.blit(self.tiny_font.render(hint, True, (120, 140, 160)), (SCREEN_WIDTH//2 - 160, y + 20))
         bx = SCREEN_WIDTH//2 - 100; vy = 258
         pygame.draw.rect(self.screen, DARK_GRAY, (bx, vy, 200, 6))
-        pygame.draw.rect(self.screen, CYAN if not self.music_muted else RED, (bx, vy, int(200 * self.music_volume), 6))
+        pygame.draw.rect(self.screen, CYAN if not self.music_muted else RED,
+                         (bx, vy, int(200 * self.music_volume), 6))
         pygame.draw.rect(self.screen, WHITE, (bx, vy, 200, 6), 1)
         self.screen.blit(self.tiny_font.render("ESC to resume", True, (100,120,140)),
-                         self.tiny_font.render("ESC to resume", True, (100,120,140)).get_rect(center=(SCREEN_WIDTH//2, 480)))
+                         self.tiny_font.render("ESC to resume", True, (100,120,140)).get_rect(
+                             center=(SCREEN_WIDTH//2, 480)))
 
     def _draw_win(self):
         for i in range(8):
