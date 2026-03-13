@@ -5,8 +5,13 @@ from settings import *
 pygame.init()
 pygame.mixer.init()
 
+<<<<<<< HEAD
+from levels.level4 import run_level4
+from levels.level2 import run_level2
+=======
 from levels.level1 import launch_game as launch_level1
 from levels.level4 import launch_game as launch_level4
+>>>>>>> ab95bec6b20d39a44a1b653a761e3e1eb9395944
 
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Christmas Pixel Adventure")
@@ -157,7 +162,28 @@ while running:
                             running = False
 
                     elif state == "LEVEL_SELECT":
+<<<<<<< HEAD
+
+                        if selected_index == 0:
+                            current_level = "Level 1"
+                            state = "LEVEL_PREVIEW"
+
+                        elif selected_index == 1:
+                            run_level2(screen)                            
+
+                        elif selected_index == 2:
+                            current_level = "Level 3"
+                            state = "LEVEL_PREVIEW"
+
+                        elif selected_index == 3:
+                            run_level4(screen)
+
+                        elif selected_index == 4:
+                            state = "MENU"
+                            selected_index = 0
+=======
                         handle_level_select(selected_index)
+>>>>>>> ab95bec6b20d39a44a1b653a761e3e1eb9395944
 
             if event.key == pygame.K_ESCAPE:
                 state = "MENU"
@@ -179,7 +205,28 @@ while running:
                         elif i == 2:
                             running = False
                     elif state == "LEVEL_SELECT":
+<<<<<<< HEAD
+
+                        if i == 0:
+                            current_level = "Level 1"
+                            state = "LEVEL_PREVIEW"
+
+                        elif i == 1:
+                            run_level2(screen)                          
+
+                        elif i == 2:
+                            current_level = "Level 3"
+                            state = "LEVEL_PREVIEW"
+
+                        elif i == 3:
+                            run_level4(screen)
+
+                        elif i == 4:
+                            state = "MENU"
+                            selected_index = 0
+=======
                         handle_level_select(i)
+>>>>>>> ab95bec6b20d39a44a1b653a761e3e1eb9395944
 
     clock.tick(FPS)
 
