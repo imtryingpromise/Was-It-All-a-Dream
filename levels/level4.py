@@ -1191,13 +1191,15 @@ class Monster:
     WIDTH, HEIGHT = 26, 26
     def __init__(self, x,y,pl,pr,speed=1.5,color=None):
         self.rect=pygame.Rect(x,y,self.WIDTH,self.HEIGHT)
+        self.bx=float(x)
         self.pl,self.pr=pl,pr; self.speed=speed; self.dir=1
         self.color=color or SNOW_WHITE; self.alive=True; self.death_timer=0; self.bob=0
     def update(self):
         if not self.alive: self.death_timer-=1; return
-        self.rect.x+=int(self.speed*self.dir)
-        if self.rect.x>=self.pr: self.rect.x=self.pr; self.dir=-1
-        elif self.rect.x<=self.pl: self.rect.x=self.pl; self.dir=1
+        self.bx+=self.speed*self.dir
+        if self.bx>=self.pr: self.bx=float(self.pr); self.dir=-1
+        elif self.bx<=self.pl: self.bx=float(self.pl); self.dir=1
+        self.rect.x=int(self.bx)
         self.bob+=0.12
     def kill(self): self.alive=False; self.death_timer=1
     def check_collision(self, player):
@@ -1261,6 +1263,7 @@ class MushroomMonster:
     WIDTH, HEIGHT = 28, 28
     def __init__(self, x,y,pl,pr,speed=1.3):
         self.rect=pygame.Rect(x,y,self.WIDTH,self.HEIGHT)
+        self.bx=float(x)
         self.patrol_left=pl; self.patrol_right=pr; self.speed=speed; self.direction=1
         self.alive=True; self.death_timer=0; self.squish_timer=0; self.tick=0
     def update(self):
@@ -1269,9 +1272,10 @@ class MushroomMonster:
             self.squish_timer-=1
             if self.squish_timer<=0: self.alive=False; self.death_timer=1
             return
-        self.tick+=1; self.rect.x+=int(self.speed*self.direction)
-        if self.rect.x>=self.patrol_right: self.rect.x=self.patrol_right; self.direction=-1
-        elif self.rect.x<=self.patrol_left: self.rect.x=self.patrol_left; self.direction=1
+        self.tick+=1; self.bx+=self.speed*self.direction
+        if self.bx>=self.patrol_right: self.bx=float(self.patrol_right); self.direction=-1
+        elif self.bx<=self.patrol_left: self.bx=float(self.patrol_left); self.direction=1
+        self.rect.x=int(self.bx)
     def kill(self): self.alive=False; self.death_timer=1
     def stomp(self): self.squish_timer=12
     def check_collision(self, player):
@@ -1309,6 +1313,7 @@ class BombMonster:
     WIDTH, HEIGHT = 30, 30
     def __init__(self, x, y, pl, pr, speed=1.0, diff=None):
         self.rect = pygame.Rect(x, y, self.WIDTH, self.HEIGHT)
+        self.bx = float(x)
         self.patrol_left = pl; self.patrol_right = pr
         diff = diff or DIFFICULTY["hard"]
         self.base_speed = speed * diff["bomb_spd"]
@@ -1358,9 +1363,10 @@ class BombMonster:
                 self.state = "exploding"; self.explode_timer = 30
             return
         # Patrol - normal movement
-        self.rect.x += int(self.speed * self.direction)
-        if self.rect.x >= self.patrol_right: self.rect.x = self.patrol_right; self.direction = -1
-        elif self.rect.x <= self.patrol_left: self.rect.x = self.patrol_left; self.direction = 1
+        self.bx += self.speed * self.direction
+        if self.bx >= self.patrol_right: self.bx = float(self.patrol_right); self.direction = -1
+        elif self.bx <= self.patrol_left: self.bx = float(self.patrol_left); self.direction = 1
+        self.rect.x = int(self.bx)
 
     def start_ticking(self, player_x):
         if self.state == "patrol":
@@ -2381,6 +2387,232 @@ def create_level(diff_key="hard"):
 
     exit_door = ExitDoor(18920, 280)
     return plats, cps, mons, pws, exit_door, npcs, ornaments, icicles, heart_pickups, saw_blades, wind_zones, crumbling_bridges, pendulums, ice_geysers
+
+
+# ---------------------------------------------------------------------------
+# Standalone credits drawing — used by both Game class and main menu
+# ---------------------------------------------------------------------------
+_cr_fonts_cache = None
+
+def _get_cr_fonts():
+    global _cr_fonts_cache
+    if _cr_fonts_cache is None:
+        _cr_fonts_cache = {
+            "heading":    pygame.font.SysFont("consolas", 42, bold=True),
+            "subheading": pygame.font.SysFont("consolas", 30, bold=True),
+            "name":       pygame.font.SysFont("consolas", 36, bold=True),
+            "role":       pygame.font.SysFont("consolas", 16),
+            "body":       pygame.font.SysFont("consolas", 20),
+            "small":      pygame.font.SysFont("consolas", 14),
+            "big_title":  pygame.font.SysFont("consolas", 56, bold=True),
+            "subtitle":   pygame.font.SysFont("consolas", 18),
+        }
+    return _cr_fonts_cache
+
+# Credits colors
+_CR_HEADER    = (30, 30, 80)
+_CR_SUBHEADER = (50, 40, 90)
+_CR_WHITE     = (255, 255, 255)
+_CR_BODY      = (200, 200, 210)
+_CR_DIM       = (100, 100, 120)
+_CR_RED       = (180, 50, 50)
+_CR_GREEN     = (40, 160, 90)
+_CR_BLUE      = (60, 120, 180)
+_CR_PINK      = (180, 100, 150)
+_CR_GOLD      = (180, 140, 30)
+
+CREDITS_DATA = [
+    ("", "body", _CR_WHITE, 80),
+    ("WAS IT ALL A DREAM?", "big_title", _CR_HEADER, 10),
+    ("Imaging Assignment", "subtitle", _CR_DIM, 8),
+    ("A Frozen Realm  -  The Final Chapter", "body", _CR_BLUE, 6),
+    ("A Christmas-themed platformer adventure", "small", _CR_DIM, 30),
+    ("", "body", _CR_WHITE, 30),
+    ("The Team", "heading", _CR_HEADER, 12),
+    ("Muqeet", "name", _CR_RED, 2),
+    ("Developer  -  Level 4  -  The Final Realm", "role", _CR_DIM, 22),
+    ("Omar", "name", _CR_GREEN, 2),
+    ("Developer  -  Level 1  -  The First Realm", "role", _CR_DIM, 22),
+    ("John", "name", _CR_BLUE, 2),
+    ("Developer  -  Level 3  -  The Third Realm", "role", _CR_DIM, 22),
+    ("Danial", "name", _CR_PINK, 2),
+    ("Developer  -  Level 2  -  The Second Realm", "role", _CR_DIM, 22),
+    ("", "body", _CR_WHITE, 30),
+    ("Game Design", "subheading", _CR_SUBHEADER, 4),
+    ("Muqeet  /  Omar  /  John  /  Danial", "role", _CR_BODY, 14),
+    ("Art & Visuals", "subheading", _CR_SUBHEADER, 4),
+    ("Muqeet  /  Omar  /  John  /  Danial", "role", _CR_BODY, 14),
+    ("Music & Sound", "subheading", _CR_SUBHEADER, 4),
+    ("Muqeet  /  Omar  /  John  /  Danial", "role", _CR_BODY, 14),
+    ("Level Design", "subheading", _CR_SUBHEADER, 4),
+    ("Muqeet  /  Omar  /  John  /  Danial", "role", _CR_BODY, 14),
+    ("Story & Narrative", "subheading", _CR_SUBHEADER, 4),
+    ("Muqeet  /  Omar  /  John  /  Danial", "role", _CR_BODY, 14),
+    ("QA & Playtesting", "subheading", _CR_SUBHEADER, 4),
+    ("Muqeet  /  Omar  /  John  /  Danial", "role", _CR_BODY, 14),
+    ("", "body", _CR_WHITE, 30),
+    ("Music Credits", "heading", _CR_HEADER, 12),
+    ("\"Running Up That Hill\"", "body", _CR_WHITE, 2),
+    ("by Kate Bush", "role", _CR_DIM, 20),
+    ("\"Civilian\"", "body", _CR_WHITE, 2),
+    ("by Wye Oak", "role", _CR_DIM, 20),
+    ("\"City of Tears\"", "body", _CR_WHITE, 2),
+    ("from Hollow Knight  -  by Christopher Larkin", "role", _CR_DIM, 20),
+    ("", "body", _CR_WHITE, 30),
+    ("Built With", "heading", _CR_HEADER, 12),
+    ("Python 3  /  Pygame", "role", _CR_BODY, 4),
+    ("Pixel Art  /  Retro Sound Design", "role", _CR_BODY, 4),
+    ("Passion  /  Sleepless Nights  /  Coffee", "role", _CR_BODY, 14),
+    ("", "body", _CR_WHITE, 30),
+    ("Special Thanks", "heading", _CR_HEADER, 12),
+    ("Mary Ting", "body", _CR_WHITE, 2),
+    ("For the guidance and inspiration", "role", _CR_DIM, 20),
+    ("Our Classmates", "body", _CR_WHITE, 2),
+    ("For the feedback, support, and laughs", "role", _CR_DIM, 20),
+    ("The Pygame Community", "body", _CR_WHITE, 2),
+    ("For the tools that made this possible", "role", _CR_DIM, 20),
+    ("Every Playtester", "body", _CR_WHITE, 2),
+    ("Who found the bugs we missed", "role", _CR_DIM, 20),
+    ("Open-Source Creators", "body", _CR_WHITE, 2),
+    ("Whose sprites, fonts, and sounds", "role", _CR_DIM, 2),
+    ("brought this world to life", "role", _CR_DIM, 20),
+    ("Our Families", "body", _CR_WHITE, 2),
+    ("For putting up with us during crunch", "role", _CR_DIM, 20),
+    ("", "body", _CR_WHITE, 30),
+    ("A Note to the Player", "heading", _CR_HEADER, 12),
+    ("You braved the four realms.", "body", _CR_BLUE, 4),
+    ("You faced every monster, every trap,", "role", _CR_BODY, 2),
+    ("every impossible jump.", "role", _CR_BODY, 14),
+    ("You refused to give up.", "body", _CR_GREEN, 14),
+    ("The dream is over now.", "role", _CR_BODY, 2),
+    ("You can finally wake up.", "role", _CR_BODY, 14),
+    ("But we hope a little piece", "role", _CR_DIM, 2),
+    ("of this adventure stays with you.", "role", _CR_DIM, 14),
+    ("", "body", _CR_WHITE, 30),
+    ("Thank You for Playing", "heading", _CR_HEADER, 12),
+    ("This game was made with heart.", "body", _CR_BODY, 4),
+    ("We hope it made you smile.", "body", _CR_BODY, 14),
+    ("Every snowflake, every light, every pixel", "role", _CR_BLUE, 2),
+    ("was crafted in the spirit of Christmas.", "role", _CR_BLUE, 14),
+    ("", "body", _CR_WHITE, 120),
+    ("WAS IT ALL A DREAM?", "big_title", _CR_HEADER, 8),
+    ("Imaging Assignment  -  2026", "subtitle", _CR_DIM, 40),
+]
+
+def get_credits_max_scroll():
+    fonts = _get_cr_fonts()
+    total_h = SCREEN_HEIGHT + 50
+    for text, fkey, _, gap in CREDITS_DATA:
+        f = fonts.get(fkey, fonts["role"])
+        fh = f.get_height() if text else 0
+        total_h += fh + gap
+    end_title_fh = fonts["big_title"].get_height()
+    end_sub_fh = fonts["subtitle"].get_height()
+    end_block = end_title_fh + 8 + end_sub_fh + 40
+    return total_h - SCREEN_HEIGHT // 2 - end_block // 2
+
+def draw_credits_screen(surface, scroll, tick, max_scroll=None):
+    """Draw the full credits sequence onto `surface`. Called by Game and main menu."""
+    fonts = _get_cr_fonts()
+    if max_scroll is None:
+        max_scroll = get_credits_max_scroll()
+    cx = SCREEN_WIDTH // 2
+    progress = min(1.0, scroll / max(1, max_scroll))
+
+    night_top = (5, 5, 20); night_bot = (10, 10, 35)
+    dawn_top = (40, 20, 60); dawn_bot = (80, 40, 70)
+    sunrise_top = (255, 140, 50); sunrise_bot = (255, 200, 100)
+
+    def lerp_c(c1, c2, t):
+        return tuple(int(c1[i] + (c2[i] - c1[i]) * t) for i in range(3))
+
+    if progress < 0.5:
+        t = progress * 2
+        top_c = lerp_c(night_top, dawn_top, t)
+        bot_c = lerp_c(night_bot, dawn_bot, t)
+    else:
+        t = (progress - 0.5) * 2
+        top_c = lerp_c(dawn_top, sunrise_top, t)
+        bot_c = lerp_c(dawn_bot, sunrise_bot, t)
+
+    for row in range(SCREEN_HEIGHT):
+        rt = row / SCREEN_HEIGHT
+        c = lerp_c(top_c, bot_c, rt)
+        pygame.draw.line(surface, c, (0, row), (SCREEN_WIDTH, row))
+
+    if progress > 0.4:
+        sun_t = min(1.0, (progress - 0.4) / 0.6)
+        sun_y = int(SCREEN_HEIGHT - sun_t * 200)
+        sun_x = SCREEN_WIDTH - 200
+        sun_r = int(40 + sun_t * 40)
+        for gr in range(sun_r + 60, sun_r, -4):
+            ga = int(30 * sun_t * (1 - (gr - sun_r) / 60))
+            glow_c = (min(255, 255), min(255, 180 + ga), min(255, 50 + ga))
+            pygame.draw.circle(surface, glow_c, (sun_x, sun_y), gr)
+        pygame.draw.circle(surface, (255, 230, 120), (sun_x, sun_y), sun_r)
+
+    # Scrolling text
+    y = SCREEN_HEIGHT + 50 - scroll
+    for text, fkey, color, gap in CREDITS_DATA:
+        f = fonts.get(fkey, fonts["role"])
+        fh = f.get_height() if text else 0
+        if text and -fh < y < SCREEN_HEIGHT + fh:
+            alpha = 1.0
+            if y < 90: alpha = max(0, y / 90)
+            if y > SCREEN_HEIGHT - 90: alpha = max(0, (SCREEN_HEIGHT - y) / 90)
+            if alpha > 0:
+                c = tuple(max(0, min(255, int(v * alpha))) for v in color)
+                surf = f.render(text, True, c)
+                rect = surf.get_rect(center=(cx, int(y)))
+                shadow_c = tuple(max(0, int(v * 0.25 * alpha)) for v in color)
+                shadow = f.render(text, True, shadow_c)
+                surface.blit(shadow, shadow.get_rect(center=(cx + 2, int(y) + 2)))
+                surface.blit(surf, rect)
+        y += fh + gap
+
+    # Christmas lights top
+    lcs = [_CR_RED, _CR_GREEN, _CR_GOLD, _CR_BLUE, _CR_PINK]
+    wire_y = 12
+    for lx in range(20, SCREEN_WIDTH - 20, 20):
+        li = lx // 20
+        lc = lcs[li % len(lcs)]
+        pulse = abs(math.sin(tick * 0.04 + li * 0.7))
+        if pulse > 0.2:
+            br = 0.5 + 0.5 * pulse
+            bc = tuple(min(255, int(c * br)) for c in lc)
+            pygame.draw.circle(surface, bc, (lx, wire_y), 4)
+            pygame.draw.circle(surface, tuple(min(255, c + 60) for c in bc), (lx, wire_y), 2)
+        if lx > 20:
+            sag = int(2 * math.sin((lx - 20) * 0.15))
+            pygame.draw.line(surface, (40, 55, 40), (lx - 20, wire_y + sag), (lx, wire_y), 1)
+
+    # Christmas lights bottom
+    bot_y = SCREEN_HEIGHT - 12
+    for lx in range(20, SCREEN_WIDTH - 20, 20):
+        li = lx // 20 + 3
+        lc = lcs[li % len(lcs)]
+        pulse = abs(math.sin(tick * 0.04 + li * 0.7 + 1.5))
+        if pulse > 0.2:
+            br = 0.5 + 0.5 * pulse
+            bc = tuple(min(255, int(c * br)) for c in lc)
+            pygame.draw.circle(surface, bc, (lx, bot_y), 4)
+            pygame.draw.circle(surface, tuple(min(255, c + 60) for c in bc), (lx, bot_y), 2)
+        if lx > 20:
+            sag = int(2 * math.sin((lx - 20) * 0.15))
+            pygame.draw.line(surface, (40, 55, 40), (lx - 20, bot_y - sag), (lx, bot_y), 1)
+
+    # Exit hint
+    is_stopped = scroll >= max_scroll
+    if is_stopped:
+        pulse = abs(math.sin(tick * 0.05)) * 0.5 + 0.5
+        hint_c = tuple(int(v * (0.6 + 0.4 * pulse)) for v in _CR_HEADER)
+        hint = fonts["body"].render("Press ENTER or ESC to return to menu", True, hint_c)
+        surface.blit(hint, hint.get_rect(center=(cx, SCREEN_HEIGHT - 32)))
+    else:
+        skip_alpha = abs(math.sin(tick * 0.04)) * 0.3 + 0.2
+        skip_c = tuple(int(v * skip_alpha) for v in (80, 80, 100))
+        skip = fonts["small"].render("Press ENTER or ESC to skip", True, skip_c)
+        surface.blit(skip, skip.get_rect(center=(cx, SCREEN_HEIGHT - 32)))
 
 
 # ---------------------------------------------------------------------------
@@ -4377,273 +4609,18 @@ class Game:
         self._credits_music_delay = 180  # 3 seconds of silence before credits music
 
     def _draw_credits(self):
-        scroll = self.credits_scroll
-        cx = SCREEN_WIDTH // 2
-
-        # ── Background: night → sunrise transition based on scroll progress ──
-        # progress goes 0.0 (start/night) → 1.0 (end/sunrise)
-        if not hasattr(self, '_cr_max_est'):
-            self._cr_max_est = 3500  # rough estimate, updated below
-        progress = min(1.0, scroll / max(1, self._cr_max_est))
-
-        # Sky colors: dark night → deep blue → purple dawn → orange sunrise
-        night_top = (5, 5, 20)
-        night_bot = (10, 10, 35)
-        dawn_top = (40, 20, 60)
-        dawn_bot = (80, 40, 70)
-        sunrise_top = (255, 140, 50)
-        sunrise_bot = (255, 200, 100)
-
-        def lerp_c(c1, c2, t):
-            return tuple(int(c1[i] + (c2[i] - c1[i]) * t) for i in range(3))
-
-        if progress < 0.5:
-            t = progress * 2  # 0→1 over first half
-            top_c = lerp_c(night_top, dawn_top, t)
-            bot_c = lerp_c(night_bot, dawn_bot, t)
-        else:
-            t = (progress - 0.5) * 2  # 0→1 over second half
-            top_c = lerp_c(dawn_top, sunrise_top, t)
-            bot_c = lerp_c(dawn_bot, sunrise_bot, t)
-
-        # Draw gradient sky
-        for row in range(SCREEN_HEIGHT):
-            rt = row / SCREEN_HEIGHT
-            c = lerp_c(top_c, bot_c, rt)
-            pygame.draw.line(self.screen, c, (0, row), (SCREEN_WIDTH, row))
-
-        # Sun rising at bottom-right as we approach sunrise
-        if progress > 0.4:
-            sun_t = min(1.0, (progress - 0.4) / 0.6)
-            sun_y = int(SCREEN_HEIGHT - sun_t * 200)
-            sun_x = SCREEN_WIDTH - 200
-            sun_r = int(40 + sun_t * 40)
-            # Glow
-            for gr in range(sun_r + 60, sun_r, -4):
-                ga = int(30 * sun_t * (1 - (gr - sun_r) / 60))
-                glow_c = (min(255, 255), min(255, 180 + ga), min(255, 50 + ga))
-                pygame.draw.circle(self.screen, glow_c, (sun_x, sun_y), gr)
-            pygame.draw.circle(self.screen, (255, 230, 120), (sun_x, sun_y), sun_r)
-
         # Stars fade out as sunrise comes
+        progress = min(1.0, self.credits_scroll / max(1, self.credits_max_scroll))
         star_alpha = max(0, 1.0 - progress * 1.5)
+
+        # Draw shared credits (background, text, lights, hints)
+        self.credits_max_scroll = get_credits_max_scroll()
+        draw_credits_screen(self.screen, self.credits_scroll, self.tick, self.credits_max_scroll)
+
+        # Level4-specific overlays: stars and snow on top
         if star_alpha > 0.05:
             for star in self.bg_stars: star.draw(self.screen, self.tick)
-
-        # Snow keeps falling always
         for sf in self.snowflakes: sf.draw(self.screen)
-
-        # Colors — dark/night tones for headers so they read well over sunrise
-        HEADER = (30, 30, 80)         # deep indigo for section headers
-        SUBHEADER = (50, 40, 90)      # slightly lighter indigo
-        NAME_WHITE = (255, 255, 255)
-        BODY = (200, 200, 210)
-        DIM = (100, 100, 120)
-        WARM_RED = (180, 50, 50)
-        WARM_GREEN = (40, 160, 90)
-        ICE_BLUE = (60, 120, 180)
-        SOFT_PINK = (180, 100, 150)
-        GOLD = (180, 140, 30)
-        DARK_GOLD = (120, 90, 20)
-
-        # Build bold fonts for credits (cached)
-        if not hasattr(self, '_cr_fonts'):
-            self._cr_fonts = {
-                "heading": pygame.font.SysFont("consolas", 42, bold=True),
-                "subheading": pygame.font.SysFont("consolas", 30, bold=True),
-                "name": pygame.font.SysFont("consolas", 36, bold=True),
-                "role": pygame.font.SysFont("consolas", 16),
-                "body": pygame.font.SysFont("consolas", 20),
-                "small": pygame.font.SysFont("consolas", 14),
-                "big_title": pygame.font.SysFont("consolas", 56, bold=True),
-                "subtitle": pygame.font.SysFont("consolas", 18),
-            }
-        fonts = self._cr_fonts
-
-        # (text, font_key, color, gap_after)
-        # Consistent spacing: heading=12 after, name=4 role, role=14 after, section gap=30
-        credits = [
-            ("", "body", NAME_WHITE, 80),
-
-            # ── Game Title ──
-            ("WAS IT ALL A DREAM?", "big_title", HEADER, 10),
-            ("Imaging Assignment", "subtitle", DIM, 8),
-            ("A Frozen Realm  -  The Final Chapter", "body", ICE_BLUE, 6),
-            ("A Christmas-themed platformer adventure", "small", DIM, 30),
-
-            ("", "body", NAME_WHITE, 30),
-
-            # ── The Team ──
-            ("The Team", "heading", HEADER, 12),
-            ("Muqeet", "name", WARM_RED, 2),
-            ("Developer  -  Level 4  -  The Final Realm", "role", DIM, 22),
-            ("Omar", "name", WARM_GREEN, 2),
-            ("Developer  -  Level 1  -  The First Realm", "role", DIM, 22),
-            ("John", "name", ICE_BLUE, 2),
-            ("Developer  -  Level 3  -  The Third Realm", "role", DIM, 22),
-            ("Danial", "name", SOFT_PINK, 2),
-            ("Developer  -  Level 2  -  The Second Realm", "role", DIM, 22),
-
-            ("", "body", NAME_WHITE, 30),
-
-            # ── Roles ──
-            ("Game Design", "subheading", SUBHEADER, 4),
-            ("Muqeet  /  Omar  /  John  /  Danial", "role", BODY, 14),
-            ("Art & Visuals", "subheading", SUBHEADER, 4),
-            ("Muqeet  /  Omar  /  John  /  Danial", "role", BODY, 14),
-            ("Music & Sound", "subheading", SUBHEADER, 4),
-            ("Muqeet  /  Omar  /  John  /  Danial", "role", BODY, 14),
-            ("Level Design", "subheading", SUBHEADER, 4),
-            ("Muqeet  /  Omar  /  John  /  Danial", "role", BODY, 14),
-            ("Story & Narrative", "subheading", SUBHEADER, 4),
-            ("Muqeet  /  Omar  /  John  /  Danial", "role", BODY, 14),
-            ("QA & Playtesting", "subheading", SUBHEADER, 4),
-            ("Muqeet  /  Omar  /  John  /  Danial", "role", BODY, 14),
-
-            ("", "body", NAME_WHITE, 30),
-
-            # ── Music Credits ──
-            ("Music Credits", "heading", HEADER, 12),
-            ("\"Running Up That Hill\"", "body", NAME_WHITE, 2),
-            ("by Kate Bush", "role", DIM, 20),
-            ("\"Civilian\"", "body", NAME_WHITE, 2),
-            ("by Wye Oak", "role", DIM, 20),
-            ("\"City of Tears\"", "body", NAME_WHITE, 2),
-            ("from Hollow Knight  -  by Christopher Larkin", "role", DIM, 20),
-
-            ("", "body", NAME_WHITE, 30),
-
-            # ── Built With ──
-            ("Built With", "heading", HEADER, 12),
-            ("Python 3  /  Pygame", "role", BODY, 4),
-            ("Pixel Art  /  Retro Sound Design", "role", BODY, 4),
-            ("Passion  /  Sleepless Nights  /  Coffee", "role", BODY, 14),
-
-            ("", "body", NAME_WHITE, 30),
-
-            # ── Special Thanks ──
-            ("Special Thanks", "heading", HEADER, 12),
-            ("Mary Ting", "body", NAME_WHITE, 2),
-            ("For the guidance and inspiration", "role", DIM, 20),
-            ("Our Classmates", "body", NAME_WHITE, 2),
-            ("For the feedback, support, and laughs", "role", DIM, 20),
-            ("The Pygame Community", "body", NAME_WHITE, 2),
-            ("For the tools that made this possible", "role", DIM, 20),
-            ("Every Playtester", "body", NAME_WHITE, 2),
-            ("Who found the bugs we missed", "role", DIM, 20),
-            ("Open-Source Creators", "body", NAME_WHITE, 2),
-            ("Whose sprites, fonts, and sounds", "role", DIM, 2),
-            ("brought this world to life", "role", DIM, 20),
-            ("Our Families", "body", NAME_WHITE, 2),
-            ("For putting up with us during crunch", "role", DIM, 20),
-
-            ("", "body", NAME_WHITE, 30),
-
-            # ── A Note to the Player ──
-            ("A Note to the Player", "heading", HEADER, 12),
-            ("You braved the four realms.", "body", ICE_BLUE, 4),
-            ("You faced every monster, every trap,", "role", BODY, 2),
-            ("every impossible jump.", "role", BODY, 14),
-            ("You refused to give up.", "body", WARM_GREEN, 14),
-            ("The dream is over now.", "role", BODY, 2),
-            ("You can finally wake up.", "role", BODY, 14),
-            ("But we hope a little piece", "role", DIM, 2),
-            ("of this adventure stays with you.", "role", DIM, 14),
-
-            ("", "body", NAME_WHITE, 30),
-
-            # ── Final ──
-            ("Thank You for Playing", "heading", HEADER, 12),
-            ("This game was made with heart.", "body", BODY, 4),
-            ("We hope it made you smile.", "body", BODY, 14),
-            ("Every snowflake, every light, every pixel", "role", ICE_BLUE, 2),
-            ("was crafted in the spirit of Christmas.", "role", ICE_BLUE, 14),
-
-            ("", "body", NAME_WHITE, 120),
-
-            # ── End Title ──
-            ("WAS IT ALL A DREAM?", "big_title", HEADER, 8),
-            ("Imaging Assignment  -  2026", "subtitle", DIM, 40),
-        ]
-
-        # Calculate total height including font heights
-        total_h = SCREEN_HEIGHT + 50
-        for text, fkey, _, gap in credits:
-            f = fonts.get(fkey, fonts["role"])
-            fh = f.get_height() if text else 0
-            total_h += fh + gap
-        # Stop scroll so the end title ("THE ENDLESS DREAM") is centered on screen
-        # The last two entries are the end title + subtitle
-        end_title_fh = fonts["big_title"].get_height()
-        end_sub_fh = fonts["subtitle"].get_height()
-        end_block = end_title_fh + 8 + end_sub_fh + 40  # gaps from credits list
-        self.credits_max_scroll = total_h - SCREEN_HEIGHT // 2 - end_block // 2
-        self._cr_max_est = self.credits_max_scroll
-
-        # ── Draw scrolling credits ──
-        # Gap = space AFTER the line (font height is added automatically)
-        y = SCREEN_HEIGHT + 50 - scroll
-        for text, fkey, color, gap in credits:
-            f = fonts.get(fkey, fonts["role"])
-            fh = f.get_height() if text else 0
-            if text and -fh < y < SCREEN_HEIGHT + fh:
-                alpha = 1.0
-                if y < 90: alpha = max(0, y / 90)
-                if y > SCREEN_HEIGHT - 90: alpha = max(0, (SCREEN_HEIGHT - y) / 90)
-                if alpha > 0:
-                    c = tuple(max(0, min(255, int(v * alpha))) for v in color)
-                    surf = f.render(text, True, c)
-                    rect = surf.get_rect(center=(cx, int(y)))
-                    shadow_c = tuple(max(0, int(v * 0.25 * alpha)) for v in color)
-                    shadow = f.render(text, True, shadow_c)
-                    self.screen.blit(shadow, shadow.get_rect(center=(cx + 2, int(y) + 2)))
-                    self.screen.blit(surf, rect)
-            y += fh + gap
-
-        # Christmas lights at top
-        wire_y = 12
-        for lx in range(20, SCREEN_WIDTH - 20, 20):
-            li = lx // 20
-            lcs = [WARM_RED, WARM_GREEN, GOLD, ICE_BLUE, SOFT_PINK]
-            lc = lcs[li % len(lcs)]
-            pulse = abs(math.sin(self.tick * 0.04 + li * 0.7))
-            if pulse > 0.2:
-                br = 0.5 + 0.5 * pulse
-                bc = tuple(min(255, int(c * br)) for c in lc)
-                pygame.draw.circle(self.screen, bc, (lx, wire_y), 4)
-                pygame.draw.circle(self.screen, tuple(min(255, c + 60) for c in bc), (lx, wire_y), 2)
-            if lx > 20:
-                sag = int(2 * math.sin((lx - 20) * 0.15))
-                pygame.draw.line(self.screen, (40, 55, 40), (lx - 20, wire_y + sag), (lx, wire_y), 1)
-
-        # Christmas lights at bottom
-        bot_y = SCREEN_HEIGHT - 12
-        for lx in range(20, SCREEN_WIDTH - 20, 20):
-            li = lx // 20 + 3
-            lcs = [WARM_RED, WARM_GREEN, GOLD, ICE_BLUE, SOFT_PINK]
-            lc = lcs[li % len(lcs)]
-            pulse = abs(math.sin(self.tick * 0.04 + li * 0.7 + 1.5))
-            if pulse > 0.2:
-                br = 0.5 + 0.5 * pulse
-                bc = tuple(min(255, int(c * br)) for c in lc)
-                pygame.draw.circle(self.screen, bc, (lx, bot_y), 4)
-                pygame.draw.circle(self.screen, tuple(min(255, c + 60) for c in bc), (lx, bot_y), 2)
-            if lx > 20:
-                sag = int(2 * math.sin((lx - 20) * 0.15))
-                pygame.draw.line(self.screen, (40, 55, 40), (lx - 20, bot_y - sag), (lx, bot_y), 1)
-
-        # Exit hint
-        is_stopped = self.credits_scroll >= self.credits_max_scroll
-        if is_stopped:
-            pulse = abs(math.sin(self.tick * 0.05)) * 0.5 + 0.5
-            hint_c = tuple(int(v * (0.6 + 0.4 * pulse)) for v in HEADER)
-            hint = fonts["body"].render("Press ENTER or ESC to return to menu", True, hint_c)
-            self.screen.blit(hint, hint.get_rect(center=(cx, SCREEN_HEIGHT - 32)))
-        else:
-            skip_alpha = abs(math.sin(self.tick * 0.04)) * 0.3 + 0.2
-            skip_c = tuple(int(v * skip_alpha) for v in (80, 80, 100))
-            skip = fonts["small"].render("Press ENTER or ESC to skip", True, skip_c)
-            self.screen.blit(skip, skip.get_rect(center=(cx, SCREEN_HEIGHT - 32)))
 
     def _draw_win(self):
         self._draw_background()
