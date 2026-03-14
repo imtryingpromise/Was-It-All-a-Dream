@@ -2,7 +2,7 @@ import pygame
 import sys
 from settings import *
 
-pygame.mixer.pre_init(44100, -16, 2, 512)  # small buffer = low latency sounds
+pygame.mixer.pre_init(44100, -16, 2, 512) 
 pygame.init()
 
 from levels.level1 import launch_game as launch_level1
