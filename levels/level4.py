@@ -2570,37 +2570,6 @@ def draw_credits_screen(surface, scroll, tick, max_scroll=None):
                 surface.blit(surf, rect)
         y += fh + gap
 
-    # Christmas lights top
-    lcs = [_CR_RED, _CR_GREEN, _CR_GOLD, _CR_BLUE, _CR_PINK]
-    wire_y = 12
-    for lx in range(20, SCREEN_WIDTH - 20, 20):
-        li = lx // 20
-        lc = lcs[li % len(lcs)]
-        pulse = abs(math.sin(tick * 0.04 + li * 0.7))
-        if pulse > 0.2:
-            br = 0.5 + 0.5 * pulse
-            bc = tuple(min(255, int(c * br)) for c in lc)
-            pygame.draw.circle(surface, bc, (lx, wire_y), 4)
-            pygame.draw.circle(surface, tuple(min(255, c + 60) for c in bc), (lx, wire_y), 2)
-        if lx > 20:
-            sag = int(2 * math.sin((lx - 20) * 0.15))
-            pygame.draw.line(surface, (40, 55, 40), (lx - 20, wire_y + sag), (lx, wire_y), 1)
-
-    # Christmas lights bottom
-    bot_y = SCREEN_HEIGHT - 12
-    for lx in range(20, SCREEN_WIDTH - 20, 20):
-        li = lx // 20 + 3
-        lc = lcs[li % len(lcs)]
-        pulse = abs(math.sin(tick * 0.04 + li * 0.7 + 1.5))
-        if pulse > 0.2:
-            br = 0.5 + 0.5 * pulse
-            bc = tuple(min(255, int(c * br)) for c in lc)
-            pygame.draw.circle(surface, bc, (lx, bot_y), 4)
-            pygame.draw.circle(surface, tuple(min(255, c + 60) for c in bc), (lx, bot_y), 2)
-        if lx > 20:
-            sag = int(2 * math.sin((lx - 20) * 0.15))
-            pygame.draw.line(surface, (40, 55, 40), (lx - 20, bot_y - sag), (lx, bot_y), 1)
-
     # Exit hint
     is_stopped = scroll >= max_scroll
     if is_stopped:
@@ -2772,24 +2741,24 @@ class Game:
                 if self.dialogue_box: self.dialogue_box.update()
                 for sf in self.snowflakes: sf.update()
                 self.tick += 1; self.ending_npc_timer += 1
-                # Slide Elder Frost in from left
-                if self.ending_npc_x < self.ending_npc_target_x:
-                    self.ending_npc_x += (self.ending_npc_target_x - self.ending_npc_x) * 0.06 + 1
                 # Determine current speaker for NPC visibility
                 if self.dialogue_box and self.dialogue_box.active:
                     spk = self.dialogue_box.dialogues[self.dialogue_box.index][0]
+                    di = self.dialogue_box.index
+                    total = len(self.dialogue_box.dialogues)
+                    # Slide NPCs in when they first speak — they stay visible
+                    if "Elder Frost" in spk and self.ending_npc_x < self.ending_npc_target_x:
+                        self.ending_npc_x += (self.ending_npc_target_x - self.ending_npc_x) * 0.06 + 1
                     if "Holly" in spk and self.ending_holly_x > SCREEN_WIDTH - 160:
                         self.ending_holly_x -= 4
                     if "Jingle" in spk and self.ending_jingle_x > SCREEN_WIDTH - 100:
                         self.ending_jingle_x -= 4
-                    # Narrator lines: NPCs fade out (slide away)
-                    if spk == "":
+                    # Only fade out NPCs during the final farewell lines (last 6)
+                    if spk == "" and di >= total - 6:
                         self.ending_npc_x -= 1.5
                         self.ending_holly_x += 1.5
                         self.ending_jingle_x += 1.5
                     # Golden sparkles during final narrator lines
-                    di = self.dialogue_box.index
-                    total = len(self.dialogue_box.dialogues)
                     if spk == "" and di >= total - 6 and self.tick % 4 == 0:
                         self.ending_sparkles.append([
                             random.randint(100, SCREEN_WIDTH - 100),
