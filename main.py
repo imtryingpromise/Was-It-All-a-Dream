@@ -41,10 +41,13 @@ level_options = ["Level 1", "Level 2", "Level 3", "Level 4", "Back"]
 selected_index = 0
 current_level  = ""
 tick = 0
+_last_mouse_pos = (0, 0)  # track mouse movement for hover detection
 
 # --- Settings state ---
 settings_cursor = 0
 settings_items = ["Volume", "Mute", "Back"]
+_settings_boxes = []
+_settings_vol_slider = pygame.Rect(0, 0, 0, 0)
 
 # --- Credits state ---
 credits_scroll = 0.0
@@ -73,18 +76,22 @@ def draw_text(text, font, color, x, y):
 
 
 def draw_menu(options, selected):
+    global _last_mouse_pos
     boxes = []
     button_width  = 420
     button_height = 60
     spacing       = 75
     start_y       = 260
 
+    mouse_pos = pygame.mouse.get_pos()
+    mouse_moved = mouse_pos != _last_mouse_pos
+    _last_mouse_pos = mouse_pos
+
     for i, option in enumerate(options):
         rect = pygame.Rect(0, 0, button_width, button_height)
         rect.center = (SCREEN_WIDTH // 2, start_y + i * spacing)
 
-        mouse_pos = pygame.mouse.get_pos()
-        if rect.collidepoint(mouse_pos):
+        if mouse_moved and rect.collidepoint(mouse_pos):
             selected = i
 
         if i == selected:
@@ -106,7 +113,8 @@ def draw_menu(options, selected):
 
 
 def draw_settings():
-    global tick
+    global tick, _settings_boxes, settings_cursor, _settings_vol_slider
+    _settings_boxes = []
     # Dark overlay
     overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
     overlay.fill((15, 15, 25, 210))
@@ -143,12 +151,18 @@ def draw_settings():
     bar_w = 420
     bar_h = 44
 
+    mouse_pos = pygame.mouse.get_pos()
+    mouse_moved = mouse_pos != _last_mouse_pos
+
     for i, item in enumerate(items_text):
         y = start_y + i * spacing
-        sel = (i == settings_cursor)
         bar_x = SCREEN_WIDTH // 2 - bar_w // 2
         bar = pygame.Rect(bar_x, y, bar_w, bar_h)
+        if mouse_moved and bar.collidepoint(mouse_pos):
+            settings_cursor = i
+        sel = (i == settings_cursor)
 
+        _settings_boxes.append(bar)
         bar_surf = pygame.Surface((bar_w, bar_h), pygame.SRCALPHA)
         if sel:
             pygame.draw.rect(bar_surf, (50, 45, 30, 180), (0, 0, bar_w, bar_h), border_radius=8)
@@ -189,6 +203,7 @@ def draw_settings():
     vbar_y = start_y + bar_h + 4
     vbar_w = 300
     vbar_h2 = 10
+    _settings_vol_slider = pygame.Rect(vbar_x, vbar_y - 6, vbar_w, vbar_h2 + 12)
     pygame.draw.rect(screen, (40, 40, 55), (vbar_x - 2, vbar_y - 2, vbar_w + 4, vbar_h2 + 4), border_radius=5)
     vol_w = int(vbar_w * music_volume)
     for px in range(vol_w):
@@ -358,25 +373,42 @@ while running:
 
         if event.type == pygame.MOUSEBUTTONDOWN:
             mouse_pos = pygame.mouse.get_pos()
-            for i, rect in enumerate(boxes):
-                if rect.collidepoint(mouse_pos):
-                    selected_index = i
-                    if state == "MENU":
-                        if i == 0:
-                            launch_level1()
-                            restore_menu_music()
-                        elif i == 1:
-                            state = "LEVEL_SELECT"
-                            selected_index = 0
-                        elif i == 2:
-                            state = "SETTINGS"
-                            settings_cursor = 0
-                        elif i == 3:
-                            enter_credits()
-                        elif i == 4:
-                            running = False
-                    elif state == "LEVEL_SELECT":
-                        handle_level_select(i)
+            if state in ("MENU", "LEVEL_SELECT"):
+                for i, rect in enumerate(boxes):
+                    if rect.collidepoint(mouse_pos):
+                        selected_index = i
+                        if state == "MENU":
+                            if i == 0:
+                                launch_level1()
+                                restore_menu_music()
+                            elif i == 1:
+                                state = "LEVEL_SELECT"
+                                selected_index = 0
+                            elif i == 2:
+                                state = "SETTINGS"
+                                settings_cursor = 0
+                            elif i == 3:
+                                enter_credits()
+                            elif i == 4:
+                                running = False
+                        elif state == "LEVEL_SELECT":
+                            handle_level_select(i)
+            elif state == "SETTINGS":
+                # Click on volume slider to set volume
+                if _settings_vol_slider.collidepoint(mouse_pos):
+                    music_volume = max(0.0, min(1.0, round((mouse_pos[0] - _settings_vol_slider.x) / _settings_vol_slider.width, 2)))
+                    apply_volume()
+                    settings_cursor = 0
+                else:
+                    for i, rect in enumerate(_settings_boxes):
+                        if rect.collidepoint(mouse_pos):
+                            settings_cursor = i
+                            if i == 1:
+                                music_muted = not music_muted
+                                apply_volume()
+                            elif i == 2:
+                                state = "MENU"
+                                selected_index = 0
 
     clock.tick(FPS)
 

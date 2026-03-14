@@ -171,10 +171,14 @@ STORY_DIALOGUES = {
         ("Starlight", "The others... Elder Frost, Holly, Jingle... they got you this far."),
         ("Starlight", "But this final road? This one is mine."),
         ("Starlight", "Look ahead. Do you see it? That light at the end. That is home."),
-        ("Starlight", "The nightmare knows you are about to wake up. It is throwing everything it has."),
+        ("Starlight", "There are no more monsters ahead. No creatures hiding behind walls. No ambushes."),
+        ("Starlight", "The nightmare has nothing left to send after you. It used them all up."),
+        ("Starlight", "But that does not mean it is giving up. Not even close."),
+        ("Starlight", "It is throwing the realm itself at you now. The ground, the sky, the air."),
+        ("Starlight", "Ice will erupt beneath you. The wind will scream in your face. The earth will crumble under your feet."),
         ("Starlight", "Look around you. Do you see it? The sky... it is turning red."),
         ("Starlight", "Do not be scared. The red is just the nightmare bleeding. It knows it is dying."),
-        ("Starlight", "They will rain down on you. Every fear, every doubt, every cold lonely night."),
+        ("Starlight", "Every fear, every doubt, every cold lonely night -- they will rain down on you."),
         ("Starlight", "But dreamer... you have been running toward the light your entire life."),
         ("Starlight", "So do what you have always done. Put your head down. And RUN."),
         ("Starlight", "Do not stop. Do not look back. Just keep running until you feel the warmth."),
@@ -2549,6 +2553,8 @@ class Game:
         self.best_combo = 0  # track best combo for stats
         self.difficulty = "hard"
         self.music_volume = 0.3; self.music_muted = False; self.settings_cursor = 0
+        self._settings_boxes = []; self._settings_vol_slider = pygame.Rect(0,0,0,0)
+        self._last_mouse_pos = (0, 0)
         self.camera = Camera(SCREEN_WIDTH, SCREEN_HEIGHT)
         self.particles = []; self.rings = []; self.flashes = []
         self.damage_flashes = []  # DamageFlash instances for red vignette
@@ -2639,6 +2645,30 @@ class Game:
                         mx, my = event.pos
                         if mx >= SCREEN_WIDTH - 50 and my <= 50:
                             self.state = "settings"; self.settings_cursor = 3
+                    elif self.state == "settings":
+                        mpos = event.pos
+                        # Volume slider click
+                        if self._settings_vol_slider.collidepoint(mpos):
+                            self.music_volume = max(0.0, min(1.0, round((mpos[0] - self._settings_vol_slider.x) / self._settings_vol_slider.width, 2)))
+                            self._apply_volume()
+                            self.settings_cursor = 0
+                        else:
+                            for i, rect in enumerate(self._settings_boxes):
+                                if rect.collidepoint(mpos):
+                                    self.settings_cursor = i
+                                    if i == 1:
+                                        self.music_muted = not self.music_muted; self._apply_volume()
+                                    elif i == 2:
+                                        diffs = ["easy","medium","hard"]
+                                        idx = diffs.index(self.difficulty)
+                                        self.difficulty = diffs[(idx + 1) % 3]
+                                    elif i == 3:
+                                        self.state = "playing"
+                                    elif i == 4:
+                                        self.load_level(); self.state = "playing"
+                                        self.sfx.start_music(volume=self.music_volume)
+                                    elif i == 5:
+                                        self._exit_to_menu()
             if not self.running: return
             # Update music crossfade system
             self.sfx.update_music()
@@ -2744,7 +2774,7 @@ class Game:
                     if getattr(self, '_cp5_dialogue_active', False):
                         di = self.dialogue_box.index if self.dialogue_box.active else 999
                         # Load and play Running Up That Hill (line 13)
-                        if di >= 12 and not self._running_up_playing:
+                        if di >= 16 and not self._running_up_playing:
                             snd = self.sfx.sounds.get("blizzard")
                             if snd: snd.stop()
                             self._blizzard_playing = False
@@ -2876,7 +2906,7 @@ class Game:
                         -self.player.wall_side * random.uniform(1, 3), random.uniform(-2, 1), 15, 3, 0.1))
             # Double jump on key press (second jump only via keydown)
             elif self.player.alive and not self.player.on_ground and self.player.jump_count == 1:
-                self.player.vel_y = JUMP_VELOCITY * 0.85
+                self.player.vel_y = JUMP_VELOCITY * 0.5
                 self.player.jump_count = 2
                 # Stop any playing jump sound first, then play double_jump (falls back to jump)
                 snd = self.sfx.sounds.get("jump")
@@ -3969,11 +3999,19 @@ class Game:
         bar_w = 420
         bar_h = 40
 
+        mouse_pos = pygame.mouse.get_pos()
+        mouse_moved = mouse_pos != self._last_mouse_pos
+        self._last_mouse_pos = mouse_pos
+        self._settings_boxes = []
+
         for i, item in enumerate(items):
             y = start_y + i * spacing
-            sel = (i == self.settings_cursor)
             bar_x = SCREEN_WIDTH // 2 - bar_w // 2
             bar = pygame.Rect(bar_x, y, bar_w, bar_h)
+            self._settings_boxes.append(bar)
+            if mouse_moved and bar.collidepoint(mouse_pos):
+                self.settings_cursor = i
+            sel = (i == self.settings_cursor)
 
             # Bar background
             bar_surf = pygame.Surface((bar_w, bar_h), pygame.SRCALPHA)
@@ -4036,6 +4074,7 @@ class Game:
         vbar_y = start_y + 0 * spacing + bar_h + 4
         vbar_w = 300
         vbar_h = 10
+        self._settings_vol_slider = pygame.Rect(vbar_x, vbar_y - 6, vbar_w, vbar_h + 12)
         pygame.draw.rect(self.screen, (40, 40, 55), (vbar_x - 2, vbar_y - 2, vbar_w + 4, vbar_h + 4), border_radius=5)
         vol_w = int(vbar_w * self.music_volume)
         # Gradient fill
