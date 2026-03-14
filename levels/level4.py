@@ -240,14 +240,14 @@ SOUND_FILES = {
 }
 # Volume levels for sound effects (0.0-1.0) — keeps them under the music
 SFX_VOLUMES = {
-    "jump": 0.07, "double_jump": 0.07, "death": 0.12, "hit": 0.1,
-    "stomp": 0.09, "monster_kill": 0.09, "shoot": 0.06, "coin": 0.1,
-    "powerup": 0.1, "unreal_end": 0.09, "checkpoint": 0.12, "win": 0.12,
-    "bomb_explode": 0.12, "bomb_defuse": 0.07, "respawn": 0.09,
-    "soul_rise": 0.09, "soul_land": 0.09, "blizzard": 0.07,
-    "saw_buzz": 0.04, "pendulum_whoosh": 0.05, "geyser_burst": 0.07,
-    "npc_talk": 0.09, "meteor_impact": 0.05, "icicle_crack": 0.07,
-    "crumble": 0.1,
+    "jump": 0.6, "double_jump": 0.6, "death": 1.0, "hit": 0.8,
+    "stomp": 0.7, "monster_kill": 0.7, "shoot": 0.5, "coin": 0.35,
+    "powerup": 0.8, "unreal_end": 0.7, "checkpoint": 1.0, "win": 1.0,
+    "bomb_explode": 1.0, "bomb_defuse": 0.6, "respawn": 0.7,
+    "soul_rise": 0.7, "soul_land": 0.7, "blizzard": 0.6,
+    "saw_buzz": 0.35, "pendulum_whoosh": 0.4, "geyser_burst": 0.6,
+    "npc_talk": 0.7, "meteor_impact": 0.4, "icicle_crack": 0.6,
+    "crumble": 0.8,
 }
 MUSIC_FILE = os.path.join(_BASE_DIR, "assets", "audio", "Level4Music.mp3")
 ENDING_MUSIC_FILE = os.path.join(_BASE_DIR, "assets", "audio", "ending.mp3")
@@ -272,6 +272,13 @@ class SoundManager:
         if os.path.isfile(MUSIC_FILE):
             try: pygame.mixer.music.load(MUSIC_FILE); self.music_loaded = True; self.current_music_path = MUSIC_FILE
             except: pass
+    def set_sfx_volume(self, multiplier):
+        """Scale all SFX by a multiplier (0.0 - 1.0) on top of their base volumes."""
+        self._sfx_multiplier = multiplier
+        for name, snd in self.sounds.items():
+            if snd:
+                base = SFX_VOLUMES.get(name, 0.4)
+                snd.set_volume(base * multiplier)
     def play(self, n):
         s = self.sounds.get(n)
         if s: s.play()
@@ -2557,8 +2564,8 @@ class Game:
         self.respawn_fade = 0  # respawn screen wipe
         self.best_combo = 0  # track best combo for stats
         self.difficulty = "hard"
-        self.music_volume = 0.3; self.music_muted = False; self.settings_cursor = 0
-        self._settings_boxes = []; self._settings_vol_slider = pygame.Rect(0,0,0,0)
+        self.music_volume = 0.35; self.sfx_volume = 0.2; self.music_muted = False; self.settings_cursor = 0
+        self._settings_boxes = []; self._settings_vol_slider = pygame.Rect(0,0,0,0); self._settings_sfx_slider = pygame.Rect(0,0,0,0)
         self._last_mouse_pos = (0, 0)
         self.camera = Camera(SCREEN_WIDTH, SCREEN_HEIGHT)
         self.particles = []; self.rings = []; self.flashes = []
@@ -2593,6 +2600,7 @@ class Game:
         self.ending_sparkles = []  # golden sparkle particles for ending
         self.load_level()
         self.sfx.start_music(volume=self.music_volume)
+        self.sfx.set_sfx_volume(self.sfx_volume)
 
     def load_level(self):
         (self.platforms, self.checkpoints, self.monsters,
@@ -2629,9 +2637,10 @@ class Game:
         pygame.event.clear()  # flush events so main.py doesn't pick up stale ESC
 
     def _apply_volume(self):
-        # Don't override volume during a fade-in
-        if getattr(self.sfx, '_fading_in', False): return
-        pygame.mixer.music.set_volume(0.0 if self.music_muted else self.music_volume)
+        # Don't override music volume during a fade-in
+        if not getattr(self.sfx, '_fading_in', False):
+            pygame.mixer.music.set_volume(0.0 if self.music_muted else self.music_volume)
+        self.sfx.set_sfx_volume(0.0 if self.music_muted else self.sfx_volume)
 
     def start_dialogue(self, key, return_state="playing"):
         if key in STORY_DIALOGUES:
@@ -2649,30 +2658,34 @@ class Game:
                     if self.state == "playing":
                         mx, my = event.pos
                         if mx >= SCREEN_WIDTH - 50 and my <= 50:
-                            self.state = "settings"; self.settings_cursor = 3
+                            self.state = "settings"; self.settings_cursor = 4
                     elif self.state == "settings":
                         mpos = event.pos
-                        # Volume slider click
+                        # Volume slider clicks
                         if self._settings_vol_slider.collidepoint(mpos):
                             self.music_volume = max(0.0, min(1.0, round((mpos[0] - self._settings_vol_slider.x) / self._settings_vol_slider.width, 2)))
                             self._apply_volume()
                             self.settings_cursor = 0
+                        elif self._settings_sfx_slider.collidepoint(mpos):
+                            self.sfx_volume = max(0.0, min(1.0, round((mpos[0] - self._settings_sfx_slider.x) / self._settings_sfx_slider.width, 2)))
+                            self._apply_volume()
+                            self.settings_cursor = 1
                         else:
                             for i, rect in enumerate(self._settings_boxes):
                                 if rect.collidepoint(mpos):
                                     self.settings_cursor = i
-                                    if i == 1:
+                                    if i == 2:
                                         self.music_muted = not self.music_muted; self._apply_volume()
-                                    elif i == 2:
+                                    elif i == 3:
                                         diffs = ["easy","medium","hard"]
                                         idx = diffs.index(self.difficulty)
                                         self.difficulty = diffs[(idx + 1) % 3]
-                                    elif i == 3:
-                                        self.state = "playing"
                                     elif i == 4:
+                                        self.state = "playing"
+                                    elif i == 5:
                                         self.load_level(); self.state = "playing"
                                         self.sfx.start_music(volume=self.music_volume)
-                                    elif i == 5:
+                                    elif i == 6:
                                         self._exit_to_menu()
             if not self.running: return
             # Update music crossfade system
@@ -2812,34 +2825,38 @@ class Game:
             return
         # Settings
         if self.state == "settings":
-            n_items = 6
+            n_items = 7
             if key == pygame.K_ESCAPE: self.state = "playing"
             elif key in (pygame.K_UP, pygame.K_w): self.settings_cursor = (self.settings_cursor - 1) % n_items
             elif key in (pygame.K_DOWN, pygame.K_s): self.settings_cursor = (self.settings_cursor + 1) % n_items
             elif key in (pygame.K_LEFT, pygame.K_a):
                 if self.settings_cursor == 0:
                     self.music_volume = max(0.0, round(self.music_volume - 0.1, 1)); self._apply_volume()
-                elif self.settings_cursor == 2:
+                elif self.settings_cursor == 1:
+                    self.sfx_volume = max(0.0, round(self.sfx_volume - 0.1, 1)); self._apply_volume()
+                elif self.settings_cursor == 3:
                     diffs = ["easy","medium","hard"]
                     idx = diffs.index(self.difficulty)
                     self.difficulty = diffs[(idx - 1) % 3]
             elif key in (pygame.K_RIGHT, pygame.K_d):
                 if self.settings_cursor == 0:
                     self.music_volume = min(1.0, round(self.music_volume + 0.1, 1)); self._apply_volume()
-                elif self.settings_cursor == 2:
+                elif self.settings_cursor == 1:
+                    self.sfx_volume = min(1.0, round(self.sfx_volume + 0.1, 1)); self._apply_volume()
+                elif self.settings_cursor == 3:
                     diffs = ["easy","medium","hard"]
                     idx = diffs.index(self.difficulty)
                     self.difficulty = diffs[(idx + 1) % 3]
             elif key in (pygame.K_RETURN, pygame.K_SPACE):
-                if self.settings_cursor == 1:
+                if self.settings_cursor == 2:
                     self.music_muted = not self.music_muted; self._apply_volume()
-                elif self.settings_cursor == 2:
+                elif self.settings_cursor == 3:
                     pass  # use arrows
-                elif self.settings_cursor == 3: self.state = "playing"
-                elif self.settings_cursor == 4:
+                elif self.settings_cursor == 4: self.state = "playing"
+                elif self.settings_cursor == 5:
                     self.load_level(); self.state = "playing"
                     self.sfx.start_music(volume=self.music_volume)
-                elif self.settings_cursor == 5:
+                elif self.settings_cursor == 6:
                     self._exit_to_menu()
             return
         # Stats screen
@@ -2882,7 +2899,7 @@ class Game:
             return
         # Playing
         if key == pygame.K_ESCAPE:
-            self.state = "settings"; self.settings_cursor = 3
+            self.state = "settings"; self.settings_cursor = 4
         elif key == pygame.K_r:
             self.player.unreal_timer = 0; self.player.hearts = 0; self.player.die(); self.sfx.play("death")
         elif key in (pygame.K_f, pygame.K_x):
@@ -3279,7 +3296,7 @@ class Game:
         if in_final and not in_final_path and not self._blizzard_playing and not self._running_up_playing:
             snd = self.sfx.sounds.get("blizzard")
             if snd:
-                snd.play(loops=-1); snd.set_volume(0.4)
+                snd.play(loops=-1); snd.set_volume(SFX_VOLUMES.get("blizzard", 0.6) * self.sfx_volume)
             self._blizzard_playing = True
         elif (not in_final or in_final_path or self._running_up_playing) and self._blizzard_playing:
             snd = self.sfx.sounds.get("blizzard")
@@ -3449,7 +3466,7 @@ class Game:
             self.combo_popups.append((x, y - 20, self.combo_count, 50))
             # Pitch-shift simulation: increase volume with combo (pygame lacks native pitch shift)
             for snd in [self.sfx.sounds.get("stomp"), self.sfx.sounds.get("monster_kill")]:
-                if snd: snd.set_volume(min(1.0, 0.5 + self.combo_count * 0.1))
+                if snd: snd.set_volume(min(1.0, (0.5 + self.combo_count * 0.1)) * self.sfx_volume)
 
     def _spawn_ambient(self):
         for plat in self.platforms:
@@ -3972,7 +3989,7 @@ class Game:
             self.screen.blit(sf_s, (sx2 - sz, sy2 - sz))
 
         # Main panel
-        panel_w, panel_h = 500, 480
+        panel_w, panel_h = 500, 530
         panel_x = SCREEN_WIDTH // 2 - panel_w // 2
         panel_y = 60
         panel_surf = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
@@ -3993,27 +4010,34 @@ class Game:
 
         # Menu items with icons
         items = [
-            f"Volume:  < {int(self.music_volume * 100)}% >",
+            f"Music:  < {int(self.music_volume * 100)}% >",
+            f"SFX:  < {int(self.sfx_volume * 100)}% >",
             f"Mute:  {'ON' if self.music_muted else 'OFF'}",
             f"Difficulty:  < {self.difficulty.upper()} >",
             "Resume",
             "Restart Level",
             "Exit to Menu",
         ]
-        item_colors = [SNOW_WHITE, SNOW_WHITE, SNOW_WHITE, XMAS_GREEN, XMAS_GOLD, XMAS_RED]
+        item_colors = [SNOW_WHITE, SNOW_WHITE, SNOW_WHITE, SNOW_WHITE, XMAS_GREEN, XMAS_GOLD, XMAS_RED]
 
-        start_y = panel_y + 80
-        spacing = 52
+        start_y = panel_y + 75
         bar_w = 420
-        bar_h = 40
+        bar_h = 36
+        slider_gap = 16  # extra space for slider below volume items
 
         mouse_pos = pygame.mouse.get_pos()
         mouse_moved = mouse_pos != self._last_mouse_pos
         self._last_mouse_pos = mouse_pos
         self._settings_boxes = []
 
+        _item_y_positions = []
         for i, item in enumerate(items):
-            y = start_y + i * spacing
+            # Items 0,1 have sliders below them so items after get extra offset
+            if i <= 1:
+                y = start_y + i * (bar_h + slider_gap + 6)
+            else:
+                y = start_y + 2 * (bar_h + slider_gap + 6) + (i - 2) * (bar_h + 8)
+            _item_y_positions.append(y)
             bar_x = SCREEN_WIDTH // 2 - bar_w // 2
             bar = pygame.Rect(bar_x, y, bar_w, bar_h)
             self._settings_boxes.append(bar)
@@ -4038,21 +4062,25 @@ class Game:
             icon_x = bar_x + 18
             icon_cy = y + bar_h // 2
             if i == 0:
-                # Speaker icon for volume
+                # Music note icon
+                pygame.draw.circle(self.screen, color, (icon_x + 4, icon_cy + 3), 4)
+                pygame.draw.line(self.screen, color, (icon_x + 8, icon_cy + 3), (icon_x + 8, icon_cy - 8), 2)
+                pygame.draw.line(self.screen, color, (icon_x + 8, icon_cy - 8), (icon_x + 14, icon_cy - 6), 2)
+            elif i == 1:
+                # Speaker icon for SFX
                 pygame.draw.rect(self.screen, color, (icon_x, icon_cy - 4, 6, 8))
                 pygame.draw.polygon(self.screen, color, [(icon_x + 6, icon_cy - 4), (icon_x + 12, icon_cy - 8), (icon_x + 12, icon_cy + 8), (icon_x + 6, icon_cy + 4)])
-                # Sound waves
                 for sw in range(2):
                     arc_r = 5 + sw * 4
                     pygame.draw.arc(self.screen, color, (icon_x + 13, icon_cy - arc_r, arc_r * 2, arc_r * 2), -0.6, 0.6, 1)
-            elif i == 1:
+            elif i == 2:
                 # Speaker with X for mute
                 pygame.draw.rect(self.screen, color, (icon_x, icon_cy - 4, 6, 8))
                 pygame.draw.polygon(self.screen, color, [(icon_x + 6, icon_cy - 4), (icon_x + 12, icon_cy - 8), (icon_x + 12, icon_cy + 8), (icon_x + 6, icon_cy + 4)])
                 if self.music_muted:
                     pygame.draw.line(self.screen, XMAS_RED, (icon_x + 15, icon_cy - 5), (icon_x + 22, icon_cy + 5), 2)
                     pygame.draw.line(self.screen, XMAS_RED, (icon_x + 22, icon_cy - 5), (icon_x + 15, icon_cy + 5), 2)
-            elif i == 2:
+            elif i == 3:
                 # Gear icon for difficulty
                 pygame.draw.circle(self.screen, color, (icon_x + 8, icon_cy), 7, 2)
                 pygame.draw.circle(self.screen, color, (icon_x + 8, icon_cy), 3)
@@ -4061,14 +4089,14 @@ class Game:
                     gx = icon_x + 8 + int(9 * math.cos(ga))
                     gy = icon_cy + int(9 * math.sin(ga))
                     pygame.draw.circle(self.screen, color, (gx, gy), 2)
-            elif i == 3:
+            elif i == 4:
                 # Play triangle for resume
                 pygame.draw.polygon(self.screen, color, [(icon_x + 3, icon_cy - 7), (icon_x + 3, icon_cy + 7), (icon_x + 15, icon_cy)])
-            elif i == 4:
+            elif i == 5:
                 # Restart arrow
                 pygame.draw.arc(self.screen, color, (icon_x + 2, icon_cy - 7, 14, 14), 0.5, 5.5, 2)
                 pygame.draw.polygon(self.screen, color, [(icon_x + 14, icon_cy - 7), (icon_x + 14, icon_cy + 1), (icon_x + 19, icon_cy - 3)])
-            elif i == 5:
+            elif i == 6:
                 # X for exit
                 pygame.draw.line(self.screen, color, (icon_x + 3, icon_cy - 5), (icon_x + 13, icon_cy + 5), 2)
                 pygame.draw.line(self.screen, color, (icon_x + 13, icon_cy - 5), (icon_x + 3, icon_cy + 5), 2)
@@ -4077,35 +4105,38 @@ class Game:
             txt = self.font.render(item, True, color)
             self.screen.blit(txt, (bar_x + 42, y + (bar_h - txt.get_height()) // 2))
 
-        # Volume slider (wider, below volume item)
-        vbar_x = SCREEN_WIDTH // 2 - 150
-        vbar_y = start_y + 0 * spacing + bar_h + 4
-        vbar_w = 300
-        vbar_h = 10
-        self._settings_vol_slider = pygame.Rect(vbar_x, vbar_y - 6, vbar_w, vbar_h + 12)
-        pygame.draw.rect(self.screen, (40, 40, 55), (vbar_x - 2, vbar_y - 2, vbar_w + 4, vbar_h + 4), border_radius=5)
-        vol_w = int(vbar_w * self.music_volume)
-        # Gradient fill
-        for px in range(vol_w):
-            t2 = px / vbar_w
-            vc = lerp_color(XMAS_GREEN, XMAS_RED, t2) if not self.music_muted else (80, 30, 30)
-            pygame.draw.line(self.screen, vc, (vbar_x + px, vbar_y), (vbar_x + px, vbar_y + vbar_h - 1))
-        pygame.draw.rect(self.screen, (100, 100, 120), (vbar_x, vbar_y, vbar_w, vbar_h), 1, border_radius=4)
-        # Bigger knob
-        knob_x = vbar_x + vol_w
-        pygame.draw.circle(self.screen, WHITE, (knob_x, vbar_y + vbar_h // 2), 8)
-        pygame.draw.circle(self.screen, XMAS_GOLD, (knob_x, vbar_y + vbar_h // 2), 5)
-        # Percentage text
-        vol_pct = self.small_font.render(f"{int(self.music_volume * 100)}%", True, (160, 160, 180))
-        self.screen.blit(vol_pct, (vbar_x + vbar_w + 14, vbar_y - 2))
+        # Helper to draw a volume slider
+        def _draw_slider(sy, volume, muted, slider_idx):
+            sx = SCREEN_WIDTH // 2 - 150
+            sw = 300; sh = 8
+            slider_rect = pygame.Rect(sx, sy - 4, sw, sh + 8)
+            pygame.draw.rect(self.screen, (40, 40, 55), (sx - 2, sy - 2, sw + 4, sh + 4), border_radius=5)
+            fill_w = int(sw * volume)
+            for px in range(fill_w):
+                t2 = px / sw
+                vc = lerp_color(XMAS_GREEN, XMAS_RED, t2) if not muted else (80, 30, 30)
+                pygame.draw.line(self.screen, vc, (sx + px, sy), (sx + px, sy + sh - 1))
+            pygame.draw.rect(self.screen, (100, 100, 120), (sx, sy, sw, sh), 1, border_radius=4)
+            kx = sx + fill_w
+            pygame.draw.circle(self.screen, WHITE, (kx, sy + sh // 2), 7)
+            pygame.draw.circle(self.screen, XMAS_GOLD, (kx, sy + sh // 2), 4)
+            pct = self.small_font.render(f"{int(volume * 100)}%", True, (160, 160, 180))
+            self.screen.blit(pct, (sx + sw + 14, sy - 2))
+            return slider_rect
 
-        # Difficulty description
+        # Music volume slider (below item 0)
+        self._settings_vol_slider = _draw_slider(_item_y_positions[0] + bar_h + 2, self.music_volume, self.music_muted, 0)
+
+        # SFX volume slider (below item 1)
+        self._settings_sfx_slider = _draw_slider(_item_y_positions[1] + bar_h + 2, self.sfx_volume, self.music_muted, 1)
+
+        # Difficulty description (below item 3)
         desc = {"easy": "Relaxed: Slower enemies, bombs need 1 hit, longer fuse",
                 "medium": "Balanced: Moderate speed, bombs need 2 hits",
                 "hard": "Intense: Fast aggressive enemies, bombs need 2 hits, short fuse"}
         dc = XMAS_GREEN if self.difficulty == "easy" else XMAS_GOLD if self.difficulty == "medium" else XMAS_RED
         dt = self.small_font.render(desc[self.difficulty], True, dc)
-        self.screen.blit(dt, dt.get_rect(center=(SCREEN_WIDTH // 2, start_y + 2 * spacing + bar_h + 6)))
+        self.screen.blit(dt, dt.get_rect(center=(SCREEN_WIDTH // 2, _item_y_positions[3] + bar_h + 4)))
 
         # Footer controls bar
         footer_y = panel_y + panel_h - 10
