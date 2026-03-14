@@ -65,13 +65,13 @@ ICICLE_SHAKE_TIME = 30
 ICICLE_FALL_SPEED = 8
 
 DIFFICULTY = {
-    "easy":   {"bomb_fuse": 300, "bomb_detect": 180, "bomb_spd": 0.5, "mon_spd": 0.4, "bomb_hits": 1,
+    "easy":   {"bomb_fuse": 300, "bomb_detect": 180, "bomb_spd": 0.6, "mon_spd": 0.4, "bomb_hits": 1,
                "plat_spd": 0.6, "glitch_on": 140, "glitch_off": 40, "collapse_delay": 70, "tp_interval": 200,
                "saw_spd": 0.5, "wind_str": 0.5, "crumble_delay": 16, "icicle_spd": 3, "ornament_gate": 0},
     "medium": {"bomb_fuse": 220, "bomb_detect": 230, "bomb_spd": 0.8, "mon_spd": 0.7, "bomb_hits": 2,
                "plat_spd": 0.85, "glitch_on": 110, "glitch_off": 55, "collapse_delay": 55, "tp_interval": 150,
                "saw_spd": 0.75, "wind_str": 0.75, "crumble_delay": 11, "icicle_spd": 5, "ornament_gate": 13},
-    "hard":   {"bomb_fuse": 150, "bomb_detect": 300, "bomb_spd": 1.3, "mon_spd": 1.0,  "bomb_hits": 2,
+    "hard":   {"bomb_fuse": 150, "bomb_detect": 300, "bomb_spd": 1.0, "mon_spd": 1.0,  "bomb_hits": 2,
                "plat_spd": 1.0, "glitch_on": 80, "glitch_off": 65, "collapse_delay": 40, "tp_interval": 110,
                "saw_spd": 1.0, "wind_str": 1.0, "crumble_delay": 8, "icicle_spd": 7, "ornament_gate": 15},
 }
@@ -1273,7 +1273,7 @@ class BombMonster:
         self.charge_dir = 0  # direction to charge toward player when ticking
         self.dodge_timer = 0; self.dodge_dir = 0
 
-    def update(self):
+    def update(self, player=None):
         if not self.alive: self.death_timer -= 1; return
         self.tick += 1
         if self.state == "defused":
@@ -1288,8 +1288,13 @@ class BombMonster:
             self.fuse_timer += 1
             progress = self.fuse_timer / self.fuse_max
             self.flash_rate = max(2, int(10 * (1 - progress)))
-            # Aggressive movement: charge toward player, dodge sideways
-            charge_spd = self.base_speed * (1.5 + progress * 1.5)  # gets faster as fuse runs out
+            # Track player — update charge direction toward player
+            if player and player.alive:
+                dx = player.rect.centerx - self.rect.centerx
+                if abs(dx) > 5:  # dead zone to avoid jittering
+                    self.charge_dir = 1 if dx > 0 else -1
+            # Chase speed: ramps up with fuse but capped to be escapable
+            charge_spd = self.base_speed * (1.8 + progress * 1.0)
             if self.hits >= 1:
                 charge_spd *= 0.6  # slow a bit if hit once
             # Dodge sideways randomly
@@ -3036,7 +3041,10 @@ class Game:
                     random.uniform(-0.3,0.3),10,2,0.02))
 
         for mon in self.monsters:
-            mon.update()
+            if isinstance(mon, BombMonster):
+                mon.update(self.player)
+            else:
+                mon.update()
             if isinstance(mon, BombMonster) and self.player.alive:
                 was_patrol = mon.state == "patrol"
                 mon.check_proximity(self.player)
