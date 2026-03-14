@@ -1908,10 +1908,20 @@ class DreamDebris:
         self.color = random.choice([(180,160,220),(160,200,240),(220,180,200),(200,220,180),(180,220,220)])
         self.shattered = False
         self.shatter_particles = []
+        self.just_shattered = False  # flag for impact effect
         # Trail positions for glow effect
         self.trail = []
-    def update(self):
+        self._target_x = None  # player x to drift toward
+    def update(self, player_x=None):
         if not self.shattered:
+            # Gently drift toward player — slow homing, looks like it's falling at you
+            if player_x is not None:
+                self._target_x = player_x
+            if self._target_x is not None:
+                dx = self._target_x - self.x
+                # Gentle pull — max 0.4 px/frame so it looks natural, not chasing
+                self.vel_x += max(-0.03, min(0.03, dx * 0.0004))
+                self.vel_x = max(-1.5, min(1.5, self.vel_x))  # cap horizontal drift
             # Store trail positions
             self.trail.append((self.x, self.y, self.alpha))
             if len(self.trail) > 3:
@@ -1920,14 +1930,23 @@ class DreamDebris:
             self.x += self.vel_x
             self.rotation += self.rot_speed
             if self.y >= self.y_target:
-                # Spawn shatter particles
+                # Spawn shatter particles — bigger burst
                 self.shattered = True
-                for _ in range(random.randint(8, 14)):
-                    sp_vx = random.uniform(-3, 3)
-                    sp_vy = random.uniform(-4, -0.5)
-                    sp_life = random.randint(15, 30)
-                    sp_size = random.randint(2, 5)
+                self.just_shattered = True
+                for _ in range(random.randint(12, 20)):
+                    sp_vx = random.uniform(-4, 4)
+                    sp_vy = random.uniform(-5, -1)
+                    sp_life = random.randint(20, 40)
+                    sp_size = random.randint(2, 6)
                     self.shatter_particles.append([self.x, self.y, sp_vx, sp_vy, sp_life, sp_size, self.color])
+                # Ground dust ring
+                for _ in range(6):
+                    sp_vx = random.uniform(-2.5, 2.5)
+                    sp_vy = random.uniform(-0.5, 0.3)
+                    sp_life = random.randint(10, 20)
+                    sp_size = random.randint(3, 7)
+                    dust_c = tuple(min(255, c + 40) for c in self.color)
+                    self.shatter_particles.append([self.x + random.randint(-8, 8), self.y, sp_vx, sp_vy, sp_life, sp_size, dust_c])
         else:
             # Update shatter particles
             new_sp = []
@@ -3352,8 +3371,14 @@ class Game:
                     else:
                         self._player_death_fx()
         self.meteors = [m for m in self.meteors if m.alive]
-        # Update dream debris
-        self.dream_debris = [d for d in self.dream_debris if d.update()]
+        # Update dream debris — pass player x so they drift toward you
+        px_center = self.player.rect.centerx
+        for d in self.dream_debris:
+            d.update(px_center)
+            if d.just_shattered:
+                d.just_shattered = False
+                self.camera.add_shake(3)  # subtle shake on impact
+        self.dream_debris = [d for d in self.dream_debris if d.alive]
         # Wind in heavy weather
         if px >= 6000:
             wind_mult = 2.0 if in_final_path else (3.0 if in_final else 1.0)
