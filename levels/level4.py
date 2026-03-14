@@ -3,6 +3,8 @@ import sys
 import math
 import random
 import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from player_sprites import init_player_sprite, draw_player_sprite
 
 SCREEN_WIDTH  = 1280
 SCREEN_HEIGHT = 720
@@ -603,33 +605,8 @@ class DamageFlash:
 
 class Player:
     WIDTH, HEIGHT = 28, 36
-    SPRITE_SIZE = 32  # each sprite frame is 32x32
-    _sprites_loaded = False
-    _sprite_frames = {}  # class-level cache
-
-    @classmethod
-    def _load_sprites(cls):
-        if cls._sprites_loaded:
-            return
-        sprite_dir = os.path.join(os.path.dirname(__file__), '..', 'assets', 'sprites', 'character')
-        sheet_info = {
-            'idle': ('Owlet_Monster_Idle_4.png', 4),
-            'walk': ('Owlet_Monster_Walk_6.png', 6),
-            'jump': ('Owlet_Monster_Jump_8.png', 8),
-            'death': ('Owlet_Monster_Death_8.png', 8),
-            'climb': ('Owlet_Monster_Climb_4.png', 4),
-        }
-        for anim, (filename, frame_count) in sheet_info.items():
-            sheet = pygame.image.load(os.path.join(sprite_dir, filename)).convert_alpha()
-            frames = []
-            for i in range(frame_count):
-                frame = sheet.subsurface(pygame.Rect(i * cls.SPRITE_SIZE, 0, cls.SPRITE_SIZE, cls.SPRITE_SIZE))
-                frames.append(frame)
-            cls._sprite_frames[anim] = frames
-        cls._sprites_loaded = True
 
     def __init__(self, x, y):
-        Player._load_sprites()
         self.rect=pygame.Rect(x,y,self.WIDTH,self.HEIGHT)
         self.vel_x=0.0; self.vel_y=0.0; self.on_ground=False
         self.spawn_x=x; self.spawn_y=y; self.alive=True; self.respawn_timer=0
@@ -655,9 +632,8 @@ class Player:
         self.squash_timer=0
         # Stats
         self.best_combo=0
-        # Animation state
-        self.anim_state='idle'; self.anim_frame=0; self.anim_tick=0
-        self.death_anim_frame=0; self.death_anim_done=False
+        # Sprite animation
+        init_player_sprite(self)
 
     @property
     def is_unreal(self): return self.unreal_timer > 0
@@ -671,7 +647,7 @@ class Player:
     def die(self):
         if self.is_unreal: return
         self.alive=False; self.respawn_timer=9999; self.death_count+=1
-        self.anim_state='death'; self.anim_frame=0; self.anim_tick=0; self.death_anim_done=False
+        self._spr_state='death'; self._spr_frame=0; self._spr_tick=0; self._spr_death_done=False
     def respawn(self):
         self.rect.topleft=(self.spawn_x,self.spawn_y)
         self.vel_x=self.vel_y=0; self.alive=True; self.on_ground=False; self.unreal_timer=0
@@ -767,7 +743,7 @@ class Player:
         if self.rect.top > DEATH_Y:
             # Falling off the map kills even in unreal mode
             self.alive=False; self.respawn_timer=9999; self.death_count+=1
-            self.anim_state='death'; self.anim_frame=0; self.anim_tick=0; self.death_anim_done=False
+            self._spr_state='death'; self._spr_frame=0; self._spr_tick=0; self._spr_death_done=False
             self.unreal_timer=0
         return "jump" if jumped else None
 
@@ -779,117 +755,17 @@ class Player:
             return Snowball(sx, self.rect.centery-2, d)
         return None
 
-    def _get_anim_state(self):
-        if not self.alive:
-            return 'death'
-        if self.wall_sliding:
-            return 'climb'
-        if self.dashing or (not self.on_ground and self.vel_y < -1):
-            return 'jump'
-        if not self.on_ground and self.vel_y > 1:
-            return 'jump'
-        if abs(self.vel_x) > 0.5:
-            return 'walk'
-        return 'idle'
-
-    def _get_sprite_frame(self):
-        state = self._get_anim_state()
-        # Animation speed per state
-        anim_speeds = {'idle': 10, 'walk': 6, 'jump': 6, 'death': 8, 'climb': 8}
-        frames = self._sprite_frames[state]
-        # Handle state transitions
-        if state != self.anim_state:
-            self.anim_state = state
-            self.anim_frame = 0
-            self.anim_tick = 0
-        self.anim_tick += 1
-        if self.anim_tick >= anim_speeds.get(state, 8):
-            self.anim_tick = 0
-            if state == 'death':
-                if self.anim_frame < len(frames) - 1:
-                    self.anim_frame += 1
-                else:
-                    self.death_anim_done = True
-            else:
-                self.anim_frame = (self.anim_frame + 1) % len(frames)
-        frame = frames[min(self.anim_frame, len(frames) - 1)]
-        if not self.facing_right:
-            frame = pygame.transform.flip(frame, True, False)
-        return frame
-
     def draw(self, surface, camera, tick):
-        # Death animation plays even when not alive
-        if not self.alive:
-            if self.death_anim_done:
-                return
-            sr = camera.apply(self.rect)
-            frame = self._get_sprite_frame()
-            scale_w, scale_h = int(sr.width * 1.8), int(sr.height * 1.6)
-            scaled = pygame.transform.scale(frame, (scale_w, scale_h))
-            blit_x = sr.centerx - scale_w // 2
-            blit_y = sr.bottom - scale_h
-            surface.blit(scaled, (blit_x, blit_y))
-            return
-        # Squash timer update
-        if self.on_ground and not self.was_on_ground: self.squash_timer=6
-        if self.squash_timer>0: self.squash_timer-=1
-        # Invincibility flicker
-        if self.invincibility > 0 and (self.invincibility // 4) % 2 == 0: return
-        # Dash afterimages
-        for idx_ai, (ax, ay, aa) in enumerate(self.dash_afterimages):
-            ar = camera.apply(pygame.Rect(ax, ay, self.WIDTH, self.HEIGHT))
-            afterimage_frame = self._sprite_frames[self.anim_state][self.anim_frame % len(self._sprite_frames[self.anim_state])]
-            if not self.facing_right:
-                afterimage_frame = pygame.transform.flip(afterimage_frame, True, False)
-            ai_scaled = pygame.transform.scale(afterimage_frame, (int(ar.width * 1.8), int(ar.height * 1.6)))
-            ai_surf = ai_scaled.copy()
-            ai_surf.set_alpha(int(aa * 0.5))
-            ai_surf.fill((*ICE_BLUE, int(aa * 0.5)), special_flags=pygame.BLEND_RGBA_MULT)
-            surface.blit(ai_surf, (ar.centerx - ai_scaled.get_width() // 2, ar.bottom - ai_scaled.get_height()))
-        if self.dashing:
+        # Dash speed lines (drawn before sprite)
+        if self.alive and self.dashing:
             dsr = camera.apply(self.rect)
             for sl in range(5):
                 slx = dsr.centerx + (-self.dash_dir) * (10 + sl * 8) + random.randint(-2, 2)
                 sly = dsr.y + random.randint(2, self.HEIGHT - 2)
                 sll = random.randint(8, 16)
                 pygame.draw.line(surface, (100, 180, 255, 180), (slx, sly), (slx + (-self.dash_dir) * sll, sly), 2)
-        # Sprint trail
-        if self.sprinting and self.on_ground and abs(self.vel_x) > 3 and tick % 3 == 0:
-            pass  # handled in _spawn_ambient
-        sr = camera.apply(self.rect)
-        # Squash & stretch visual adjustment
-        if self.vel_y<-3 and not self.on_ground:
-            stretch=4; sr=sr.inflate(-4,stretch*2); sr.bottom+=stretch
-        elif self.squash_timer>0:
-            sq=int(self.squash_timer*0.8); sr=sr.inflate(sq*2,-sq*2); sr.bottom+=sq
-        # Get the current animation frame
-        frame = self._get_sprite_frame()
-        # Scale sprite larger — roughly 1.8x the hitbox for visual presence
-        scale_w, scale_h = int(sr.width * 1.8), int(sr.height * 1.6)
-        scaled = pygame.transform.scale(frame, (scale_w, scale_h))
-        # Unreal mode: rainbow tint on sprite pixels only
-        if self.is_unreal:
-            bc = xmas_cycle_color(tick, 0.12)
-            pulse = abs(math.sin(tick * 0.15)) * 0.5 + 0.5
-            # Tint only opaque pixels — use BLEND_RGB_ADD which preserves original alpha
-            tint_surf = scaled.copy()
-            tint_strength = int(40 + 30 * pulse)
-            tint_surf.fill((tint_strength, tint_strength, tint_strength), special_flags=pygame.BLEND_RGB_ADD)
-            tint_surf.fill((*bc, 255), special_flags=pygame.BLEND_RGB_MULT)
-            # Blend tinted version back over original to keep it subtle
-            blended = scaled.copy()
-            tint_surf.set_alpha(int(100 + 55 * pulse))
-            blended.blit(tint_surf, (0, 0))
-            scaled = blended
-        blit_x = sr.centerx - scale_w // 2
-        blit_y = sr.bottom - scale_h
-        surface.blit(scaled, (blit_x, blit_y))
-        # Wall slide scratchy lines
-        if self.wall_sliding:
-            wx = sr.left if self.wall_side == -1 else sr.right
-            for i in range(4):
-                sy2 = sr.y + 5 + i * 8 + random.randint(-1, 1)
-                pygame.draw.line(surface, WHITE, (wx, sy2), (wx + random.randint(-3, 3), sy2 + random.randint(4, 8)), 1)
+        draw_player_sprite(self, surface, camera, tick,
+                           unreal_tint_fn=lambda t: xmas_cycle_color(t, 0.12))
 
 # --- Platforms ---
 class Platform:
@@ -3451,7 +3327,7 @@ class Game:
         # Soul animation: intercept normal respawn
         if not self.player.alive and self.soul_state is None:
             # Wait for death animation to finish before starting soul rise
-            if self.player.death_anim_done and self.player.respawn_timer > 0:
+            if self.player._spr_death_done and self.player.respawn_timer > 0:
                 self.player.respawn_timer = 9999  # block auto-respawn
                 self.soul_x = self.player.rect.centerx
                 self.soul_y = self.player.rect.centery

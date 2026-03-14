@@ -3,6 +3,8 @@ import sys
 import math
 import random
 import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from player_sprites import init_player_sprite, draw_player_sprite
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -240,6 +242,9 @@ class Player:
         self.prev_unreal = False
         self.kill_count = 0
         self.riding_platform = None
+        self.squash_timer = 0
+        self.was_on_ground = False
+        init_player_sprite(self)
 
     @property
     def is_unreal(self): return self.unreal_timer > 0
@@ -297,6 +302,7 @@ class Player:
                 self.vel_x = 0
 
         # Vertical
+        self.was_on_ground = self.on_ground
         self.on_ground = False; self.riding_platform = None
         vy = int(self.vel_y)
         if self.vel_y > 0 and vy == 0: vy = 1
@@ -319,26 +325,8 @@ class Player:
         return "jump" if jumped else None
 
     def draw(self, surface, camera, tick):
-        if not self.alive: return
-        sr = camera.apply(self.rect)
-        if self.is_unreal:
-            bc = rainbow_color(tick, 0.12)
-            pygame.draw.rect(surface, bc, sr)
-            pulse = abs(math.sin(tick * 0.15)) * 0.5 + 0.5
-            pygame.draw.rect(surface, lerp_color(GOLD, WHITE, pulse), sr.inflate(4, 4), 2)
-            gc = tuple(max(0, min(255, int(c * 0.3))) for c in bc)
-            pygame.draw.rect(surface, gc, sr.inflate(6 + int(4 * pulse), 6 + int(4 * pulse)), 3)
-        else:
-            pygame.draw.rect(surface, CLOUD_WHITE, sr)
-            pygame.draw.rect(surface, SKY_MID, (sr.x + 2, sr.y + 2, sr.width - 4, 4))
-        ey = sr.y + 10
-        pupil = BLACK if not self.is_unreal else GOLD
-        if self.facing_right:
-            pygame.draw.rect(surface, WHITE, (sr.x + 16, ey, 7, 7))
-            pygame.draw.rect(surface, pupil, (sr.x + 19, ey + 2, 4, 4))
-        else:
-            pygame.draw.rect(surface, WHITE, (sr.x + 5,  ey, 7, 7))
-            pygame.draw.rect(surface, pupil, (sr.x + 5,  ey + 2, 4, 4))
+        draw_player_sprite(self, surface, camera, tick,
+                           unreal_tint_fn=lambda t: rainbow_color(t, 0.12))
 
 
 # ---------------------------------------------------------------------------

@@ -2,6 +2,9 @@ import pygame
 import math
 import random
 import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from player_sprites import init_player_sprite, draw_player_sprite
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -1224,6 +1227,8 @@ class Player:
         self.alive=True; self.respawn_timer=0
         self.facing_right=True; self.riding_platform=None
         self.move_speed=move_speed; self.jump_velocity=jump_velocity
+        self.squash_timer=0; self.was_on_ground=False
+        init_player_sprite(self)
 
     def die(self): self.alive=False; self.respawn_timer=60
 
@@ -1267,6 +1272,7 @@ class Player:
                 self.vel_x=0
 
         # Vertical
+        self.was_on_ground=self.on_ground
         self.on_ground=False; self.riding_platform=None
         vy=int(self.vel_y)
         if self.vel_y>0 and vy==0: vy=1
@@ -1286,23 +1292,7 @@ class Player:
         return "jump" if jumped else None
 
     def draw(self,surface,camera,tick):
-        if not self.alive: return
-        sr=camera.apply(self.rect)
-        EG=(40,160,70); ER=(200,40,50)
-        pygame.draw.rect(surface,EG,sr)
-        by=sr.y+sr.height//2-2
-        pygame.draw.rect(surface,(80,50,20),(sr.x,by,sr.width,5))
-        pygame.draw.rect(surface,GOLD,(sr.centerx-4,by-1,8,7))
-        pygame.draw.polygon(surface,ER,[(sr.centerx,sr.y-12),(sr.x+2,sr.y+4),(sr.right-2,sr.y+4)])
-        pygame.draw.rect(surface,WHITE,(sr.x,sr.y+1,sr.width,5))
-        pygame.draw.circle(surface,WHITE,(sr.centerx,sr.y-12),4)
-        ey=sr.y+11
-        if self.facing_right:
-            pygame.draw.rect(surface,WHITE,(sr.x+16,ey,7,6))
-            pygame.draw.rect(surface,BLACK,(sr.x+19,ey+2,3,3))
-        else:
-            pygame.draw.rect(surface,WHITE,(sr.x+5,ey,7,6))
-            pygame.draw.rect(surface,BLACK,(sr.x+5,ey+2,3,3))
+        draw_player_sprite(self, surface, camera, tick)
 
 # ---------------------------------------------------------------------------
 # Sound Manager
