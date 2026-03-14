@@ -11,21 +11,25 @@ SCREEN_WIDTH  = 1280
 SCREEN_HEIGHT = 720
 FPS = 60
 
-# Sky / Cloud colour palette
 WHITE        = (255, 255, 255)
 BLACK        = (0,   0,   0)
-SKY_TOP      = (74,  144, 200)   # deep blue at altitude (SVG #4A90C8)
-SKY_MID      = (114, 174, 221)   # SVG #72AEDD
-SKY_BOT      = (190, 224, 245)   # SVG #BEE0F5
-CLOUD_WHITE  = (208, 234, 255)   # SVG #D0EAFF  — cloud platform tint
-CLOUD_SHADOW = (128, 184, 224)   # SVG #80B8E0
-SUN_YELLOW   = (255, 215,  64)   # SVG #FFD740
-SUN_ORANGE   = (255, 153,   0)   # SVG #FF9900
-PLAT_CLOUD   = (208, 234, 255)   # standard cloud platform  #D0EAFF
-PLAT_MOVE    = (136, 221, 136)   # moving  #88DD88
-PLAT_GLITCH  = (200, 168, 255)   # glitch  #C8A8FF
-PLAT_FALL    = (255, 152, 152)   # collapsing  #FF9898
-PLAT_TELE    = (255, 184,  96)   # teleport  #FFB860
+SKY_TOP      = (74,  144, 200)
+SKY_MID      = (114, 174, 221)
+SKY_BOT      = (190, 224, 245)
+CLOUD_WHITE  = (208, 234, 255)
+CLOUD_SHADOW = (128, 184, 224)
+SUN_YELLOW   = (255, 215,  64)
+SUN_ORANGE   = (255, 153,   0)
+PLAT_CLOUD   = (208, 234, 255)
+PLAT_MOVE    = (136, 221, 136)
+PLAT_GLITCH  = (200, 168, 255)
+PLAT_FALL    = (255, 152, 152)
+PLAT_TELE    = (255, 184,  96)
+PLAT_ICE     = (180, 230, 255)
+PLAT_BOUNCE  = (120, 255, 140)
+PLAT_SPIKE   = (210, 210, 215)
+SPIKE_COLOR  = (200,  50,  50)
+WIND_COLOR   = (160, 210, 255)
 GRAY         = (160, 170, 185)
 DARK_GRAY    = ( 70,  80,  95)
 RED          = (220,  60,  60)
@@ -34,21 +38,18 @@ YELLOW       = (255, 220,  50)
 ORANGE       = (255, 160,  30)
 CYAN         = ( 80, 220, 255)
 GOLD         = (255, 200,  50)
-BROWN        = (160, 110,  60)
-DARK_BROWN   = (110,  70,  30)
-MUSHROOM_RED = (204,  34,  34)   # SVG #CC2222
 DARK_BG      = (155, 205, 250)
 GRID_COLOR   = (140, 190, 235)
 
 # Physics
-GRAVITY        = 0.6
-JUMP_VELOCITY  = -15
-MOVE_SPEED     = 5
-SPRINT_SPEED   = 8
-MAX_FALL_SPEED = 15
-STOMP_BOUNCE   = -10
+GRAVITY         = 0.6
+JUMP_VELOCITY   = -15
+MOVE_SPEED      = 5
+SPRINT_SPEED    = 8
+MAX_FALL_SPEED  = 15
+BOUNCE_VELOCITY = -22   # spring launcher
 
-# Death Y — below the spawn cloud
+# Death Y
 DEATH_Y = 980
 
 # Unreal Mode
@@ -78,10 +79,14 @@ SOUND_DIR  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sounds")
 MUSIC_FILE = "assets/audio/Level1Music.mp3"
 
 SOUND_FILES = {
-    "jump": "jump.wav", "death": "death.wav", "respawn": "respawn.wav",
-    "stomp": "stomp.wav", "monster_kill": "monster_kill.wav",
-    "powerup": "powerup.wav", "unreal_end": "unreal_end.wav",
-    "checkpoint": "checkpoint.wav", "win": "win.wav",
+    "jump":       "jump.wav",
+    "death":      "death.wav",
+    "respawn":    "respawn.wav",
+    "powerup":    "powerup.wav",
+    "unreal_end": "unreal_end.wav",
+    "checkpoint": "checkpoint.wav",
+    "win":        "win.wav",
+    "bounce":     "jump.wav",
 }
 
 
@@ -116,7 +121,7 @@ class SoundManager:
 
 
 # ---------------------------------------------------------------------------
-# Camera  — follows player both X and Y (vertical map)
+# Camera
 # ---------------------------------------------------------------------------
 class Camera:
     def __init__(self, width, height):
@@ -128,13 +133,10 @@ class Camera:
         self.shake_x = self.shake_y = 0
 
     def update(self, target_rect):
-        # Horizontal: keep player ~1/3 from left
         tx = target_rect.centerx - self.width // 3
         self.offset_x += (tx - self.offset_x) * 0.1
-        # Vertical: centre player — full Y tracking for vertical map
         ty = target_rect.centery - self.height // 2
         self.offset_y += (ty - self.offset_y) * 0.08
-
         if self.shake_amount > 0.5:
             self.shake_x = random.randint(int(-self.shake_amount), int(self.shake_amount))
             self.shake_y = random.randint(int(-self.shake_amount), int(self.shake_amount))
@@ -189,7 +191,8 @@ class RingEffect:
         self.color = color
         self.radius = 0
         self.max_radius = max_radius
-        self.speed = speed; self.width = width
+        self.speed = speed
+        self.width = width
 
     def update(self):
         self.radius += self.speed
@@ -209,13 +212,16 @@ class RingEffect:
 # ---------------------------------------------------------------------------
 class FlashOverlay:
     def __init__(self, color, duration=15, max_alpha=180):
-        self.color = color; self.duration = duration
-        self.timer = duration; self.max_alpha = max_alpha
+        self.color = color
+        self.duration = duration
+        self.timer = duration
+        self.max_alpha = max_alpha
         self.surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         self.surface.fill(color)
 
     def update(self):
-        self.timer -= 1; return self.timer > 0
+        self.timer -= 1
+        return self.timer > 0
 
     def draw(self, surface):
         self.surface.set_alpha(int(self.max_alpha * self.timer / self.duration))
@@ -223,136 +229,247 @@ class FlashOverlay:
 
 
 # ---------------------------------------------------------------------------
-# Player
+# NEW OBSTACLE: Wind Zone
+# Invisible horizontal push zone. Draws as animated streaks with arrows.
 # ---------------------------------------------------------------------------
-class Player:
-    WIDTH, HEIGHT = 28, 36
+class WindZone:
+    def __init__(self, x, y, w, h, force=2.5, direction=1):
+        self.rect      = pygame.Rect(x, y, w, h)
+        self.force     = force
+        self.direction = direction   # +1 right, -1 left
+        self.tick      = 0
+        rng = random.Random(x ^ (y + 1))
+        self.streaks = [(rng.randint(0, w), rng.randint(0, h),
+                         rng.randint(40, 90)) for _ in range(20)]
+
+    def update(self):
+        self.tick += 1
+
+    def apply_to_player(self, player):
+        if player.alive and player.rect.colliderect(self.rect):
+            player.vel_x += self.force * self.direction * 0.35
+            player.vel_x = max(-12, min(12, player.vel_x))
+
+    def draw(self, surface, camera):
+        sr = camera.apply(self.rect)
+        if sr.right < -20 or sr.left > SCREEN_WIDTH + 20: return
+        if sr.bottom < -20 or sr.top  > SCREEN_HEIGHT + 20: return
+
+        # Translucent tinted fill
+        overlay = pygame.Surface((max(1, sr.width), max(1, sr.height)), pygame.SRCALPHA)
+        alpha = int(30 + 14 * abs(math.sin(self.tick * 0.04)))
+        col = (100, 180, 255, alpha) if self.direction > 0 else (255, 170, 80, alpha)
+        overlay.fill(col)
+        surface.blit(overlay, (sr.x, sr.y))
+
+        # Animated streaks
+        speed_off = self.tick * 3 * self.direction
+        for ox, oy, length in self.streaks:
+            sx = sr.x + (ox + speed_off) % max(1, sr.width)
+            sy = sr.y + oy % max(1, sr.height)
+            ex = sx + length * self.direction
+            sx = max(sr.x, min(sr.right, sx))
+            ex = max(sr.x, min(sr.right, ex))
+            a2 = int(70 + 50 * abs(math.sin(self.tick * 0.06 + ox)))
+            c3 = (160, 210, 255) if self.direction > 0 else (255, 200, 130)
+            if abs(ex - sx) > 2:
+                pygame.draw.line(surface, c3, (int(sx), int(sy)), (int(ex), int(sy)), 1)
+
+        # Arrow indicators every 80 px across the zone
+        arrow_step = 80
+        start_x = sr.x + 30
+        for ax in range(start_x, sr.right - 20, arrow_step):
+            ay = sr.centery
+            tip = (ax + 14 * self.direction, ay)
+            base_l = (ax, ay - 7)
+            base_r = (ax, ay + 7)
+            pygame.draw.polygon(surface, WIND_COLOR, [base_l, tip, base_r])
+
+        # Label
+        font = pygame.font.SysFont("consolas", 11, bold=True)
+        lbl = font.render(">> WIND >>" if self.direction > 0 else "<< WIND <<", True, (70, 130, 190))
+        surface.blit(lbl, (sr.x + 6, sr.y + 4))
+
+
+# ---------------------------------------------------------------------------
+# NEW OBSTACLE: Ice Platform
+# Very low friction — player slides and accelerates slowly.
+# ---------------------------------------------------------------------------
+class IcePlatform:
+    ICE_FRICTION = 0.96   # slightly more forgiving — still slippery but not hopeless
+    ICE_ACCEL    = 0.14
+
+    def __init__(self, x, y, w, h=26):
+        self.rect  = pygame.Rect(x, y, w, h)
+        self.color = PLAT_ICE
+        self.tick  = 0
+
+    def is_active(self):         return True
+    def get_rect(self):          return self.rect
+    def on_player_land(self, p): pass
+    def update(self):            self.tick += 1
+
+    def draw(self, surface, camera):
+        sr = camera.apply(self.rect)
+        if sr.right < -10 or sr.left > SCREEN_WIDTH + 10: return
+        pygame.draw.rect(surface, self.color, sr, border_radius=10)
+        # Glossy highlight
+        hi = tuple(min(c + 65, 255) for c in self.color)
+        pygame.draw.rect(surface, hi, (sr.x + 4, sr.y, sr.width - 8, 5), border_radius=4)
+        # Sparkle dots
+        for i in range(5):
+            phase = (self.tick * 0.09 + i * 1.3) % (2 * math.pi)
+            bri   = int(150 + 105 * abs(math.sin(phase)))
+            sp_x  = sr.x + 10 + i * max(1, (sr.width - 20) // 4)
+            pygame.draw.circle(surface, (bri, bri, 255), (sp_x, sr.y + 8), 2)
+        # Label
+        font = pygame.font.SysFont("consolas", 10, bold=True)
+        lbl  = font.render("ICE", True, (80, 160, 215))
+        surface.blit(lbl, (sr.centerx - lbl.get_width() // 2, sr.y + 9))
+
+
+# ---------------------------------------------------------------------------
+# NEW OBSTACLE: Bouncy Pad
+# Small spring that launches the player much higher than a normal jump.
+# ---------------------------------------------------------------------------
+class BouncyPad:
+    PAD_W, PAD_H = 60, 18
 
     def __init__(self, x, y):
-        self.rect = pygame.Rect(x, y, self.WIDTH, self.HEIGHT)
-        self.vel_x = self.vel_y = 0.0
-        self.on_ground = False
-        self.spawn_x, self.spawn_y = x, y
-        self.alive = True
-        self.respawn_timer = 0
-        self.facing_right = True
-        self.unreal_timer = 0
-        self.prev_unreal = False
-        self.kill_count = 0
-        self.riding_platform = None
+        self.rect   = pygame.Rect(x, y, self.PAD_W, self.PAD_H)
+        self.tick   = 0
+        self.squish = 0
 
-    @property
-    def is_unreal(self): return self.unreal_timer > 0
+    def is_active(self):  return True
+    def get_rect(self):   return self.rect
 
-    def activate_unreal(self): self.unreal_timer = UNREAL_DURATION
+    def on_player_land(self, player):
+        player.vel_y     = BOUNCE_VELOCITY
+        player.on_ground = False
+        self.squish      = 10
 
-    def set_checkpoint(self, x, y): self.spawn_x, self.spawn_y = x, y
+    def update(self):
+        self.tick += 1
+        if self.squish > 0: self.squish -= 1
 
-    def die(self):
-        if self.is_unreal: return
-        self.alive = False; self.respawn_timer = 50
-
-    def respawn(self):
-        self.rect.topleft = (self.spawn_x, self.spawn_y)
-        self.vel_x = self.vel_y = 0
-        self.alive = True; self.on_ground = False; self.unreal_timer = 0
-
-    def update(self, keys, platforms):
-        self.prev_unreal = self.is_unreal
-        if not self.alive:
-            self.respawn_timer -= 1
-            if self.respawn_timer <= 0: self.respawn()
-            return
-
-        if self.unreal_timer > 0: self.unreal_timer -= 1
-
-        if self.riding_platform is not None and hasattr(self.riding_platform, 'dx'):
-            self.rect.x += self.riding_platform.dx
-            self.rect.y += self.riding_platform.dy
-
-        move = 0.0
-        speed = SPRINT_SPEED if (keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]) else MOVE_SPEED
-        if self.is_unreal: speed += UNREAL_SPEED_BOOST
-        if keys[pygame.K_LEFT]  or keys[pygame.K_a]: move -= speed; self.facing_right = False
-        if keys[pygame.K_RIGHT] or keys[pygame.K_d]: move += speed; self.facing_right = True
-
-        self.vel_x = self.vel_x + (move - self.vel_x) * 0.3 if move else self.vel_x * 0.75
-        if abs(self.vel_x) < 0.1: self.vel_x = 0
-
-        self.vel_y = min(self.vel_y + GRAVITY, MAX_FALL_SPEED)
-        jumped = False
-        if self.on_ground and (keys[pygame.K_SPACE] or keys[pygame.K_UP] or keys[pygame.K_w]):
-            self.vel_y = JUMP_VELOCITY + (-2 if self.is_unreal else 0)
-            self.on_ground = False; self.riding_platform = None; jumped = True
-
-        # Horizontal
-        self.rect.x += int(self.vel_x)
-        for plat in platforms:
-            if not plat.is_active(): continue
-            pr = plat.get_rect()
-            if self.rect.colliderect(pr):
-                if self.rect.bottom <= pr.top + 6: continue
-                if self.vel_x > 0:   self.rect.right = pr.left
-                elif self.vel_x < 0: self.rect.left  = pr.right
-                self.vel_x = 0
-
-        # Vertical
-        self.on_ground = False; self.riding_platform = None
-        vy = int(self.vel_y)
-        if self.vel_y > 0 and vy == 0: vy = 1
-        self.rect.y += vy
-        for plat in platforms:
-            if not plat.is_active(): continue
-            pr = plat.get_rect()
-            if self.rect.colliderect(pr):
-                if self.vel_y > 0:
-                    self.rect.bottom = pr.top; self.vel_y = 0
-                    self.on_ground = True
-                    if isinstance(plat, MovingPlatform): self.riding_platform = plat
-                    plat.on_player_land(self)
-                elif self.vel_y < 0:
-                    self.rect.top = pr.bottom; self.vel_y = 0
-
-        if self.rect.top > DEATH_Y:
-            self.alive = False; self.respawn_timer = 50
-
-        return "jump" if jumped else None
-
-    def draw(self, surface, camera, tick):
-        if not self.alive: return
+    def draw(self, surface, camera):
         sr = camera.apply(self.rect)
-        if self.is_unreal:
-            bc = rainbow_color(tick, 0.12)
-            pygame.draw.rect(surface, bc, sr)
-            pulse = abs(math.sin(tick * 0.15)) * 0.5 + 0.5
-            pygame.draw.rect(surface, lerp_color(GOLD, WHITE, pulse), sr.inflate(4, 4), 2)
-            gc = tuple(max(0, min(255, int(c * 0.3))) for c in bc)
-            pygame.draw.rect(surface, gc, sr.inflate(6 + int(4 * pulse), 6 + int(4 * pulse)), 3)
-        else:
-            pygame.draw.rect(surface, CLOUD_WHITE, sr)
-            pygame.draw.rect(surface, SKY_MID, (sr.x + 2, sr.y + 2, sr.width - 4, 4))
-        ey = sr.y + 10
-        pupil = BLACK if not self.is_unreal else GOLD
-        if self.facing_right:
-            pygame.draw.rect(surface, WHITE, (sr.x + 16, ey, 7, 7))
-            pygame.draw.rect(surface, pupil, (sr.x + 19, ey + 2, 4, 4))
-        else:
-            pygame.draw.rect(surface, WHITE, (sr.x + 5,  ey, 7, 7))
-            pygame.draw.rect(surface, pupil, (sr.x + 5,  ey + 2, 4, 4))
+        if sr.right < -10 or sr.left > SCREEN_WIDTH + 10: return
+
+        # Squish animation
+        sh = max(4, int(sr.height * (1.0 - 0.45 * self.squish / 10)))
+        sy = sr.bottom - sh
+        body = pygame.Rect(sr.x, sy, sr.width, sh)
+
+        coil_col = lerp_color(PLAT_BOUNCE, (200, 255, 200),
+                              abs(math.sin(self.tick * 0.12)) * 0.4)
+        pygame.draw.rect(surface, coil_col, body, border_radius=8)
+
+        # Coil lines
+        for i in range(3):
+            cy2 = body.y + 3 + i * max(1, sh // 3)
+            pygame.draw.line(surface, (50, 170, 70),
+                             (sr.x + 6, cy2), (sr.right - 6, cy2), 2)
+
+        # Bouncing arrow above pad
+        pulse = abs(math.sin(self.tick * 0.14))
+        ay = sr.y - int(7 + 7 * pulse)
+        arrow_col = lerp_color((80, 220, 100), WHITE, pulse)
+        pygame.draw.polygon(surface, arrow_col,
+            [(sr.centerx, ay - 9), (sr.centerx - 8, ay + 3), (sr.centerx + 8, ay + 3)])
+
+        # Label
+        font = pygame.font.SysFont("consolas", 10, bold=True)
+        lbl  = font.render("SPRING", True, (30, 130, 50))
+        surface.blit(lbl, (sr.centerx - lbl.get_width() // 2, body.y + 1))
 
 
 # ---------------------------------------------------------------------------
-# Platforms
+# NEW OBSTACLE: Spike Trap
+# Platform with spikes that extend/retract on a timer.
+# Touching the spikes while they're out = death.
+# ---------------------------------------------------------------------------
+class SpikeTrap:
+    SPIKE_H = 14
+
+    def __init__(self, x, y, w, h=26, up_time=70, down_time=50, offset=0, spike_count=None):
+        self.rect        = pygame.Rect(x, y, w, h)
+        self.up_time     = up_time
+        self.down_time   = down_time
+        self.timer       = offset
+        self.spikes_up   = False
+        self.spike_count = spike_count or max(2, w // 20)
+        self.color       = PLAT_SPIKE
+
+    def is_active(self):         return True
+    def get_rect(self):          return self.rect
+    def on_player_land(self, p): pass
+
+    def update(self):
+        self.timer += 1
+        phase = self.timer % (self.up_time + self.down_time)
+        self.spikes_up = phase < self.up_time
+
+    def kills_player(self, player):
+        if not self.spikes_up or not player.alive: return False
+        spike_rect = pygame.Rect(self.rect.x, self.rect.y - self.SPIKE_H,
+                                 self.rect.width, self.SPIKE_H + 4)
+        return player.rect.colliderect(spike_rect)
+
+    def draw(self, surface, camera):
+        sr = camera.apply(self.rect)
+        if sr.right < -10 or sr.left > SCREEN_WIDTH + 10: return
+
+        # Platform base
+        pygame.draw.rect(surface, self.color, sr, border_radius=6)
+        hi = tuple(min(c + 30, 255) for c in self.color)
+        pygame.draw.rect(surface, hi, (sr.x + 4, sr.y, sr.width - 8, 4), border_radius=3)
+
+        # Spike extension amount
+        phase = self.timer % (self.up_time + self.down_time)
+        if self.spikes_up:
+            ext = self.SPIKE_H
+        else:
+            retract = min(1.0, (phase - self.up_time) / 12.0)
+            ext = int(self.SPIKE_H * (1.0 - retract))
+
+        n   = self.spike_count
+        gap = sr.width / max(1, n)
+        if ext > 0:
+            for i in range(n):
+                tip_x  = int(sr.x + gap * i + gap / 2)
+                tip_y  = sr.y - ext
+                base_l = int(sr.x + gap * i + 3)
+                base_r = int(sr.x + gap * (i + 1) - 3)
+                pygame.draw.polygon(surface, SPIKE_COLOR,
+                    [(tip_x, tip_y), (base_l, sr.y), (base_r, sr.y)])
+                pygame.draw.polygon(surface, (255, 110, 110),
+                    [(tip_x, tip_y), (base_l, sr.y), (base_r, sr.y)], 1)
+
+        # Warning flash — blinks when spikes are about to rise
+        warn = self.down_time - (phase - self.up_time) if not self.spikes_up else 0
+        if not self.spikes_up and warn < 20 and (self.timer // 4) % 2 == 0:
+            pygame.draw.rect(surface, (255, 80, 80), sr, 2, border_radius=6)
+
+        # Label
+        font = pygame.font.SysFont("consolas", 10, bold=True)
+        col  = (200, 50, 50) if self.spikes_up else (110, 110, 120)
+        lbl  = font.render("SPIKE", True, col)
+        surface.blit(lbl, (sr.centerx - lbl.get_width() // 2, sr.y + 7))
+
+
+# ---------------------------------------------------------------------------
+# Standard Platforms
 # ---------------------------------------------------------------------------
 class Platform:
     def __init__(self, x, y, w, h, color=None):
-        self.rect = pygame.Rect(x, y, w, h)
+        self.rect  = pygame.Rect(x, y, w, h)
         self.color = color or PLAT_CLOUD
 
-    def is_active(self): return True
-    def get_rect(self):  return self.rect
-    def on_player_land(self, player): pass
-    def update(self): pass
+    def is_active(self):         return True
+    def get_rect(self):          return self.rect
+    def on_player_land(self, p): pass
+    def update(self):            pass
 
     def draw(self, surface, camera):
         sr = camera.apply(self.rect)
@@ -365,7 +482,8 @@ class Platform:
 class MovingPlatform(Platform):
     def __init__(self, x1, y1, x2, y2, w, h, speed=1.5, color=None):
         super().__init__(x1, y1, w, h, color or PLAT_MOVE)
-        self.sx, self.sy = x1, y1; self.ex, self.ey = x2, y2
+        self.sx, self.sy = x1, y1
+        self.ex, self.ey = x2, y2
         self.speed = speed; self.progress = 0.0; self.dir = 1
         self.dx = self.dy = 0
 
@@ -377,15 +495,19 @@ class MovingPlatform(Platform):
         t = self.progress; s = t * t * (3 - 2 * t)
         self.rect.x = int(self.sx + (self.ex - self.sx) * s)
         self.rect.y = int(self.sy + (self.ey - self.sy) * s)
-        self.dx = self.rect.x - ox; self.dy = self.rect.y - oy
+        self.dx = self.rect.x - ox
+        self.dy = self.rect.y - oy
 
 
 class GlitchPlatform(Platform):
     def __init__(self, x, y, w, h, on_time=90, off_time=60, offset=0, color=None):
         super().__init__(x, y, w, h, color or PLAT_GLITCH)
         self.base_color = self.color
-        self.on_time = on_time; self.off_time = off_time
-        self.timer = offset; self.active = True; self.alpha = 255
+        self.on_time  = on_time
+        self.off_time = off_time
+        self.timer    = offset
+        self.active   = True
+        self.alpha    = 255
 
     def update(self):
         self.timer += 1
@@ -398,7 +520,8 @@ class GlitchPlatform(Platform):
         else:
             self.active = False
             off_e = phase - self.on_time
-            self.alpha = 25 if off_e < self.off_time - 20 else min(25 + (off_e - (self.off_time - 20)) * 6, 80)
+            self.alpha = 25 if off_e < self.off_time - 20 \
+                else min(25 + (off_e - (self.off_time - 20)) * 6, 80)
 
     def is_active(self): return self.active
 
@@ -413,7 +536,8 @@ class GlitchPlatform(Platform):
             for ix in range(0, sr.width, 8):
                 if (self.timer + ix) % 12 < 6:
                     lc = tuple(min(v + 40, 255) for v in c)
-                    pygame.draw.line(surface, lc, (sr.x + ix, sr.y), (sr.x + ix, sr.y + sr.height))
+                    pygame.draw.line(surface, lc,
+                                     (sr.x + ix, sr.y), (sr.x + ix, sr.y + sr.height))
 
 
 class TeleportPlatform(Platform):
@@ -444,9 +568,11 @@ class TeleportPlatform(Platform):
 class CollapsingPlatform(Platform):
     def __init__(self, x, y, w, h, delay=45, respawn_time=180, color=None):
         super().__init__(x, y, w, h, color or PLAT_FALL)
-        self.base_color = self.color; self.oy = y; self.delay = delay
-        self.respawn_time = respawn_time; self.stood = 0
-        self.collapsed = False; self.rc = 0; self.shake = 0
+        self.base_color  = self.color
+        self.oy          = y
+        self.delay       = delay
+        self.respawn_time = respawn_time
+        self.stood = 0; self.collapsed = False; self.rc = 0; self.shake = 0
 
     def update(self):
         if self.collapsed:
@@ -475,11 +601,12 @@ class CollapsingPlatform(Platform):
             col = self.base_color
         pygame.draw.rect(surface, col, sr, border_radius=8)
         if self.stood > self.delay * 0.5:
-            pygame.draw.line(surface, BLACK, (sr.centerx - 8, sr.y), (sr.centerx + 4, sr.bottom), 2)
+            pygame.draw.line(surface, BLACK,
+                             (sr.centerx - 8, sr.y), (sr.centerx + 4, sr.bottom), 2)
 
 
 # ---------------------------------------------------------------------------
-# Checkpoint
+# Checkpoint / Exit
 # ---------------------------------------------------------------------------
 class Checkpoint:
     def __init__(self, x, y):
@@ -507,9 +634,6 @@ class Checkpoint:
             pygame.draw.rect(surface, tuple(int(v * i) for v in SUN_YELLOW), sr.inflate(6, 6), 2)
 
 
-# ---------------------------------------------------------------------------
-# Exit Door
-# ---------------------------------------------------------------------------
 class ExitDoor:
     def __init__(self, x, y):
         self.rect = pygame.Rect(x, y, 50, 70); self.pulse = 0
@@ -522,146 +646,11 @@ class ExitDoor:
         sr = camera.apply(self.rect)
         pygame.draw.rect(surface, DARK_GRAY, sr.inflate(10, 10), border_radius=8)
         p = abs(math.sin(math.radians(self.pulse)))
-        pygame.draw.rect(surface, (int(40 + 180 * p), int(200 + 55 * p), int(40 + 80 * p)), sr, border_radius=8)
+        pygame.draw.rect(surface,
+            (int(40 + 180 * p), int(200 + 55 * p), int(40 + 80 * p)), sr, border_radius=8)
         pygame.draw.circle(surface, SUN_YELLOW, (sr.right - 14, sr.centery), 5)
         font = pygame.font.SysFont("consolas", 14)
         surface.blit(font.render("EXIT", True, WHITE), (sr.x + 7, sr.y + 6))
-
-
-# ---------------------------------------------------------------------------
-# Monsters
-# ---------------------------------------------------------------------------
-class Monster:
-    WIDTH, HEIGHT = 26, 26
-    def __init__(self, x, y, pl, pr, speed=1.5, color=None):
-        self.rect = pygame.Rect(x, y, self.WIDTH, self.HEIGHT)
-        self.pl, self.pr = pl, pr; self.speed = speed; self.dir = 1
-        self.color = color or (255, 100, 80); self.alive = True
-        self.death_timer = 0; self.bob = 0
-
-    def update(self):
-        if not self.alive: self.death_timer -= 1; return
-        self.rect.x += int(self.speed * self.dir)
-        if self.rect.x >= self.pr: self.rect.x = self.pr; self.dir = -1
-        elif self.rect.x <= self.pl: self.rect.x = self.pl; self.dir = 1
-        self.bob += 0.12
-
-    def kill(self): self.alive = False; self.death_timer = 1
-
-    def check_collision(self, player):
-        if not self.alive or not player.alive: return None
-        if not self.rect.colliderect(player.rect): return None
-        return "kill_monster" if player.is_unreal else "kill_player"
-
-    def draw(self, surface, camera, tick):
-        if not self.alive: return
-        sr = camera.apply(self.rect)
-        if sr.right < -10 or sr.left > SCREEN_WIDTH + 10: return
-        bo = int(math.sin(self.bob) * 2)
-        b = pygame.Rect(sr.x, sr.y + bo, sr.w, sr.h)
-        pygame.draw.rect(surface, self.color, b, border_radius=4)
-        for sx in range(b.x + 2, b.right - 2, 6):
-            pygame.draw.polygon(surface, self.color, [(sx, b.y), (sx + 3, b.y - 6), (sx + 6, b.y)])
-        ey = b.y + 8
-        pygame.draw.rect(surface, WHITE, (b.x + 4,  ey, 6, 5))
-        pygame.draw.rect(surface, WHITE, (b.x + 16, ey, 6, 5))
-        pygame.draw.rect(surface, BLACK, (b.x + 6,  ey + 2, 3, 3))
-        pygame.draw.rect(surface, BLACK, (b.x + 18, ey + 2, 3, 3))
-        pygame.draw.line(surface, BLACK, (b.x + 3, ey - 2), (b.x + 10, ey), 2)
-        pygame.draw.line(surface, BLACK, (b.right - 3, ey - 2), (b.right - 10, ey), 2)
-
-
-class FlyingMonster:
-    WIDTH, HEIGHT = 30, 22
-    def __init__(self, x, y, pl, pr, speed=1.2, amplitude=40, color=None):
-        self.bx, self.by = float(x), float(y)
-        self.rect = pygame.Rect(x, y, self.WIDTH, self.HEIGHT)
-        self.pl, self.pr = pl, pr; self.speed = speed
-        self.amplitude = amplitude; self.dir = 1
-        self.color = color or (85, 119, 238); self.alive = True
-        self.death_timer = 0; self.phase = random.uniform(0, math.pi * 2); self.tick = 0
-
-    def update(self):
-        if not self.alive: self.death_timer -= 1; return
-        self.tick += 1; self.bx += self.speed * self.dir
-        if self.bx >= self.pr: self.bx = self.pr; self.dir = -1
-        elif self.bx <= self.pl: self.bx = self.pl; self.dir = 1
-        self.rect.x = int(self.bx)
-        self.rect.y = int(self.by + math.sin(self.tick * 0.04 + self.phase) * self.amplitude)
-
-    def kill(self): self.alive = False; self.death_timer = 1
-
-    def check_collision(self, player):
-        if not self.alive or not player.alive: return None
-        if not self.rect.colliderect(player.rect): return None
-        return "kill_monster" if player.is_unreal else "kill_player"
-
-    def draw(self, surface, camera, tick):
-        if not self.alive: return
-        sr = camera.apply(self.rect)
-        if sr.right < -10 or sr.left > SCREEN_WIDTH + 10: return
-        pygame.draw.ellipse(surface, self.color, sr)
-        wy = sr.centery - 2 + int(math.sin(tick * 0.3) * 3)
-        pygame.draw.polygon(surface, self.color, [(sr.left, wy), (sr.left - 10, wy - 8), (sr.left + 5, wy)])
-        pygame.draw.polygon(surface, self.color, [(sr.right, wy), (sr.right + 10, wy - 8), (sr.right - 5, wy)])
-        ey = sr.y + 6; ex = sr.x + 16 if self.dir >= 0 else sr.x + 8
-        pygame.draw.rect(surface, WHITE, (ex, ey, 6, 5))
-        pygame.draw.rect(surface, BLACK, (ex + 2, ey + 1, 3, 3))
-
-
-class MushroomMonster:
-    WIDTH, HEIGHT = 28, 28
-    def __init__(self, x, y, patrol_left, patrol_right, speed=1.3):
-        self.rect = pygame.Rect(x, y, self.WIDTH, self.HEIGHT)
-        self.patrol_left = patrol_left; self.patrol_right = patrol_right
-        self.speed = speed; self.direction = 1; self.alive = True
-        self.death_timer = 0; self.squish_timer = 0; self.tick = 0
-
-    def update(self):
-        if not self.alive: self.death_timer -= 1; return
-        if self.squish_timer > 0:
-            self.squish_timer -= 1
-            if self.squish_timer <= 0: self.alive = False; self.death_timer = 1
-            return
-        self.tick += 1; self.rect.x += int(self.speed * self.direction)
-        if self.rect.x >= self.patrol_right: self.rect.x = self.patrol_right; self.direction = -1
-        elif self.rect.x <= self.patrol_left: self.rect.x = self.patrol_left; self.direction = 1
-
-    def kill(self): self.alive = False; self.death_timer = 1
-    def stomp(self): self.squish_timer = 12
-
-    def check_collision(self, player):
-        if not self.alive or self.squish_timer > 0 or not player.alive: return None
-        if not self.rect.colliderect(player.rect): return None
-        if player.is_unreal: return "kill_monster"
-        if player.vel_y > 0 and player.rect.bottom <= self.rect.centery + 6: return "stomp"
-        return "kill_player"
-
-    def draw(self, surface, camera, tick):
-        if not self.alive: return
-        sr = camera.apply(self.rect)
-        if sr.right < -10 or sr.left > SCREEN_WIDTH + 10: return
-        if self.squish_timer > 0:
-            flat = pygame.Rect(sr.x - 4, sr.bottom - 8, sr.width + 8, 8)
-            pygame.draw.rect(surface, BROWN, flat)
-            pygame.draw.ellipse(surface, MUSHROOM_RED, (flat.x, flat.y - 4, flat.width, 8))
-            return
-        bob = int(math.sin(self.tick * 0.2) * 1.5)
-        stem = pygame.Rect(sr.x + 4, sr.centery + bob, sr.width - 8, sr.height // 2)
-        pygame.draw.rect(surface, BROWN, stem)
-        cap = pygame.Rect(sr.x - 2, sr.y + bob, sr.width + 4, sr.height // 2 + 4)
-        pygame.draw.ellipse(surface, MUSHROOM_RED, cap)
-        for sx, sy, r in [(cap.x + 6, cap.y + 5, 3), (cap.right - 8, cap.y + 4, 3), (cap.centerx, cap.y + 2, 2)]:
-            pygame.draw.circle(surface, WHITE, (sx, sy + bob), r)
-        fy = sr.bottom + bob
-        pygame.draw.ellipse(surface, DARK_BROWN, (sr.x + 2, fy - 4, 8, 5))
-        pygame.draw.ellipse(surface, DARK_BROWN, (sr.right - 10, fy - 4, 8, 5))
-        ey = sr.centery - 2 + bob
-        pygame.draw.circle(surface, WHITE, (sr.x + 8, ey), 4)
-        pygame.draw.circle(surface, WHITE, (sr.right - 8, ey), 4)
-        px = 1 if self.direction > 0 else -1
-        pygame.draw.circle(surface, BLACK, (sr.x + 8 + px, ey + 1), 2)
-        pygame.draw.circle(surface, BLACK, (sr.right - 8 + px, ey + 1), 2)
 
 
 # ---------------------------------------------------------------------------
@@ -671,7 +660,8 @@ class Powerup:
     RADIUS = 12
     def __init__(self, x, y, respawn_time=600):
         self.x, self.y = x, y
-        self.rect = pygame.Rect(x - self.RADIUS, y - self.RADIUS, self.RADIUS * 2, self.RADIUS * 2)
+        self.rect = pygame.Rect(x - self.RADIUS, y - self.RADIUS,
+                                self.RADIUS * 2, self.RADIUS * 2)
         self.collected = False; self.respawn_time = respawn_time
         self.rc = 0; self.tick = random.randint(0, 360)
 
@@ -695,19 +685,24 @@ class Powerup:
         sx, sy = pos.x, pos.y
         if sx < -30 or sx > SCREEN_WIDTH + 30: return
         pulse = abs(math.sin(self.tick * 0.08)) * 0.4 + 0.6
-        pygame.draw.circle(surface, tuple(max(0, min(255, int(c * 0.3 * pulse))) for c in SUN_YELLOW), (sx, sy), int(self.RADIUS * 2 * pulse))
-        pygame.draw.circle(surface, lerp_color(SUN_YELLOW, WHITE, abs(math.sin(self.tick * 0.1))), (sx, sy), self.RADIUS)
+        pygame.draw.circle(surface,
+            tuple(max(0, min(255, int(c * 0.3 * pulse))) for c in SUN_YELLOW),
+            (sx, sy), int(self.RADIUS * 2 * pulse))
+        pygame.draw.circle(surface,
+            lerp_color(SUN_YELLOW, WHITE, abs(math.sin(self.tick * 0.1))),
+            (sx, sy), self.RADIUS)
         pygame.draw.circle(surface, WHITE, (sx - 3, sy - 3), 4)
         font = pygame.font.SysFont("consolas", 9, bold=True)
-        lbl = font.render("U", True, BLACK)
+        lbl  = font.render("U", True, BLACK)
         surface.blit(lbl, (sx - lbl.get_width() // 2, sy - lbl.get_height() // 2))
         a = self.tick * 0.08
         pygame.draw.rect(surface, rainbow_color(self.tick, 0.15),
-            (sx + int(math.cos(a) * (self.RADIUS + 6)) - 2, sy + int(math.sin(a) * (self.RADIUS + 6)) - 2, 4, 4))
+            (sx + int(math.cos(a) * (self.RADIUS + 6)) - 2,
+             sy + int(math.sin(a) * (self.RADIUS + 6)) - 2, 4, 4))
 
 
 # ---------------------------------------------------------------------------
-# Background decoration cloud
+# Background cloud
 # ---------------------------------------------------------------------------
 class BgCloud:
     def __init__(self, x, y, size, drift=0.15):
@@ -718,250 +713,340 @@ class BgCloud:
         sy = int(self.y - camera.offset_y * 0.15)
         if sx < -self.size * 4 or sx > SCREEN_WIDTH + self.size * 4: return
         s = self.size
-        for ox, oy, r in [(0, 0, s), (s, 4, int(s * 0.8)), (-s, 4, int(s * 0.75)), (int(s * 1.8), 8, int(s * 0.6))]:
+        for ox, oy, r in [(0,0,s),(s,4,int(s*.8)),(-s,4,int(s*.75)),(int(s*1.8),8,int(s*.6))]:
             pygame.draw.circle(surface, CLOUD_WHITE, (sx + ox, sy + oy), r)
 
 
 # ---------------------------------------------------------------------------
-# Level builder — redesigned to match level1_climb_map_v2.svg
-#
-# SVG coordinate space: 680 wide × 980 tall.
-#   SVG y=900  → spawn (bottom)        → game world y ≈ 860
-#   SVG y=84   → exit platform (top)   → game world y ≈ -2540
-#
-# The SVG uses two columns (left ≈ x140–160, right ≈ x420–460).
-# In the game world we map those proportionally:
-#   SVG x / 680 * game_width  where game_width ≈ 640 (0–640 visible range)
-#
-# Vertical scale: (900 - 84) = 816 SVG units → (860 - (-2540)) = 3400 game units
-#   scale_y ≈ 3400 / 816 ≈ 4.17
-#
-# Conversion helpers (origin at SVG y=900 → game y=860):
-#   game_x = svg_x / 680 * 640
-#   game_y = 860 - (900 - svg_y) * 4.17
-#
-# Tier boundaries (game world y, approx):
-#   Tier 1  staircase intro      y  860 →  140
-#   Tier 2  glitch islands       y  140 → -740
-#   Tier 3  moving platforms     y -740 →-1490
-#   Tier 4  teleport + collapse  y-1490 →-2160
-#   Tier 5  summit gauntlet      y-2160 →-2620
-#   Exit door                    y      ≈-2640
+# Player
 # ---------------------------------------------------------------------------
+class Player:
+    WIDTH, HEIGHT = 28, 36
 
+    def __init__(self, x, y):
+        self.rect = pygame.Rect(x, y, self.WIDTH, self.HEIGHT)
+        self.vel_x = self.vel_y = 0.0
+        self.on_ground = False
+        self.spawn_x, self.spawn_y = x, y
+        self.alive = True
+        self.respawn_timer = 0
+        self.facing_right = True
+        self.unreal_timer = 0
+        self.prev_unreal  = False
+        self.riding_platform = None
+        self.on_ice = False
+
+    @property
+    def is_unreal(self): return self.unreal_timer > 0
+
+    def activate_unreal(self): self.unreal_timer = UNREAL_DURATION
+
+    def set_checkpoint(self, x, y): self.spawn_x, self.spawn_y = x, y
+
+    def die(self):
+        if self.is_unreal: return
+        self.alive = False; self.respawn_timer = 50
+
+    def respawn(self):
+        self.rect.topleft = (self.spawn_x, self.spawn_y)
+        self.vel_x = self.vel_y = 0
+        self.alive = True; self.on_ground = False; self.unreal_timer = 0
+
+    def update(self, keys, platforms):
+        self.prev_unreal = self.is_unreal
+        if not self.alive:
+            self.respawn_timer -= 1
+            if self.respawn_timer <= 0: self.respawn()
+            return
+
+        if self.unreal_timer > 0: self.unreal_timer -= 1
+
+        if self.riding_platform is not None and hasattr(self.riding_platform, 'dx'):
+            self.rect.x += self.riding_platform.dx
+            self.rect.y += self.riding_platform.dy
+
+        move  = 0.0
+        speed = SPRINT_SPEED if (keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]) else MOVE_SPEED
+        if self.is_unreal: speed += UNREAL_SPEED_BOOST
+        if keys[pygame.K_LEFT]  or keys[pygame.K_a]: move -= speed; self.facing_right = False
+        if keys[pygame.K_RIGHT] or keys[pygame.K_d]: move += speed; self.facing_right = True
+
+        # Ice changes feel — sluggish acceleration, barely any friction
+        accel = IcePlatform.ICE_ACCEL    if self.on_ice else 0.3
+        fric  = IcePlatform.ICE_FRICTION if self.on_ice else 0.75
+
+        self.vel_x = (self.vel_x + (move - self.vel_x) * accel) if move else (self.vel_x * fric)
+        if abs(self.vel_x) < 0.1: self.vel_x = 0
+
+        self.vel_y = min(self.vel_y + GRAVITY, MAX_FALL_SPEED)
+        jumped = False
+        if self.on_ground and (keys[pygame.K_SPACE] or keys[pygame.K_UP] or keys[pygame.K_w]):
+            self.vel_y = JUMP_VELOCITY + (-2 if self.is_unreal else 0)
+            self.on_ground = False; self.riding_platform = None; jumped = True
+
+        # Horizontal
+        self.rect.x += int(self.vel_x)
+        for plat in platforms:
+            if not plat.is_active(): continue
+            pr = plat.get_rect()
+            if self.rect.colliderect(pr):
+                if self.rect.bottom <= pr.top + 6: continue
+                if self.vel_x > 0:   self.rect.right = pr.left
+                elif self.vel_x < 0: self.rect.left  = pr.right
+                self.vel_x = 0
+
+        # Vertical
+        self.on_ground = False; self.riding_platform = None; self.on_ice = False
+        vy = int(self.vel_y)
+        if self.vel_y > 0 and vy == 0: vy = 1
+        self.rect.y += vy
+        for plat in platforms:
+            if not plat.is_active(): continue
+            pr = plat.get_rect()
+            if self.rect.colliderect(pr):
+                if self.vel_y > 0:
+                    self.rect.bottom = pr.top; self.vel_y = 0
+                    self.on_ground   = True
+                    if isinstance(plat, MovingPlatform): self.riding_platform = plat
+                    if isinstance(plat, IcePlatform):    self.on_ice = True
+                    plat.on_player_land(self)
+                elif self.vel_y < 0:
+                    self.rect.top = pr.bottom; self.vel_y = 0
+
+        if self.rect.top > DEATH_Y:
+            self.alive = False; self.respawn_timer = 50
+
+        return "jump" if jumped else None
+
+    def draw(self, surface, camera, tick):
+        if not self.alive: return
+        sr = camera.apply(self.rect)
+        if self.is_unreal:
+            bc = rainbow_color(tick, 0.12)
+            pygame.draw.rect(surface, bc, sr)
+            pulse = abs(math.sin(tick * 0.15)) * 0.5 + 0.5
+            pygame.draw.rect(surface, lerp_color(GOLD, WHITE, pulse), sr.inflate(4, 4), 2)
+            gc = tuple(max(0, min(255, int(c * 0.3))) for c in bc)
+            pygame.draw.rect(surface, gc, sr.inflate(6 + int(4*pulse), 6 + int(4*pulse)), 3)
+        elif self.on_ice:
+            pygame.draw.rect(surface, (210, 238, 255), sr)
+            pygame.draw.rect(surface, PLAT_ICE, (sr.x + 2, sr.y + 2, sr.width - 4, 4))
+        else:
+            pygame.draw.rect(surface, CLOUD_WHITE, sr)
+            pygame.draw.rect(surface, SKY_MID, (sr.x + 2, sr.y + 2, sr.width - 4, 4))
+        ey    = sr.y + 10
+        pupil = BLACK if not self.is_unreal else GOLD
+        if self.facing_right:
+            pygame.draw.rect(surface, WHITE, (sr.x + 16, ey, 7, 7))
+            pygame.draw.rect(surface, pupil, (sr.x + 19, ey + 2, 4, 4))
+        else:
+            pygame.draw.rect(surface, WHITE, (sr.x + 5, ey, 7, 7))
+            pygame.draw.rect(surface, pupil, (sr.x + 5, ey + 2, 4, 4))
+
+
+# ---------------------------------------------------------------------------
 # SVG → game coordinate helpers
-_SVG_W  = 680
-_SVG_H  = 980
-_GAME_W = 640        # usable horizontal game space (x 0..640)
-_SPAWN_SVG_Y = 900   # SVG y of spawn
-_SPAWN_GAME_Y = 860  # game y of spawn
-_SCALE_Y = 4.17      # vertical stretch factor
+# ---------------------------------------------------------------------------
+_SVG_W        = 680
+_GAME_W       = 640
+_SPAWN_GAME_Y = 860
+_SCALE_Y      = 4.17
 
-def _gx(svg_x):
-    """Map SVG x to game x."""
-    return int(svg_x / _SVG_W * _GAME_W)
+def _gx(svg_x): return int(svg_x / _SVG_W * _GAME_W)
+def _pw(svg_w): return max(80, int(svg_w / _SVG_W * _GAME_W))
 
-def _gy(svg_y):
-    """Map SVG y to game y (higher SVG y = lower in game = larger y)."""
-    return int(_SPAWN_GAME_Y - (_SPAWN_SVG_Y - svg_y) * _SCALE_Y)
-
-def _pw(svg_w):
-    """Map SVG platform width to game width."""
-    return max(80, int(svg_w / _SVG_W * _GAME_W))
-
-# Standard platform height in game units
 _PH = 26
 
 
+# ---------------------------------------------------------------------------
+# Level builder
+#
+# Physics: JUMP_VELOCITY=-15, GRAVITY=0.6 → max height 187.5 px
+# All vertical gaps ≤ 120 px.  Bridge platforms fill tier transitions.
+#
+# Obstacle theme per tier:
+#   Tier 1  Staircase intro      — cloud steps + bouncy pad shortcuts
+#   Tier 2  Ice gauntlet         — all ice platforms + rightward wind zone
+#   Tier 3  Moving spike maze    — moving platforms + synced spike traps
+#   Tier 4  Glitch + wind left   — glitch blink + leftward wind
+#   Tier 5  Summit gauntlet      — collapsing + spikes + teleport + bounce exit
+# ---------------------------------------------------------------------------
 def create_level_1():
     """
-    Platform layout verified against physics:
-      JUMP_VELOCITY = -15, GRAVITY = 0.6
-      Max jump height = 187.5 px
-      All vertical gaps capped at 120 px (well within safe margin).
-      Bridge platforms inserted at every tier transition to fill gaps.
+    Vibe: chill but tricky — every obstacle feels fair and readable.
+
+    Tier themes:
+      T1  Staircase intro         cloud steps + 2 bouncy pad shortcuts
+      T2  Ice + gentle wind       ice platforms, mild rightward push
+      T3  Moving + spike traps    slow movers, generous spike timings
+      T4  Teleport labyrinth      teleporters replace glitch — predictable, fun
+      T5  Summit mix              spikes + teleport + bounce exit pad
+
+    NO glitch platforms anywhere.
+    Wind force dialled down (force=1.8) so player can fight it comfortably.
+    Spike up_time >= down_time so there is always more safe time than danger time.
+    Teleport intervals are long (140–180 frames) so the player can see the cycle.
     """
-    plats, cps, mons, pws = [], [], [], []
+    plats = []
+    cps   = []
+    pws   = []
+    winds = []
 
     # ══════════════════════════════════════════════════════════════════════
-    # TIER 1 — Staircase intro
-    # Stairs ascend left→right.  Each step is ~120 px above the last.
-    # step1 y lowered from _gy(844)=626 to 648 so gap from spawn (768) = 120.
+    # TIER 1 — Staircase intro  (y 768 → 193)
+    # Plain cloud steps — purely to get the player moving and comfortable.
+    # Two optional bouncy pad shortcuts reward exploration.
     # ══════════════════════════════════════════════════════════════════════
+    plats.append(Platform(_gx(70),  768, _pw(260), _PH + 2, PLAT_CLOUD))  # spawn cloud
+    plats.append(Platform(_gx(100), 648, _pw(100), _PH, PLAT_CLOUD))       # step 1
+    plats.append(Platform(_gx(220), 530, _pw(100), _PH, PLAT_CLOUD))       # step 2
+    plats.append(Platform(_gx(340), 409, _pw(100), _PH, PLAT_CLOUD))       # step 3
+    plats.append(Platform(_gx(460), 301, _pw(110), _PH, PLAT_CLOUD))       # landing + CP1
 
-    # Wide spawn cloud
-    plats.append(Platform(_gx(70),  768,        _pw(260), _PH + 2, PLAT_CLOUD))
-    # Step 1 — lowered to y=648 (gap from spawn = 120 ✓)
-    plats.append(Platform(_gx(100), 648,        _pw(100), _PH, PLAT_CLOUD))
-    # Step 2 — y=530  (gap 118 ✓)
-    plats.append(Platform(_gx(220), 530,        _pw(100), _PH, PLAT_CLOUD))
-    # Step 3 — y=409  (gap 121 ✓)
-    plats.append(Platform(_gx(340), 409,        _pw(100), _PH, PLAT_CLOUD))
-    # Wide landing + CP1 — y=301  (gap 108 ✓)
-    plats.append(Platform(_gx(460), 301,        _pw(110), _PH, PLAT_CLOUD))
+    # Bouncy pad on step 1 right edge → launches over step 2 entirely (optional skip)
+    plats.append(BouncyPad(_gx(163), 648 - 18))
+    # Bouncy pad on step 3 right edge → launches toward landing (saves one jump)
+    plats.append(BouncyPad(_gx(395), 409 - 18))
 
-    # Intro mushroom on spawn cloud
-    mons.append(MushroomMonster(_gx(145), 768 - 28, _gx(90),  _gx(280), speed=1.0))
-
-    # CP1 on top-right landing
     cps.append(Checkpoint(_gx(475), 301))
 
-    # ── Bridge T1 → T2 ────────────────────────────────────────────────
-    # landing y=301 → T2 safe_L y=84  gap=217 → 1 bridge at y=193 (gaps 108+109 ✓)
+    # Bridge T1 → T2
     plats.append(Platform(_gx(260), 193, _pw(110), _PH, PLAT_CLOUD))
 
     # ══════════════════════════════════════════════════════════════════════
-    # TIER 2 — Glitch islands (alternating left / right, 108 px apart)
-    # Path (bottom→top): safe_L(84)→gR2(-24)→gL2(-132)→safe_R(-240)→gL1(-349)→gR1(-457)
-    # CP2 on glitch_L2, powerup centre
+    # TIER 2 — Ice + gentle wind  (y 84 → -457)
+    # Ice platforms introduce slippery feel — every platform is wide enough
+    # to stop on if the player is careful.  One safe cloud mid-tier.
+    # Wind is mild (force=1.8) and only covers the gap between columns
+    # so it nudges rather than shoves.
     # ══════════════════════════════════════════════════════════════════════
+    plats.append(IcePlatform(_gx(140),  84,  _pw(150)))   # entry (widest = most forgiving)
+    plats.append(IcePlatform(_gx(420), -24,  _pw(130)))
+    plats.append(IcePlatform(_gx(140), -132, _pw(130)))   # CP2 here
+    plats.append(Platform(   _gx(420), -240, _pw(130), _PH, PLAT_CLOUD))  # safe breather (no ice)
+    plats.append(IcePlatform(_gx(140), -349, _pw(130)))
+    plats.append(IcePlatform(_gx(420), -457, _pw(130)))
 
-    # Left safe rest — y=84   (gap from bridge 193 = 109 ✓)
-    plats.append(Platform(      _gx(140),  84,  _pw(140), _PH, PLAT_CLOUD))
-    # Right glitch — y=-24  (gap 108 ✓)
-    plats.append(GlitchPlatform(_gx(420), -24,  _pw(120), _PH, on_time=95,  off_time=60, offset=55))
-    # Left glitch (CP2) — y=-132  (gap 108 ✓)
-    plats.append(GlitchPlatform(_gx(140), -132, _pw(120), _PH, on_time=85,  off_time=65, offset=20))
-    # Right safe rest — y=-240  (gap 108 ✓)
-    plats.append(Platform(      _gx(420), -240, _pw(120), _PH, PLAT_CLOUD))
-    # Left glitch — y=-349  (gap 109 ✓)
-    plats.append(GlitchPlatform(_gx(140), -349, _pw(120), _PH, on_time=90,  off_time=70, offset=35))
-    # Right glitch — y=-457  (gap 108 ✓)
-    plats.append(GlitchPlatform(_gx(420), -457, _pw(120), _PH, on_time=100, off_time=65, offset=0))
+    # Mild rightward wind — only in the narrow gap, doesn't reach the platforms
+    winds.append(WindZone(_gx(240), -420, _pw(180), 340, force=1.8, direction=1))
 
-    # Flying monster mid-tier
-    mons.append(FlyingMonster(_gx(310), -200, _gx(100), _gx(560), speed=1.1, amplitude=35, color=(85, 119, 238)))
-    # Mushroom on right safe rest
-    mons.append(MushroomMonster(_gx(435), -240 - 28, _gx(420), _gx(520), speed=1.2))
-
-    # CP2 on left glitch at y=-132
     cps.append(Checkpoint(_gx(160), -132))
-    # Powerup centre between columns
     pws.append(Powerup(_gx(308), -290))
 
-    # ── Bridge T2 → T3 ────────────────────────────────────────────────
-    # gR1 y=-457 → T3 safe_L2 y=-682  gap=225 → 1 bridge at y=-569 (gaps 112+113 ✓)
+    # Bridge T2 → T3
     plats.append(Platform(_gx(260), -569, _pw(110), _PH, PLAT_CLOUD))
 
     # ══════════════════════════════════════════════════════════════════════
-    # TIER 3 — Moving platform maze
-    # Path: safe_L2(-682)→mRH(-791)→safe_L(-899)→mRV(-1008)→mLH(-1116)
-    # CP3 on right fast H-mover, powerup centre
+    # TIER 3 — Moving platforms + spike traps  (y -682 → -1116)
+    # Movers are slow-to-medium speed.  Spike timings are generous:
+    # down_time > up_time so safe windows are always longer than danger windows.
+    # Safe cloud rest islands every other step.
     # ══════════════════════════════════════════════════════════════════════
+    plats.append(Platform(_gx(140), -682, _pw(130), _PH, PLAT_CLOUD))   # safe entry + CP3
 
-    # Left safe rest 2 — y=-682  (gap from bridge -569 = 113 ✓)
-    plats.append(Platform(_gx(140), -682, _pw(130), _PH, PLAT_CLOUD))
-    # Right H-mover — y=-791  (gap 109 ✓) — CP3 here
-    plats.append(MovingPlatform(_gx(420), -791, _gx(560), -791, _pw(120), _PH, speed=1.6))
-    # Left safe rest — y=-899  (gap 108 ✓)
-    plats.append(Platform(      _gx(140), -899, _pw(110), _PH, PLAT_CLOUD))
-    # Right V-mover — y=-1008  (gap 109 ✓)
-    plats.append(MovingPlatform(_gx(420), -1008, _gx(420), -1086, _pw(120), _PH, speed=1.0))
-    # Left H-mover — y=-1116  (gap 108 ✓)
-    plats.append(MovingPlatform(_gx(140), -1116, _gx(320), -1116, _pw(120), _PH, speed=1.3))
+    # Right slow H-mover  (speed 1.2) — spikes: 50 up / 70 down = more safe
+    _m1_y = -791
+    plats.append(MovingPlatform(_gx(420), _m1_y, _gx(530), _m1_y, _pw(120), _PH, speed=1.2))
+    plats.append(SpikeTrap(_gx(420), _m1_y - 14, _pw(120), 14,
+                           up_time=50, down_time=70, offset=0))
 
-    # Mushroom on left safe rest
-    mons.append(MushroomMonster(_gx(148), -899 - 28, _gx(140), _gx(240), speed=1.4))
-    # Spiky patrol near right mover
-    mons.append(Monster(_gx(432), -791 - 26, _gx(420), _gx(530), speed=1.4, color=(255, 68, 51)))
+    # Left safe rest cloud
+    plats.append(Platform(_gx(140), -899, _pw(120), _PH, PLAT_CLOUD))
 
-    # CP3 on right H-mover
-    cps.append(Checkpoint(_gx(440), -791))
-    # Powerup centre
+    # Right slow V-mover — spikes: 45 up / 75 down (very generous)
+    _m2_y = -1008
+    plats.append(MovingPlatform(_gx(420), _m2_y, _gx(420), _m2_y - 70, _pw(120), _PH, speed=0.9))
+    plats.append(SpikeTrap(_gx(420), _m2_y - 14, _pw(120), 14,
+                           up_time=45, down_time=75, offset=30))
+
+    # Left slow H-mover, no spikes — relaxed pacing
+    plats.append(MovingPlatform(_gx(140), -1116, _gx(310), -1116, _pw(120), _PH, speed=1.1))
+
+    cps.append(Checkpoint(_gx(160), -682))
     pws.append(Powerup(_gx(308), -950))
 
-    # ── Bridge T3 → T4 ────────────────────────────────────────────────
-    # mLH y=-1116 → T4 safe_L y=-1291  gap=175 → 1 bridge at y=-1203 (gaps 87+88 ✓)
+    # Bridge T3 → T4
     plats.append(Platform(_gx(260), -1203, _pw(110), _PH, PLAT_CLOUD))
 
     # ══════════════════════════════════════════════════════════════════════
-    # TIER 4 — Teleport + collapse chaos
-    # Path: safe_L(-1291)→collR(-1391)→teleL(-1491)→gR(-1591)→collL(-1692)→teleR(-1792)
-    # CP4 on left safe rest, powerup centre
+    # TIER 4 — Teleport labyrinth + leftward wind  (y -1291 → -1792)
+    # ALL platforms here are teleporters (no glitch).
+    # Intervals are long (140–180 frames ≈ 2.3–3 s) so the player can easily
+    # read the cycle before jumping.  Ghost position always shows where it
+    # will reappear.  One safe cloud mid-tier.
+    # Leftward wind is mild (force=1.6) and only in the upper half.
     # ══════════════════════════════════════════════════════════════════════
+    plats.append(Platform(_gx(150), -1291, _pw(130), _PH, PLAT_CLOUD))   # safe entry + CP4
 
-    # Left safe rest — y=-1291  (gap from bridge -1203 = 88 ✓)  CP4 here
-    plats.append(Platform(         _gx(150), -1291, _pw(130), _PH, PLAT_CLOUD))
-    # Right collapse — y=-1391  (gap 100 ✓)
-    plats.append(CollapsingPlatform(_gx(420), -1391, _pw(110), _PH, delay=40))
-    # Left teleport — y=-1491  (gap 100 ✓)
-    plats.append(TeleportPlatform(  _gx(140), -1491, _gx(240), -1400, _pw(110), _PH, interval=120))
-    # Right glitch — y=-1591  (gap 100 ✓)
-    plats.append(GlitchPlatform(    _gx(420), -1591, _pw(110), _PH, on_time=75, off_time=55, offset=0))
-    # Left collapse — y=-1692  (gap 101 ✓)
-    plats.append(CollapsingPlatform(_gx(140), -1692, _pw(110), _PH, delay=48))
-    # Right teleport — y=-1792  (gap 100 ✓)
-    plats.append(TeleportPlatform(  _gx(430), -1792, _gx(530), -1700, _pw(110), _PH, interval=140))
+    # T4 teleporters — each jumps to a nearby second position
+    plats.append(TeleportPlatform(_gx(420), -1391, _gx(300), -1391,
+                                  _pw(110), _PH, interval=160))
+    plats.append(TeleportPlatform(_gx(140), -1491, _gx(260), -1480,
+                                  _pw(110), _PH, interval=180))
+    plats.append(Platform(        _gx(420), -1591, _pw(120), _PH, PLAT_CLOUD))   # mid safe
+    plats.append(TeleportPlatform(_gx(140), -1692, _gx(270), -1700,
+                                  _pw(110), _PH, interval=150))
+    plats.append(TeleportPlatform(_gx(430), -1792, _gx(310), -1785,
+                                  _pw(110), _PH, interval=140))
 
-    # Flying monster mid-tier
-    mons.append(FlyingMonster(_gx(308), -1540, _gx(80), _gx(560), speed=1.4, amplitude=45, color=(85, 119, 238)))
-    # Spiky patrol on right collapse
-    mons.append(Monster(_gx(432), -1391 - 26, _gx(420), _gx(520), speed=1.5, color=(255, 68, 51)))
+    # Mild leftward wind — upper portion only, easy to counter with right movement
+    winds.append(WindZone(_gx(120), -1770, _pw(420), 300, force=1.6, direction=-1))
 
-    # CP4 on left safe rest
     cps.append(Checkpoint(_gx(165), -1291))
-    # Powerup centre
     pws.append(Powerup(_gx(308), -1540))
 
-    # ── Bridge T4 → T5 ────────────────────────────────────────────────
-    # teleR y=-1792 → T5 teleL y=-2084  gap=292 → 2 bridges (gaps 97+97+98 ✓)
+    # Bridge T4 → T5
     plats.append(Platform(_gx(160), -1889, _pw(110), _PH, PLAT_CLOUD))
     plats.append(Platform(_gx(420), -1986, _pw(110), _PH, PLAT_CLOUD))
 
     # ══════════════════════════════════════════════════════════════════════
-    # TIER 5 — Summit gauntlet (tight zigzag)
-    # Path: teleL(-2084)→mR(-2184)→collL(-2275)→gR(-2367)→bridge(-2454)→exit(-2542)
-    # CP5 on right glitch, powerup between platforms
+    # TIER 5 — Summit mix  (y -2084 → -2542)
+    # Combines teleport + spikes + a collapsing platform with a bouncy pad
+    # on top as a skill-skip to the exit.  All spike timings remain generous.
     # ══════════════════════════════════════════════════════════════════════
 
-    # Left teleport — y=-2084  (gap from bridge2 -1986 = 98 ✓)
-    plats.append(TeleportPlatform(  _gx(150), -2084, _gx(250), -2010, _pw(110), _PH, interval=100))
-    # Right fast mover — y=-2184  (gap 100 ✓)
-    plats.append(MovingPlatform(    _gx(420), -2184, _gx(540), -2184, _pw(110), _PH, speed=1.9))
-    # Left collapse — y=-2275  (gap 91 ✓)
-    plats.append(CollapsingPlatform(_gx(160), -2275, _pw(100), _PH, delay=38))
-    # Right glitch (CP5) — y=-2367  (gap 92 ✓)
-    plats.append(GlitchPlatform(    _gx(420), -2367, _pw(100), _PH, on_time=70, off_time=55, offset=0))
+    # Left teleporter (long interval — easy to read)
+    plats.append(TeleportPlatform(_gx(150), -2084, _gx(260), -2075,
+                                  _pw(110), _PH, interval=160))
 
-    # ── Bridge T5 → exit ─────────────────────────────────────────────
-    # gR y=-2367 → exit y=-2542  gap=175 → 1 bridge at y=-2454 (gaps 87+88 ✓)
+    # Right medium H-mover + fair spike timing (50 up / 80 down)
+    _m3_y = -2184
+    plats.append(MovingPlatform(_gx(420), _m3_y, _gx(530), _m3_y, _pw(110), _PH, speed=1.4))
+    plats.append(SpikeTrap(_gx(420), _m3_y - 14, _pw(110), 14,
+                           up_time=50, down_time=80, offset=15))
+
+    # Left collapsing platform — delay 55 frames (just under 1 s) — fair warning
+    plats.append(CollapsingPlatform(_gx(160), -2275, _pw(100), _PH, delay=55))
+    # Bouncy pad on top: if player hits it before collapse, launches straight to exit platform
+    plats.append(BouncyPad(_gx(178), -2275 - 18))
+
+    # Right safe cloud + CP5
+    plats.append(Platform(_gx(420), -2367, _pw(110), _PH, PLAT_CLOUD))
+
+    # Bridge T5 → exit
     plats.append(Platform(_gx(255), -2454, _pw(110), _PH, PLAT_CLOUD))
-
-    # Exit-approach platform — y=-2542  (gap 88 ✓)
     plats.append(Platform(_gx(255), -2542, _pw(130), _PH + 4, PLAT_CLOUD))
 
-    # Flying monster pair
-    mons.append(FlyingMonster(_gx(295), -2230, _gx(80), _gx(560), speed=1.6, amplitude=50, color=(85, 119, 238)))
-    mons.append(MushroomMonster(_gx(268), -2542 - 28, _gx(255), _gx(370), speed=1.9))
-
-    # CP5 on right glitch
     cps.append(Checkpoint(_gx(435), -2367))
-    # Powerup between T5 platforms
     pws.append(Powerup(_gx(308), -2320))
 
-    # ══════════════════════════════════════════════════════════════════════
-    # EXIT DOOR — above exit platform
-    # ══════════════════════════════════════════════════════════════════════
     exit_door = ExitDoor(_gx(295), -2620)
-
-    return plats, cps, mons, pws, exit_door
+    return plats, cps, pws, winds, exit_door
 
 
 LEVELS = [create_level_1]
 
 
 # ---------------------------------------------------------------------------
-# Background cloud decorations
+# Background clouds
 # ---------------------------------------------------------------------------
 def make_bg_clouds():
     clouds = []
     rng = random.Random(42)
     for _ in range(80):
         clouds.append(BgCloud(
-            rng.randint(-200, 800),
-            rng.randint(-3000, 900),
-            rng.randint(28, 65),
-            rng.uniform(0.05, 0.2),
+            rng.randint(-200, 800), rng.randint(-3000, 900),
+            rng.randint(28, 65), rng.uniform(0.05, 0.2),
         ))
     return clouds
 
@@ -992,7 +1077,7 @@ class Game:
         self.bg_clouds = make_bg_clouds()
 
         self.platforms = []; self.checkpoints = []
-        self.monsters  = []; self.powerups    = []
+        self.powerups  = []; self.winds       = []
         self.exit_door = None
         self.player    = Player(100, 400)
 
@@ -1000,11 +1085,11 @@ class Game:
         self.sfx.start_music(volume=self.music_volume)
 
     def load_level(self, index=0):
-        (self.platforms, self.checkpoints, self.monsters,
-         self.powerups, self.exit_door) = LEVELS[index % len(LEVELS)]()
-        # Spawn player on the wide spawn cloud (left side, bottom)
+        (self.platforms, self.checkpoints,
+         self.powerups, self.winds,
+         self.exit_door) = LEVELS[index % len(LEVELS)]()
         spawn_x = _gx(100)
-        spawn_y = 768 - 40   # spawn platform top is y=768
+        spawn_y = 768 - 40
         self.player = Player(spawn_x, spawn_y)
         self.camera = Camera(SCREEN_WIDTH, SCREEN_HEIGHT)
         self.particles.clear(); self.rings.clear()
@@ -1035,14 +1120,14 @@ class Game:
     def _handle_key(self, key):
         if self.state == "settings":
             if key == pygame.K_ESCAPE: self.state = "playing"
-            elif key in (pygame.K_UP,   pygame.K_w): self.settings_cursor = (self.settings_cursor - 1) % 4
-            elif key in (pygame.K_DOWN, pygame.K_s): self.settings_cursor = (self.settings_cursor + 1) % 4
+            elif key in (pygame.K_UP,   pygame.K_w): self.settings_cursor = (self.settings_cursor-1)%4
+            elif key in (pygame.K_DOWN, pygame.K_s): self.settings_cursor = (self.settings_cursor+1)%4
             elif key in (pygame.K_LEFT, pygame.K_a):
                 if self.settings_cursor == 0:
-                    self.music_volume = max(0.0, round(self.music_volume - 0.1, 1)); self._apply_volume()
+                    self.music_volume = max(0.0, round(self.music_volume-0.1,1)); self._apply_volume()
             elif key in (pygame.K_RIGHT, pygame.K_d):
                 if self.settings_cursor == 0:
-                    self.music_volume = min(1.0, round(self.music_volume + 0.1, 1)); self._apply_volume()
+                    self.music_volume = min(1.0, round(self.music_volume+0.1,1)); self._apply_volume()
             elif key in (pygame.K_RETURN, pygame.K_SPACE):
                 if   self.settings_cursor == 1: self.music_muted = not self.music_muted; self._apply_volume()
                 elif self.settings_cursor == 2: self.state = "playing"
@@ -1060,32 +1145,35 @@ class Game:
     def _update(self):
         self.tick += 1
         keys = pygame.key.get_pressed()
+
         for p in self.platforms: p.update()
+        for w in self.winds:     w.update()
 
         result = self.player.update(keys, self.platforms)
         if result == "jump": self.sfx.play("jump")
+
+        # Detect BouncyPad launch (first frame of squish = just bounced)
+        for p in self.platforms:
+            if isinstance(p, BouncyPad) and p.squish == 9:
+                self.sfx.play("bounce")
+                self._bounce_fx(p)
+
         if self.player.prev_unreal and not self.player.is_unreal: self.sfx.play("unreal_end")
         if self.player.alive: self.camera.update(self.player.rect)
+
+        # Wind push every frame
+        for w in self.winds:
+            w.apply_to_player(self.player)
+
+        # Spike trap death
+        for p in self.platforms:
+            if isinstance(p, SpikeTrap) and p.kills_player(self.player):
+                if not self.player.is_unreal:
+                    self._player_death_fx(); self.player.die(); self.sfx.play("death")
 
         for cp in self.checkpoints:
             cp.update()
             if self.player.alive and cp.check(self.player): self.sfx.play("checkpoint")
-
-        for mon in self.monsters:
-            mon.update()
-            coll = mon.check_collision(self.player)
-            if coll == "kill_player":
-                self._player_death_fx(); self.player.die(); self.sfx.play("death")
-            elif coll == "kill_monster":
-                self._monster_kill_fx(mon); mon.kill()
-                self.player.kill_count += 1; self.sfx.play("monster_kill")
-            elif coll == "stomp":
-                self._stomp_fx(mon); mon.stomp()
-                self.player.vel_y = STOMP_BOUNCE
-                self.player.kill_count += 1; self.sfx.play("stomp")
-
-        self.monsters = [m for m in self.monsters
-                         if m.alive or (hasattr(m, 'squish_timer') and m.squish_timer > 0) or m.death_timer > 0]
 
         for pw in self.powerups:
             pw.update()
@@ -1099,7 +1187,7 @@ class Game:
         self.particles    = [p for p in self.particles if p.update()]
         self.rings        = [r for r in self.rings     if r.update()]
         self.flashes      = [f for f in self.flashes   if f.update()]
-        self.score_popups = [(x, y - 0.8, t, timer - 1, c)
+        self.score_popups = [(x, y-0.8, t, timer-1, c)
                              for x, y, t, timer, c in self.score_popups if timer > 0]
         self._spawn_ambient()
         if not self.player.alive and self.player.respawn_timer == 1: self.sfx.play("respawn")
@@ -1111,60 +1199,58 @@ class Game:
         self.camera.add_shake(14)
         self.flashes.append(FlashOverlay(RED, 18, 120))
         for _ in range(35):
-            a = random.uniform(0, math.pi * 2); s = random.uniform(2, 7)
-            self.particles.append(Particle(cx, cy, random.choice([SKY_MID, CYAN, WHITE, CLOUD_WHITE]),
-                math.cos(a)*s, math.sin(a)*s, random.randint(25, 50), random.randint(3, 7), 0.15))
+            a = random.uniform(0, math.pi*2); s = random.uniform(2, 7)
+            self.particles.append(Particle(cx, cy,
+                random.choice([SKY_MID, CYAN, WHITE, CLOUD_WHITE]),
+                math.cos(a)*s, math.sin(a)*s, random.randint(25,50), random.randint(3,7), 0.15))
         for _ in range(8):
-            self.particles.append(Particle(cx+random.randint(-10,10), cy+random.randint(-10,10),
+            self.particles.append(Particle(
+                cx+random.randint(-10,10), cy+random.randint(-10,10),
                 CLOUD_SHADOW, random.uniform(-3,3), random.uniform(-8,-2), 40, 6, 0.3))
 
-    def _monster_kill_fx(self, mon):
-        cx, cy = mon.rect.center
-        self.camera.add_shake(8)
-        self.rings.append(RingEffect(cx, cy, SUN_YELLOW, 80, 5, 3))
-        self.flashes.append(FlashOverlay(YELLOW, 8, 80))
-        for _ in range(25):
-            a = random.uniform(0, math.pi*2); s = random.uniform(2, 6)
-            self.particles.append(Particle(cx, cy, random.choice([RED, ORANGE, SUN_YELLOW, WHITE]),
-                math.cos(a)*s, math.sin(a)*s, random.randint(20,40), random.randint(3,6), 0.1))
-        self.score_popups.append((cx, cy - 20, "+100", 60, SUN_YELLOW))
-
-    def _stomp_fx(self, mon):
-        cx, cy = mon.rect.centerx, mon.rect.bottom
-        self.camera.add_shake(5)
-        self.rings.append(RingEffect(cx, cy, WHITE, 40, 4, 2))
-        for _ in range(12):
+    def _bounce_fx(self, pad):
+        cx = pad.rect.centerx; cy = pad.rect.top
+        self.rings.append(RingEffect(cx, cy, (100, 255, 120), 60, 4, 2))
+        for _ in range(14):
             a = random.uniform(-math.pi, 0); s = random.uniform(1, 4)
-            self.particles.append(Particle(cx, cy, random.choice([BROWN, MUSHROOM_RED, WHITE, DARK_BROWN]),
-                math.cos(a)*s, math.sin(a)*s - 1, random.randint(15,30), random.randint(2,5), 0.15))
-        self.score_popups.append((cx, cy - 25, "+50", 50, WHITE))
+            self.particles.append(Particle(cx, cy,
+                random.choice([PLAT_BOUNCE, WHITE, (180, 255, 180)]),
+                math.cos(a)*s, math.sin(a)*s - 1, random.randint(15,30), random.randint(2,5), 0.12))
 
     def _powerup_fx(self, pw):
         cx, cy = pw.x, pw.y
         self.camera.add_shake(10)
         self.flashes.append(FlashOverlay(SUN_YELLOW, 20, 160))
         for i in range(3):
-            self.rings.append(RingEffect(cx, cy, rainbow_color(self.tick + i*30), 100+i*40, 3+i, 4-i))
+            self.rings.append(RingEffect(cx, cy, rainbow_color(self.tick+i*30), 100+i*40, 3+i, 4-i))
         for _ in range(40):
             a = random.uniform(0, math.pi*2); s = random.uniform(1, 5)
-            self.particles.append(Particle(cx, cy, random.choice([SUN_YELLOW, YELLOW, WHITE, ORANGE]),
+            self.particles.append(Particle(cx, cy,
+                random.choice([SUN_YELLOW, YELLOW, WHITE, ORANGE]),
                 math.cos(a)*s, math.sin(a)*s, random.randint(30,60), random.randint(2,6), 0.05))
-        self.score_popups.append((cx, cy - 30, "UNREAL MODE!", 90, SUN_YELLOW))
+        self.score_popups.append((cx, cy-30, "UNREAL MODE!", 90, SUN_YELLOW))
 
     def _spawn_ambient(self):
         for plat in self.platforms:
-            if isinstance(plat, GlitchPlatform) and plat.active and plat.alpha < 200:
-                if random.random() < 0.25:
-                    self.particles.append(Particle(
-                        plat.rect.x + random.randint(0, plat.rect.width),
-                        plat.rect.y + random.randint(0, plat.rect.height),
-                        PLAT_GLITCH, random.uniform(-1,1), random.uniform(-2,0), 20))
+            if isinstance(plat, IcePlatform) and random.random() < 0.07:
+                self.particles.append(Particle(
+                    plat.rect.x + random.randint(0, plat.rect.width),
+                    plat.rect.y - 2,
+                    (205, 238, 255),
+                    random.uniform(-0.4,0.4), random.uniform(-1.4,-0.2),
+                    random.randint(12,22), 2, 0.0))
             elif isinstance(plat, TeleportPlatform) and plat.flash > 0:
                 for _ in range(4):
                     self.particles.append(Particle(
                         plat.rect.x + random.randint(0, plat.rect.width),
                         plat.rect.y + random.randint(0, plat.rect.height),
                         SUN_YELLOW, random.uniform(-3,3), random.uniform(-3,3), 15))
+            elif isinstance(plat, TeleportPlatform) and (self.tick % 8 == 0):
+                # Gentle idle shimmer on teleporters
+                self.particles.append(Particle(
+                    plat.rect.x + random.randint(0, plat.rect.width),
+                    plat.rect.y,
+                    PLAT_TELE, random.uniform(-0.5,0.5), random.uniform(-1.0,-0.2), 18, 2, 0.0))
 
         if not self.player.alive and self.player.respawn_timer == 49:
             self._player_death_fx()
@@ -1184,6 +1270,16 @@ class Game:
                     self.player.rect.centery + random.randint(-10,10),
                     WHITE, -side*random.uniform(1,3), random.uniform(-1,1), 15, 3, 0))
 
+        # Wind particles on player when inside zone
+        for w in self.winds:
+            if self.player.rect.colliderect(w.rect) and self.tick % 3 == 0:
+                self.particles.append(Particle(
+                    self.player.rect.centerx + random.randint(-14,14),
+                    self.player.rect.centery + random.randint(-14,14),
+                    WIND_COLOR,
+                    w.force * w.direction * 0.6 + random.uniform(-0.3,0.3),
+                    random.uniform(-0.4,0.4), 18, 3, 0.0))
+
     # ── Drawing ──────────────────────────────────────────────────────────
     def _draw(self):
         self.screen.fill(DARK_BG)
@@ -1193,140 +1289,140 @@ class Game:
         pygame.display.flip()
 
     def _draw_background(self):
-        # Sky gradient — deep blue at top (high altitude), light blue at bottom (low)
-        # Match SVG palette: top #4A90C8 → bottom #D8EEF8
-        band_colors = [
-            (74,  144, 200),   # SVG #4A90C8  highest altitude
-            (114, 174, 221),   # SVG #72AEDD
-            (157, 203, 238),   # SVG #9DCBEE
-            (190, 224, 245),   # SVG #BEE0F5
-            (216, 238, 248),   # SVG #D8EEF8  lowest visible
-        ]
-        bands = len(band_colors)
-        for i, col in enumerate(band_colors):
+        for i, col in enumerate([
+            (74,144,200),(114,174,221),(157,203,238),(190,224,245),(216,238,248)
+        ]):
             pygame.draw.rect(self.screen, col,
-                             (0, i * SCREEN_HEIGHT // bands, SCREEN_WIDTH, SCREEN_HEIGHT // bands + 2))
+                (0, i*SCREEN_HEIGHT//5, SCREEN_WIDTH, SCREEN_HEIGHT//5+2))
 
-        # Sun fixed top-right (near exit — matches SVG)
         pulse = abs(math.sin(self.tick * 0.03)) * 6
-        pygame.draw.circle(self.screen, SUN_ORANGE, (SCREEN_WIDTH - 110, 70), int(34 + pulse))
-        pygame.draw.circle(self.screen, SUN_YELLOW, (SCREEN_WIDTH - 110, 70), 22)
-        pygame.draw.circle(self.screen, WHITE,      (SCREEN_WIDTH - 122, 58), 9)
+        pygame.draw.circle(self.screen, SUN_ORANGE, (SCREEN_WIDTH-110, 70), int(34+pulse))
+        pygame.draw.circle(self.screen, SUN_YELLOW, (SCREEN_WIDTH-110, 70), 22)
+        pygame.draw.circle(self.screen, WHITE,      (SCREEN_WIDTH-122, 58), 9)
 
-        # Stars (visible at high altitude — twinkle)
-        stars = [(80, 20), (160, 35), (260, 15), (380, 28), (450, 12)]
-        for sx, sy in stars:
-            brightness = int(140 + 115 * abs(math.sin(self.tick * 0.04 + sx * 0.1)))
-            # Only show when camera is high up (low offset_y means high altitude)
-            alt_ratio = max(0.0, min(1.0, -self.camera.offset_y / 2000))
+        alt_ratio = max(0.0, min(1.0, -self.camera.offset_y / 2000))
+        for sx, sy in [(80,20),(160,35),(260,15),(380,28),(450,12)]:
             if alt_ratio > 0.3:
-                alpha = int(brightness * (alt_ratio - 0.3) / 0.7)
-                star_col = (alpha, alpha, alpha)
-                pygame.draw.circle(self.screen, star_col, (sx, sy), 2)
+                bri = int((140+115*abs(math.sin(self.tick*0.04+sx*0.1)))
+                          * (alt_ratio-0.3)/0.7)
+                pygame.draw.circle(self.screen, (bri,bri,bri), (sx,sy), 2)
 
-        # Parallax background clouds
-        for c in self.bg_clouds:
-            c.draw(self.screen, self.camera)
+        for c in self.bg_clouds: c.draw(self.screen, self.camera)
 
-        # Altitude guide lines (subtle horizontal)
         oy = int(self.camera.offset_y * 0.1) % 90
-        for y in range(0, SCREEN_HEIGHT + 90, 90):
-            pygame.draw.line(self.screen, GRID_COLOR, (0, y - oy), (SCREEN_WIDTH, y - oy))
+        for y in range(0, SCREEN_HEIGHT+90, 90):
+            pygame.draw.line(self.screen, GRID_COLOR, (0, y-oy), (SCREEN_WIDTH, y-oy))
 
     def _draw_game(self):
         self._draw_background()
-        for p in self.platforms:    p.draw(self.screen, self.camera)
-        for cp in self.checkpoints: cp.draw(self.screen, self.camera)
-        for pw in self.powerups:    pw.draw(self.screen, self.camera, self.tick)
+
+        # Wind zones — behind everything
+        for w in self.winds: w.draw(self.screen, self.camera)
+
+        for p  in self.platforms:    p.draw(self.screen, self.camera)
+        for cp in self.checkpoints:  cp.draw(self.screen, self.camera)
+        for pw in self.powerups:     pw.draw(self.screen, self.camera, self.tick)
         self.exit_door.draw(self.screen, self.camera)
-        for m in self.monsters:     m.draw(self.screen, self.camera, self.tick)
-        for p in self.particles:    p.draw(self.screen, self.camera)
-        for r in self.rings:        r.draw(self.screen, self.camera)
+        for p  in self.particles:    p.draw(self.screen, self.camera)
+        for r  in self.rings:        r.draw(self.screen, self.camera)
         self.player.draw(self.screen, self.camera, self.tick)
-        for f in self.flashes:      f.draw(self.screen)
+        for f  in self.flashes:      f.draw(self.screen)
 
         for x, y, text, timer, color in self.score_popups:
-            a = min(1.0, timer / 30)
-            c = tuple(max(0, min(255, int(v * a))) for v in color)
-            pos = self.camera.apply(pygame.Rect(int(x), int(y), 1, 1))
+            a = min(1.0, timer/30)
+            c = tuple(max(0,min(255,int(v*a))) for v in color)
+            pos = self.camera.apply(pygame.Rect(int(x),int(y),1,1))
             surf = self.small_font.render(text, True, c)
             self.screen.blit(surf, surf.get_rect(center=(pos.x, pos.y)))
 
         # HUD
         t = self.level_time / FPS
-        self.screen.blit(self.small_font.render(f"Time: {t:.1f}s", True, DARK_GRAY), (SCREEN_WIDTH - 150, 10))
-        if self.player.kill_count > 0:
-            self.screen.blit(self.small_font.render(f"Kills: {self.player.kill_count}", True, ORANGE), (SCREEN_WIDTH - 150, 30))
+        self.screen.blit(self.small_font.render(f"Time: {t:.1f}s", True, DARK_GRAY),
+                         (SCREEN_WIDTH-150, 10))
 
-        # Altitude bar (left side)
-        max_alt = 3400
-        alt = max(0, min(max_alt, _gy(900) - self.player.rect.centery))
-        ratio = alt / max_alt
-        bh = 200; bx = 12; by = SCREEN_HEIGHT // 2 - bh // 2
+        # Altitude bar
+        alt   = max(0, min(3400, 860 - self.player.rect.centery))
+        ratio = alt / 3400
+        bh=200; bx=12; by=SCREEN_HEIGHT//2-bh//2
         pygame.draw.rect(self.screen, DARK_GRAY, (bx, by, 10, bh), 1)
-        fill_h = int(bh * ratio)
+        fh = int(bh*ratio)
         pygame.draw.rect(self.screen, lerp_color(SKY_BOT, SUN_YELLOW, ratio),
-                         (bx, by + bh - fill_h, 10, fill_h))
-        self.screen.blit(self.tiny_font.render("ALT", True, DARK_GRAY), (bx - 2, by - 14))
+                         (bx, by+bh-fh, 10, fh))
+        self.screen.blit(self.tiny_font.render("ALT", True, DARK_GRAY), (bx-2, by-14))
 
+        # Unreal bar
         if self.player.is_unreal:
             rem = self.player.unreal_timer / FPS
-            bw, bh2 = 160, 14; bx2 = SCREEN_WIDTH // 2 - 80; by2 = 12
-            ratio2 = self.player.unreal_timer / UNREAL_DURATION
-            pygame.draw.rect(self.screen, DARK_GRAY, (bx2 - 2, by2 - 2, bw + 4, bh2 + 4))
-            for px_i in range(int(bw * ratio2)):
-                pygame.draw.line(self.screen, rainbow_color(self.tick + px_i * 2, 0.3),
-                                 (bx2 + px_i, by2), (bx2 + px_i, by2 + bh2))
-            self.screen.blit(self.tiny_font.render(f"UNREAL  {rem:.1f}s", True, WHITE), (bx2 + 4, by2 + 1))
-            pygame.draw.rect(self.screen, rainbow_color(self.tick, 0.15), (bx2 - 2, by2 - 2, bw + 4, bh2 + 4), 2)
+            bw=160; bh2=14; bx2=SCREEN_WIDTH//2-80; by2=12
+            r2 = self.player.unreal_timer / UNREAL_DURATION
+            pygame.draw.rect(self.screen, DARK_GRAY, (bx2-2, by2-2, bw+4, bh2+4))
+            for pi in range(int(bw*r2)):
+                pygame.draw.line(self.screen, rainbow_color(self.tick+pi*2, 0.3),
+                                 (bx2+pi, by2), (bx2+pi, by2+bh2))
+            self.screen.blit(self.tiny_font.render(f"UNREAL  {rem:.1f}s", True, WHITE),
+                             (bx2+4, by2+1))
+            pygame.draw.rect(self.screen, rainbow_color(self.tick, 0.15),
+                             (bx2-2, by2-2, bw+4, bh2+4), 2)
+
+        # Obstacle legend — top left
+        legend = [
+            (PLAT_ICE,    "ICE    — slippery!"),
+            (WIND_COLOR,  "WIND   — push zone"),
+            (SPIKE_COLOR, "SPIKE  — timed!"),
+            (PLAT_BOUNCE, "SPRING — launcher"),
+            (PLAT_TELE,   "TELE   — teleports!"),
+        ]
+        for i, (col, txt) in enumerate(legend):
+            pygame.draw.rect(self.screen, col, (34, 10+i*18, 12, 12), border_radius=3)
+            self.screen.blit(self.tiny_font.render(txt, True, DARK_GRAY), (52, 10+i*18))
 
         self.screen.blit(self.small_font.render("R-Respawn  ESC-Settings", True, CLOUD_SHADOW),
-                         (10, SCREEN_HEIGHT - 22))
+                         (10, SCREEN_HEIGHT-22))
 
         if not self.player.alive:
             txt = self.font.render("Respawning...", True, RED)
-            self.screen.blit(txt, txt.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)))
+            self.screen.blit(txt, txt.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2)))
 
     def _draw_settings(self):
         ov = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT)); ov.fill(BLACK); ov.set_alpha(160)
-        self.screen.blit(ov, (0, 0))
-        self.screen.blit(self.font.render("SETTINGS", True, CYAN),
-                         self.font.render("SETTINGS", True, CYAN).get_rect(center=(SCREEN_WIDTH//2, 160)))
+        self.screen.blit(ov, (0,0))
+        hdr = self.font.render("SETTINGS", True, CYAN)
+        self.screen.blit(hdr, hdr.get_rect(center=(SCREEN_WIDTH//2, 160)))
         items = [f"Music Volume:  < {int(self.music_volume*100)}% >",
                  f"Mute Music:    {'ON' if self.music_muted else 'OFF'}",
                  "Resume Game", "Exit to Menu"]
-        hints = ["(Left / Right to adjust)", "(Enter to toggle)", "(Enter)", "(Enter)"]
+        hints = ["(Left / Right)", "(Enter to toggle)", "(Enter)", "(Enter)"]
         for i, (item, hint) in enumerate(zip(items, hints)):
-            y = 230 + i * 50; sel = i == self.settings_cursor
+            y = 230+i*50; sel = i == self.settings_cursor
             color = SUN_YELLOW if sel else GRAY
             if sel:
-                bar = pygame.Rect(SCREEN_WIDTH//2 - 200, y - 4, 400, 30)
-                pygame.draw.rect(self.screen, (30, 50, 80), bar)
+                bar = pygame.Rect(SCREEN_WIDTH//2-200, y-4, 400, 30)
+                pygame.draw.rect(self.screen, (30,50,80), bar)
                 pygame.draw.rect(self.screen, SUN_YELLOW, bar, 1)
-                self.screen.blit(self.small_font.render(">", True, SUN_YELLOW), (SCREEN_WIDTH//2 - 190, y))
-            self.screen.blit(self.small_font.render(item, True, color), (SCREEN_WIDTH//2 - 160, y))
+                self.screen.blit(self.small_font.render(">", True, SUN_YELLOW),
+                                 (SCREEN_WIDTH//2-190, y))
+            self.screen.blit(self.small_font.render(item, True, color), (SCREEN_WIDTH//2-160, y))
             if sel:
-                self.screen.blit(self.tiny_font.render(hint, True, (120, 140, 160)), (SCREEN_WIDTH//2 - 160, y + 20))
-        bx = SCREEN_WIDTH//2 - 100; vy = 258
+                self.screen.blit(self.tiny_font.render(hint, True, (120,140,160)),
+                                 (SCREEN_WIDTH//2-160, y+20))
+        bx = SCREEN_WIDTH//2-100; vy = 258
         pygame.draw.rect(self.screen, DARK_GRAY, (bx, vy, 200, 6))
         pygame.draw.rect(self.screen, CYAN if not self.music_muted else RED,
-                         (bx, vy, int(200 * self.music_volume), 6))
+                         (bx, vy, int(200*self.music_volume), 6))
         pygame.draw.rect(self.screen, WHITE, (bx, vy, 200, 6), 1)
-        self.screen.blit(self.tiny_font.render("ESC to resume", True, (100,120,140)),
-                         self.tiny_font.render("ESC to resume", True, (100,120,140)).get_rect(
-                             center=(SCREEN_WIDTH//2, 480)))
+        esc = self.tiny_font.render("ESC to resume", True, (100,120,140))
+        self.screen.blit(esc, esc.get_rect(center=(SCREEN_WIDTH//2, 480)))
 
     def _draw_win(self):
         for i in range(8):
             pygame.draw.rect(self.screen, lerp_color(SKY_TOP, SKY_BOT, i/7),
-                             (0, i * SCREEN_HEIGHT//8, SCREEN_WIDTH, SCREEN_HEIGHT//8 + 2))
+                             (0, i*SCREEN_HEIGHT//8, SCREEN_WIDTH, SCREEN_HEIGHT//8+2))
         wt = self.big_font.render("LEVEL COMPLETE!", True, SUN_YELLOW)
         self.screen.blit(wt, wt.get_rect(center=(SCREEN_WIDTH//2, 160)))
         t = self.level_time / FPS
         for surf, cy in [
             (self.font.render(f"Time: {t:.1f} seconds", True, WHITE), 250),
-            (self.font.render(f"Monsters defeated: {self.player.kill_count}", True, ORANGE), 300),
-            (self.small_font.render("Press ENTER or ESC to exit", True, WHITE), 400),
+            (self.small_font.render("Press ENTER or ESC to exit", True, WHITE), 360),
         ]:
             self.screen.blit(surf, surf.get_rect(center=(SCREEN_WIDTH//2, cy)))
 
