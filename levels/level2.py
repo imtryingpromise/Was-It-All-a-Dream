@@ -1307,7 +1307,7 @@ class Player:
 # ---------------------------------------------------------------------------
 # Sound Manager
 # ---------------------------------------------------------------------------
-SOUND_DIR  = os.path.join(os.path.dirname(os.path.abspath(__file__)),"sounds")
+SOUND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "audio")
 SOUND_FILES= {"jump":"jump.wav","death":"death.wav","respawn":"respawn.wav",
               "balloon":"powerup.wav","balloon_pop":"balloon_pop.wav",
               "checkpoint":"checkpoint.wav","win":"win.wav"}
@@ -1315,15 +1315,31 @@ SOUND_FILES= {"jump":"jump.wav","death":"death.wav","respawn":"respawn.wav",
 # ── Background music for this level ─────────────────────────────────────
 # Replace the filename below with your own track.
 # The file should be placed in the assets/audio folder.
-MUSIC_FILE = r"C:\Users\ilham\Documents\APU WORKS\YEAR 2 SEM 2\IMAGING & SE\GameAssignment\imaging-assignment\assets\audio\background_song_level2.mp3"
+MUSIC_FILE = r"C:\Users\ilham\Documents\APU WORKS\YEAR 2 SEM 2\IMAGING & SE\GameAssignment\imaging-assignment\assets\audio\backgroundlevel2.mp3"
 
 class SoundManager:
     def __init__(self):
         self.sounds={}; self.music_loaded=False
+        # for name,fn in SOUND_FILES.items():
+        #     p=os.path.join(SOUND_DIR,fn)
+        #     try: self.sounds[name]=pygame.mixer.Sound(p) if os.path.isfile(p) else None
+        #     except: self.sounds[name]=None
+
         for name,fn in SOUND_FILES.items():
             p=os.path.join(SOUND_DIR,fn)
-            try: self.sounds[name]=pygame.mixer.Sound(p) if os.path.isfile(p) else None
-            except: self.sounds[name]=None
+            print("Loading:", p)
+
+            if os.path.isfile(p):
+                try:
+                    self.sounds[name] = pygame.mixer.Sound(p)
+                    print("Loaded:", name)
+                except Exception as e:
+                    print("FAILED:", name, e)
+                    self.sounds[name] = None
+            else:
+                print("Missing:", p)
+                self.sounds[name] = None
+
         if os.path.isfile(MUSIC_FILE):
             try: pygame.mixer.music.load(MUSIC_FILE); self.music_loaded=True
             except: pass
@@ -1625,7 +1641,7 @@ class Game:
         # Track alive state before player update (to detect death this frame)
         was_alive=self.player.alive
         result=self.player.update(keys,self.platforms)
-        if result=="jump": self.sfx.play("jump")
+        if result=="jump": self.sfx.play("jump") 
 
         # On player death: reset countdown, tram and sleigh
         if was_alive and not self.player.alive:
@@ -1873,7 +1889,7 @@ class Game:
         self.screen.blit(ds,ds.get_rect(center=(SCREEN_WIDTH//2,168)))
         items=[(f"Difficulty :  < {self.difficulty.upper()} >","Left/Right — restarts level instantly"),
                (f"Music Volume :  < {int(self.music_volume*100)}% >","Left/Right"),
-               (f"Mute Music :  {'ON' if self.music_muted else 'OFF'}","Enter to toggle"),
+               (f"Mute Music :  {'OFF' if self.music_muted else 'ON'}","Enter to toggle"),
                ("Resume","Enter or ESC"),("Exit to Menu","Enter")]
         for i,(label,hint) in enumerate(items):
             y=205+i*58; sel=(i==self.settings_cursor)
@@ -1916,7 +1932,7 @@ def launch_game():
     pygame.mixer.music.stop()
     game=Game(); game.run()
     pygame.display.set_caption("Christmas Pixel Adventure")
-    try: pygame.mixer.music.load("assets/audio/BackgroundMusic.mp3"); pygame.mixer.music.play(-1)
+    try: pygame.mixer.music.load("assets/audio/backgroundlevel2.mp3"); pygame.mixer.music.play(-1)
     except: pass
 
 if __name__=="__main__":
