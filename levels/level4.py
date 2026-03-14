@@ -246,7 +246,7 @@ SFX_VOLUMES = {
     "bomb_explode": 1.0, "bomb_defuse": 0.6, "respawn": 0.7,
     "soul_rise": 0.7, "soul_land": 0.7, "blizzard": 0.6,
     "saw_buzz": 0.35, "pendulum_whoosh": 0.4, "geyser_burst": 0.6,
-    "npc_talk": 0.7, "meteor_impact": 0.4, "icicle_crack": 0.6,
+    "npc_talk": 1.0, "meteor_impact": 0.4, "icicle_crack": 0.6,
     "crumble": 0.8,
 }
 MUSIC_FILE = os.path.join(_BASE_DIR, "assets", "audio", "Level4Music.mp3")
