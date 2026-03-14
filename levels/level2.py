@@ -90,37 +90,69 @@ COUNTDOWN_GRACE = 90
 # ---------------------------------------------------------------------------
 DIFFICULTY_PRESETS = {
     "easy": {
-        "shrink_speed":   0.5,
-        "fall_delay":     50,
-        "phantom_frames": 30,
-        "balloon_vx":     10,
-        "balloon_vy":     -13,
-        "player_speed":   5,
-        "player_jump":    -14,
-        "countdown_sec":  3,
-        "tram_speed":     2,
+        # Ice melts slowly, falls late, phantom is wide and stays long
+        "shrink_speed":    0.4,
+        "shrink_respawn":  400,
+        "fall_delay":      55,
+        "phantom_frames":  30,
+        "phantom_w":       110,
+        "balloon_vx":      10,
+        "balloon_vy":      -13,
+        "balloon_radius":  18,
+        "player_speed":    5,
+        "player_jump":     -14,
+        "countdown_sec":   3,
+        "countdown_grace": 100,
+        "tram_speed":      2,
+        "tram_vanish":     650,
+        "santa_timeout":   420,
+        "rope_len":        160,
+        "rope_grab_r":     22,
+        "zigzag_ledge_w":  80,
+        "kidnap_dist":     320,
     },
     "medium": {
-        "shrink_speed":   1.2,
-        "fall_delay":     25,
-        "phantom_frames": 18,
-        "balloon_vx":     9,
-        "balloon_vy":     -11,
-        "player_speed":   5,
-        "player_jump":    -13,
-        "countdown_sec":  3,
-        "tram_speed":     3,
+        "shrink_speed":    1.2,
+        "shrink_respawn":  300,
+        "fall_delay":      25,
+        "phantom_frames":  18,
+        "phantom_w":       80,
+        "balloon_vx":      9,
+        "balloon_vy":      -11,
+        "balloon_radius":  14,
+        "player_speed":    5,
+        "player_jump":     -13,
+        "countdown_sec":   3,
+        "countdown_grace": 90,
+        "tram_speed":      3,
+        "tram_vanish":     560,
+        "santa_timeout":   300,
+        "rope_len":        130,
+        "rope_grab_r":     14,
+        "zigzag_ledge_w":  60,
+        "kidnap_dist":     250,
     },
     "hard": {
-        "shrink_speed":   2.5,
-        "fall_delay":     8,
-        "phantom_frames": 8,
-        "balloon_vx":     8,
-        "balloon_vy":     -10,
-        "player_speed":   5,
-        "player_jump":    -13,
-        "countdown_sec":  2,
-        "tram_speed":     4,
+        # Ice melts fast, falls instantly, phantom is narrow and disappears quick
+        "shrink_speed":    2.8,
+        "shrink_respawn":  240,
+        "fall_delay":      8,
+        "phantom_frames":  8,
+        "phantom_w":       55,
+        "balloon_vx":      8,
+        "balloon_vy":      -10,
+        "balloon_radius":  9,
+        "player_speed":    5,
+        "player_jump":     -13,
+        "countdown_sec":   2,
+        "countdown_grace": 60,
+        "tram_speed":      4,
+        "tram_vanish":     555,
+        "santa_timeout":   300,
+        "rope_len":        130,
+        "rope_grab_r":     14,  # grab zone — hard difficulty via short rope+timeout
+        "zigzag_ledge_w":  42,
+        "kidnap_dist":     250,
     },
 }
 
@@ -628,9 +660,10 @@ class ZigzagLedge(Platform):
     LEDGE_W = 70
     LEDGE_H = 14
 
-    def __init__(self, x, y, side, owner_climb, step_index):
+    def __init__(self, x, y, side, owner_climb, step_index, ledge_w=None):
         col = LEDGE_L_COL if side == "LEFT" else LEDGE_R_COL
-        super().__init__(x, y, self.LEDGE_W, self.LEDGE_H, col)
+        w = ledge_w if ledge_w is not None else self.LEDGE_W
+        super().__init__(x, y, w, self.LEDGE_H, col)
         self.side        = side
         self.owner_climb = owner_climb
         self.step_index  = step_index
@@ -715,7 +748,7 @@ class ZigzagExitPlatform(Platform):
         super().draw(surface, camera)
 
 
-def build_zigzag_section(base_x, base_y):
+def build_zigzag_section(base_x, base_y, ledge_w=70):
     """
     Build the zigzag floating-ledge obstacle.
 
@@ -745,13 +778,13 @@ def build_zigzag_section(base_x, base_y):
     for i in range(WALL_STEPS):
         # RIGHT ledge — player jumps here from the left
         r_y = base_y - i * LEDGE_RISE
-        r_ledge = ZigzagLedge(right_x, r_y, "RIGHT", climb, step)
+        r_ledge = ZigzagLedge(right_x, r_y, "RIGHT", climb, step, ledge_w)
         plats.append(r_ledge)
         step += 1
 
         # LEFT ledge — half a LEDGE_RISE above the right ledge at this level
         l_y = base_y - i * LEDGE_RISE - LEDGE_RISE // 2
-        l_ledge = ZigzagLedge(left_x, l_y, "LEFT", climb, step)
+        l_ledge = ZigzagLedge(left_x, l_y, "LEFT", climb, step, ledge_w)
         plats.append(l_ledge)
         step += 1
 
@@ -772,161 +805,251 @@ def build_zigzag_section(base_x, base_y):
 # OBSTACLE 3 — Tram + Santa Sleigh
 # ---------------------------------------------------------------------------
 class TramPlatform(Platform):
-    def __init__(self, x, y, w, h, speed=3, stop_x=None):
-        super().__init__(x,y,w,h,MOVING_COL)
-        self.speed     = speed
-        self.moving    = False
-        self.origin_x  = x
-        self.stop_x    = stop_x   # world X where tram stops (None = no stop)
-        self.dx        = 0        # pixels moved this frame — used by player riding
+    """
+    Moving platform (tram/cart).
+    - Starts moving when player lands on it
+    - At vanish_x it starts falling away (becomes inactive) — player MUST jump before this
+    - dx is exposed so Player.update can move the player with the tram each frame
+    """
+    FALL_SPEED = 0.5
+    MAX_FALL   = 14
 
-    def on_player_land(self, player): self.moving=True
+    def __init__(self, x, y, w, h, speed=3, vanish_x=None):
+        super().__init__(x,y,w,h,MOVING_COL)
+        self.speed      = speed
+        self.moving     = False
+        self.origin_x   = x
+        self.origin_y   = y
+        self.vanish_x   = vanish_x   # world X where tram starts falling
+        self.dx         = 0
+        self.falling    = False
+        self.fall_vy    = 0.0
+        self.gone       = False
+        # Warning flash counter — flashes red near vanish point
+        self.warn_flash = 0
+
+    def on_player_land(self, player):
+        if not self.falling and not self.gone:
+            self.moving = True
+
+    def is_active(self):
+        return not self.gone
+
     def reset(self):
-        self.rect.x = self.origin_x
-        self.moving = False
-        self.dx     = 0
+        self.rect.x   = self.origin_x
+        self.rect.y   = self.origin_y
+        self.moving   = False
+        self.falling  = False
+        self.gone     = False
+        self.fall_vy  = 0.0
+        self.dx       = 0
+        self.warn_flash = 0
 
     def update(self):
+        if self.gone:
+            self.dx = 0
+            return
+        if self.falling:
+            self.dx       = 0
+            self.fall_vy  = min(self.fall_vy + self.FALL_SPEED, self.MAX_FALL)
+            self.rect.y  += int(self.fall_vy)
+            if self.rect.top > DEATH_Y + 200:
+                self.gone = True
+            return
         if self.moving:
-            if self.stop_x is not None and self.rect.x >= self.stop_x:
-                self.dx = 0   # stopped
+            if self.vanish_x is not None and self.rect.x >= self.vanish_x:
+                # Start falling
+                self.falling  = True
+                self.fall_vy  = 0.0
+                self.dx       = 0
             else:
-                self.rect.x += self.speed
-                self.dx      = self.speed
+                self.rect.x  += self.speed
+                self.dx       = self.speed
+                # Warning when within 120px of vanish point
+                if self.vanish_x is not None:
+                    dist = self.vanish_x - self.rect.x
+                    if dist < 120:
+                        self.warn_flash = (self.warn_flash + 1) % 12
         else:
             self.dx = 0
 
     def draw(self, surface, camera):
-        sr=camera.apply(self.rect)
-        if sr.right<-10 or sr.left>SCREEN_WIDTH+10: return
-        pygame.draw.rect(surface,MOVING_COL,sr)
+        if self.gone: return
+        sr = camera.apply(self.rect)
+        if sr.right < -10 or sr.left > SCREEN_WIDTH + 10: return
+        # Near-vanish warning colour
+        if self.vanish_x is not None and self.moving and not self.falling:
+            dist = self.vanish_x - self.rect.x
+            if dist < 120:
+                warn_t = 1.0 - dist / 120
+                col = lerp_color(MOVING_COL, RED, warn_t)
+            else:
+                col = MOVING_COL
+        else:
+            col = MOVING_COL
+        pygame.draw.rect(surface, col, sr)
         for i in range(3):
-            lx=sr.x+15+i*(sr.width//3-5)
-            pygame.draw.line(surface,SLEIGH_GOLD,(lx,sr.y+4),(lx,sr.bottom-4),2)
-        pygame.draw.rect(surface,SNOW_WHITE,(sr.x,sr.y,sr.width,5))
-        pygame.draw.rect(surface,SLEIGH_GOLD,sr,2)
-        if self.moving and self.dx != 0:
-            f=pygame.font.SysFont("consolas",14,bold=True)
-            t=f.render("JUMP!",True,RED)
-            surface.blit(t,(sr.centerx-t.get_width()//2,sr.y-22))
+            lx = sr.x + 15 + i * (sr.width // 3 - 5)
+            pygame.draw.line(surface, SLEIGH_GOLD, (lx, sr.y+4), (lx, sr.bottom-4), 2)
+        pygame.draw.rect(surface, SNOW_WHITE, (sr.x, sr.y, sr.width, 5))
+        pygame.draw.rect(surface, SLEIGH_GOLD, sr, 2)
+        if self.moving and not self.falling:
+            f = pygame.font.SysFont("consolas", 14, bold=True)
+            if self.vanish_x is not None and self.vanish_x - self.rect.x < 200:
+                t = f.render("JUMP TO SLEIGH!", True, RED)
+            else:
+                t = f.render("RIDE THE TRAM", True, GOLD)
+            surface.blit(t, (sr.centerx - t.get_width()//2, sr.y - 22))
 
 
 class SantaSleigh:
     """
-    States:
-      waiting    - off screen, not started yet
-      flying_in  - swooping in from top-right toward the tram
-      hovering   - floating above the tram, waiting for player to jump on
-                   if HOVER_TIMEOUT frames pass without player boarding → kidnap_miss → player dies
-      carrying   - player aboard, sleigh flies right toward portal
-                   player must jump OFF to land on the portal
-                   if sleigh passes portal_x + KIDNAP_DIST without player jumping off → kidnap → player dies
-      kidnapping - player stayed on too long, sleigh flies off-screen fast → player dies
-      done       - invisible, waiting for reset
+    Rope-grab mechanic:
+      - Santa hovers above the tram and drops a rope
+      - Rope bottom hangs 80px above the tram top — within jump reach
+      - Player jumps and overlaps the ROPE RECT → grabbed instantly (no vel check)
+      - While grabbed: player hangs on rope, sleigh flies right toward portal
+      - Player presses jump → releases rope, flies forward freely
+      - If sleigh passes portal_x + KIDNAP_DIST without player releasing → kidnap → die
+      - If hover timeout expires without grab → kidnap (fly away empty)
     """
-    WIDTH         = 120
-    HEIGHT        = 30
-    HOVER_TIMEOUT = 300   # frames santa waits before flying away (5 sec)
-    KIDNAP_DIST   = 160   # px past portal_x before santa kidnaps player
+    WIDTH  = 160
+    HEIGHT = 30
+    # rope/timing constants set per-instance from difficulty preset
 
-    def __init__(self, portal_x, portal_y, tram):
+    def __init__(self, portal_x, portal_y, tram,
+                 rope_len=130, rope_grab_r=14,
+                 hover_timeout=300, kidnap_dist=250):
         self.tram          = tram
-        self.portal_x      = portal_x   # world X of the portal
+        self.portal_x      = portal_x
         self.portal_y      = portal_y
-        self.wx            = float(SCREEN_WIDTH + 300)
+        self.ROPE_LEN      = rope_len
+        self.ROPE_W        = rope_grab_r
+        self.HOVER_TIMEOUT = hover_timeout
+        self.KIDNAP_DIST   = kidnap_dist
+        self.wx            = float(SCREEN_WIDTH + 400)
         self.wy            = float(-200)
         self.rect          = pygame.Rect(int(self.wx), int(self.wy), self.WIDTH, self.HEIGHT)
         self.state         = "waiting"
         self.tick          = 0
-        self.hover_tick    = 0           # counts frames spent hovering
-        self.player_aboard = False
+        self.hover_tick    = 0
+        self.player_grabbed= False
+        self.carry_tick    = 0
+
+    # Rope bottom world position
+    def rope_tip_world(self):
+        cx = int(self.wx + self.WIDTH // 2)
+        cy = int(self.wy + self.HEIGHT + self.ROPE_LEN)
+        return cx, cy
+
+    def rope_grab_rect(self):
+        """Full rope length grab zone — player can grab anywhere along the rope."""
+        rope_top_x = int(self.wx + self.WIDTH // 2)
+        rope_top_y = int(self.wy + self.HEIGHT)
+        w = max(30, self.ROPE_W * 2)  # at least player width
+        return pygame.Rect(rope_top_x - w // 2, rope_top_y, w, self.ROPE_LEN)
 
     def reset(self):
-        self.wx            = float(SCREEN_WIDTH + 300)
-        self.wy            = float(-200)
-        self.rect.x        = int(self.wx)
-        self.rect.y        = int(self.wy)
-        self.state         = "waiting"
-        self.tick          = 0
-        self.hover_tick    = 0
-        self.player_aboard = False
+        self.wx             = float(SCREEN_WIDTH + 400)
+        self.wy             = float(-200)
+        self.rect.x         = int(self.wx)
+        self.rect.y         = int(self.wy)
+        self.state          = "waiting"
+        self.tick           = 0
+        self.hover_tick     = 0
+        self.player_grabbed = False
+        self.carry_tick     = 0
 
     def start(self, tram_rect):
-        self.wx         = float(tram_rect.right + 600)
-        self.wy         = float(tram_rect.top - 400)
-        self.state      = "flying_in"
-        self.hover_tick = 0
+        """Called when tram has travelled far enough."""
+        self.wx    = float(tram_rect.centerx + 500)
+        self.wy    = float(tram_rect.top - 380)
+        self.state = "flying_in"
 
     def update(self, player):
-        """
-        Returns "kill_player" if the player should die this frame, else None.
-        """
+        """Returns 'kill_player' if player should die, else None."""
         self.tick += 1
         tr = self.tram.rect
 
+        # ── flying_in ────────────────────────────────────────────────────
         if self.state == "flying_in":
             tx = float(tr.centerx - self.WIDTH // 2)
-            ty = float(tr.top - 120)
+            ty = float(tr.top - 260)   # hover higher up — rope tip hangs at jump height
             self.wx += (tx - self.wx) * 0.06
             self.wy += (ty - self.wy) * 0.06
-            if abs(self.wx - tx) < 8 and abs(self.wy - ty) < 8:
-                self.state = "hovering"
+            if abs(self.wx - tx) < 10 and abs(self.wy - ty) < 10:
+                self.state      = "hovering"
                 self.hover_tick = 0
 
+        # ── hovering ─────────────────────────────────────────────────────
         elif self.state == "hovering":
-            # Bob above tram
-            tx = float(tr.centerx - self.WIDTH // 2)
-            ty = float(tr.top - 120) + math.sin(self.tick * 0.06) * 6
-            self.wx += (tx - self.wx) * 0.12
-            self.wy += (ty - self.wy) * 0.10
-            self.hover_tick += 1
-            # Check player jumps on
-            if (player.alive and not self.player_aboard
-                    and player.vel_y >= 0
-                    and player.rect.colliderect(self.rect)):
-                self.player_aboard = True
-                self.state = "carrying"
-            # Timeout — santa flies away, player missed
-            elif self.hover_tick >= self.HOVER_TIMEOUT:
-                self.state = "kidnapping"   # fly away empty, tram keeps moving
+            # Track tram while alive, freeze when tram falls
+            if not self.tram.falling and not self.tram.gone:
+                tx = float(tr.centerx - self.WIDTH // 2)
+                ty = float(tr.top - 260) + math.sin(self.tick * 0.07) * 8
+                self.wx += (tx - self.wx) * 0.12
+                self.wy += (ty - self.wy) * 0.10
+            else:
+                # Tram gone — hold position, gentle bob
+                self.wy += math.sin(self.tick * 0.09) * 0.6
 
+            self.hover_tick += 1
+
+            # Check grab — player touches the ROPE TIP (not the sleigh body)
+            if player.alive and not self.player_grabbed:
+                grip = self.rope_grab_rect()
+                if player.rect.colliderect(grip):
+                    self.player_grabbed = True
+                    self.state          = "carrying"
+                    self.carry_tick     = 0
+                    player.riding_platform = None  # detach from tram
+
+            # Timeout
+            if self.hover_tick >= self.HOVER_TIMEOUT:
+                self.state = "kidnapping"
+
+        # ── carrying ─────────────────────────────────────────────────────
         elif self.state == "carrying":
-            # Carry player rightward toward portal
-            self.wx += 4
-            self.wy += math.sin(self.tick * 0.04) * 0.5   # gentle bob
+            self.carry_tick += 1
+            self.wx += 5
+            self.wy += math.sin(self.tick * 0.05) * 0.4
+
             if player.alive:
-                # Only snap if player hasn't jumped (vel_y >= 0 means not rising)
-                if player.vel_y >= 0:
-                    # Snap X to centre of sleigh, sit on top
-                    player.rect.bottom  = self.rect.top
-                    player.rect.centerx = self.rect.centerx
-                    player.vel_x        = 0
-                    player.on_ground    = True
-                    # Let vel_y stay 0 so player can jump normally next frame
-                    if player.vel_y > 0:
-                        player.vel_y = 0
-                else:
-                    # Player is rising (jumped off) — release them
-                    self.player_aboard = False
-                    self.state = "done"
-            # Kidnap: player passed portal without jumping off
+                # Hang player at rope tip
+                cx, cy = self.rope_tip_world()
+                player.rect.centerx = cx
+                player.rect.bottom  = cy + player.HEIGHT // 2
+                player.vel_x        = 0
+                player.vel_y        = 0
+                player.on_ground    = False  # hanging, not on ground
+
+                # Release: player presses jump after grace period
+                keys = pygame.key.get_pressed()
+                if self.carry_tick > 10 and (
+                        keys[pygame.K_SPACE] or keys[pygame.K_UP] or keys[pygame.K_w]):
+                    self.player_grabbed = False
+                    self.state          = "done"
+                    # Give player a forward boost so they can reach the portal
+                    player.vel_x = 7
+                    player.vel_y = -10
+
+            # Kidnap: passed portal without releasing
             if self.state == "carrying" and self.wx > self.portal_x + self.KIDNAP_DIST:
                 self.state = "kidnapping"
 
+        # ── kidnapping ───────────────────────────────────────────────────
         elif self.state == "kidnapping":
-            # Fly off fast to the right
-            self.wx += 12
-            self.wy -= 3
-            if player.alive and self.player_aboard:
-                player.rect.bottom  = self.rect.top
-                player.rect.centerx = self.rect.centerx
-                player.vel_x = 0; player.vel_y = 0; player.on_ground = True
-            if self.wx > SCREEN_WIDTH + 400:
-                # Off screen — kill player if they're still aboard
-                result = "kill_player" if self.player_aboard else None
-                self.player_aboard = False
+            self.wx += 16
+            self.wy -= 6
+            if player.alive and self.player_grabbed:
+                cx, cy = self.rope_tip_world()
+                player.rect.centerx = cx
+                player.rect.bottom  = cy + player.HEIGHT // 2
+                player.vel_x = 0; player.vel_y = 0
+            if self.wx > self.portal_x + 900:
+                result = "kill_player" if self.player_grabbed else None
+                self.player_grabbed = False
                 self.state = "done"
-                self.rect.x = int(self.wx); self.rect.y = int(self.wy)
                 return result
 
         self.rect.x = int(self.wx)
@@ -935,39 +1058,61 @@ class SantaSleigh:
 
     def draw(self, surface, camera):
         if self.state in ("waiting", "done"): return
+
+        # Sleigh body
         sr = camera.apply(self.rect)
-        if sr.right < -10 or sr.left > SCREEN_WIDTH + 10: return
-        pygame.draw.rect(surface, SLEIGH_BROWN, sr)
-        pygame.draw.rect(surface, SLEIGH_GOLD, sr, 2)
-        for side in (sr.x + 8, sr.right - 18):
-            pygame.draw.arc(surface, SLEIGH_GOLD, (side, sr.bottom-4, 10, 8), 0, math.pi, 2)
-        hx = sr.centerx - 12; hy = sr.y - 28
-        pygame.draw.rect(surface, SANTA_RED,       (hx,    hy+10, 24, 18))
-        pygame.draw.rect(surface, (50, 30, 10),    (hx,    hy+18, 24,  4))
-        pygame.draw.rect(surface, SLEIGH_GOLD,     (hx+9,  hy+17,  6,  6))
-        pygame.draw.rect(surface, (240, 200, 160), (hx+4,  hy,    16, 12))
-        pygame.draw.rect(surface, SANTA_RED,       (hx+4,  hy-8,  16, 10))
-        pygame.draw.rect(surface, WHITE,           (hx+2,  hy-1,  20,  4))
-        pygame.draw.circle(surface, WHITE, (hx+20, hy-8), 3)
-        pygame.draw.rect(surface, WHITE, (hx+2, hy+6, 20, 8))
-        if self.state == "hovering" and self.tick % 80 < 50:
-            f = pygame.font.SysFont("consolas", 12, bold=True)
-            t = f.render("HO HO!  JUMP ON!", True, SANTA_RED)
-            surface.blit(t, (sr.centerx - t.get_width()//2, sr.y - 48))
+        if -200 < sr.x < SCREEN_WIDTH + 200:
+            pygame.draw.rect(surface, SLEIGH_BROWN, sr)
+            pygame.draw.rect(surface, SLEIGH_GOLD, sr, 2)
+            for side in (sr.x + 8, sr.right - 18):
+                pygame.draw.arc(surface, SLEIGH_GOLD,
+                                (side, sr.bottom-4, 10, 8), 0, math.pi, 2)
+            # Santa pixel art
+            hx = sr.centerx - 12; hy = sr.y - 28
+            pygame.draw.rect(surface, SANTA_RED,       (hx,    hy+10, 24, 18))
+            pygame.draw.rect(surface, (50, 30, 10),    (hx,    hy+18, 24,  4))
+            pygame.draw.rect(surface, SLEIGH_GOLD,     (hx+9,  hy+17,  6,  6))
+            pygame.draw.rect(surface, (240, 200, 160), (hx+4,  hy,    16, 12))
+            pygame.draw.rect(surface, SANTA_RED,       (hx+4,  hy-8,  16, 10))
+            pygame.draw.rect(surface, WHITE,           (hx+2,  hy-1,  20,  4))
+            pygame.draw.circle(surface, WHITE, (hx+20, hy-8), 3)
+            pygame.draw.rect(surface, WHITE,   (hx+2,  hy+6,  20,  8))
+
+        # Rope
+        cx_w, cy_w = self.rope_tip_world()
+        rp_top = camera.apply(pygame.Rect(int(self.wx + self.WIDTH//2), int(self.wy + self.HEIGHT), 1, 1))
+        rp_bot = camera.apply(pygame.Rect(cx_w, cy_w, 1, 1))
+
+        # Draw rope as a zigzag for visual interest
+        pygame.draw.line(surface, (180, 120, 60),
+                         (rp_top.x, rp_top.y), (rp_bot.x, rp_bot.y), 3)
+        # Grab ring at tip — pulses to show it's interactive
+        pulse = int(4 + abs(math.sin(self.tick * 0.15)) * 4)
+        ring_col = (GOLD if self.state == "hovering" else
+                    (100, 220, 100) if self.state == "carrying" else RED)
+        pygame.draw.circle(surface, ring_col, (rp_bot.x, rp_bot.y), pulse + 4)
+        pygame.draw.circle(surface, WHITE,    (rp_bot.x, rp_bot.y), pulse + 4, 2)
+
+        # HUD hints
+        if self.state == "hovering" and not self.player_grabbed:
+            f = pygame.font.SysFont("consolas", 13, bold=True)
+            t = f.render("JUMP TO GRAB ROPE!", True, GOLD)
+            surface.blit(t, (rp_bot.x - t.get_width()//2, rp_bot.y - 28))
+            # Hover timeout bar
+            if self.hover_tick > self.HOVER_TIMEOUT // 2:
+                ratio = 1 - self.hover_tick / self.HOVER_TIMEOUT
+                bx, by = sr.x, sr.y - 12
+                pygame.draw.rect(surface, DARK_GRAY, (bx, by, sr.width, 6))
+                pygame.draw.rect(surface, RED,       (bx, by, int(sr.width * ratio), 6))
         elif self.state == "carrying":
-            f = pygame.font.SysFont("consolas", 12, bold=True)
-            t = f.render("JUMP OFF AT PORTAL!", True, GOLD)
-            surface.blit(t, (sr.centerx - t.get_width()//2, sr.y - 48))
+            f = pygame.font.SysFont("consolas", 13, bold=True)
+            t = f.render("JUMP to release at portal!", True, (100, 255, 100))
+            surface.blit(t, (rp_bot.x - t.get_width()//2, rp_bot.y - 28))
         elif self.state == "kidnapping":
             f = pygame.font.SysFont("consolas", 14, bold=True)
             t = f.render("HO HO HO! BYE BYE!", True, RED)
-            surface.blit(t, (sr.centerx - t.get_width()//2, sr.y - 48))
-        # Hover timeout warning bar
-        if self.state == "hovering" and self.hover_tick > self.HOVER_TIMEOUT // 2:
-            ratio = 1 - (self.hover_tick / self.HOVER_TIMEOUT)
-            bar_w = int(sr.width * ratio)
-            pygame.draw.rect(surface, DARK_GRAY, (sr.x, sr.y - 10, sr.width, 5))
-            pygame.draw.rect(surface, RED, (sr.x, sr.y - 10, bar_w, 5))
+            surface.blit(t, (sr.centerx - t.get_width()//2, sr.y - 50))
+
 
 # ---------------------------------------------------------------------------
 # Spike Trap
@@ -992,8 +1137,9 @@ class SpikeTrap:
 # ---------------------------------------------------------------------------
 class Balloon:
     RADIUS=14; STRING_LEN=30
-    def __init__(self,x,y,launch_vx=9,launch_vy=-11):
+    def __init__(self,x,y,launch_vx=9,launch_vy=-11,radius=14):
         self.x=float(x); self.y=float(y)
+        self.RADIUS=radius
         self.launch_vx=launch_vx; self.launch_vy=launch_vy
         self.grabbed=False; self.rc=0; self.tick=0
         self.rect=pygame.Rect(int(x)-self.RADIUS,int(y)-self.RADIUS,self.RADIUS*2,self.RADIUS*2)
@@ -1163,9 +1309,13 @@ class Player:
 # ---------------------------------------------------------------------------
 SOUND_DIR  = os.path.join(os.path.dirname(os.path.abspath(__file__)),"sounds")
 SOUND_FILES= {"jump":"jump.wav","death":"death.wav","respawn":"respawn.wav",
-              "balloon":"powerup.wav","checkpoint":"checkpoint.wav","win":"win.wav"}
-MUSIC_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                           "assets","audio","ChristmasMusic.mp3")
+              "balloon":"powerup.wav","balloon_pop":"balloon_pop.wav",
+              "checkpoint":"checkpoint.wav","win":"win.wav"}
+
+# ── Background music for this level ─────────────────────────────────────
+# Replace the filename below with your own track.
+# The file should be placed in the assets/audio folder.
+MUSIC_FILE = r"C:\Users\ilham\Documents\APU WORKS\YEAR 2 SEM 2\IMAGING & SE\GameAssignment\imaging-assignment\assets\audio\background_song_level2.mp3"
 
 class SoundManager:
     def __init__(self):
@@ -1203,9 +1353,9 @@ def create_christmas_level(preset):
     add(Platform(0, BASE_Y, PW_SAFE, PH, PINE_GREEN))
 
     # ── ICE shrink ───────────────────────────────────────────────────────
-    sp=preset["shrink_speed"]
-    for p in [ShrinkingPlatform(420,BASE_Y-30,PW_SHRINK,PH,sp),
-              ShrinkingPlatform(660,BASE_Y-60,PW_SHRINK,PH,sp)]:
+    sp=preset["shrink_speed"]; sr=preset["shrink_respawn"]
+    for p in [ShrinkingPlatform(420,BASE_Y-30,PW_SHRINK,PH,sp,sr),
+              ShrinkingPlatform(660,BASE_Y-60,PW_SHRINK,PH,sp,sr)]:
         add(p); shrink_platforms.append(p)
 
     add(Platform(910,BASE_Y-40,PW_SAFE,PH,PINE_GREEN))
@@ -1228,7 +1378,7 @@ def create_christmas_level(preset):
     sbx=1880; sby=BASE_Y+10
     add(Platform(sbx,sby,140,PH,(60,60,70)))
     spikes.append(SpikeTrap(sbx+6,sby,9))
-    balloon=Balloon(sbx+70,sby-90,preset["balloon_vx"],preset["balloon_vy"])
+    balloon=Balloon(sbx+70,sby-90,preset["balloon_vx"],preset["balloon_vy"],preset["balloon_radius"])
 
     add(Platform(2120,BASE_Y-20,PW_SAFE,PH,PINE_GREEN))
     section_checkpoints.append(SectionCheckpoint(
@@ -1236,9 +1386,9 @@ def create_christmas_level(preset):
         float_y=BASE_Y-140, label="C"))
 
     # ── PHANTOM ──────────────────────────────────────────────────────────
-    pf=preset["phantom_frames"]
-    for p in [PhantomPlatform(2450,BASE_Y-50,PW_PHANTOM,PH,pf),
-              PhantomPlatform(2640,BASE_Y-80,PW_PHANTOM,PH,pf)]:
+    pf=preset["phantom_frames"]; pw=preset["phantom_w"]
+    for p in [PhantomPlatform(2450,BASE_Y-50,pw,PH,pf),
+              PhantomPlatform(2640,BASE_Y-80,pw,PH,pf)]:
         add(p); phantom_platforms.append(p)
 
     add(Platform(2840,BASE_Y-60,PW_SAFE+50,PH,PINE_GREEN))
@@ -1252,7 +1402,7 @@ def create_christmas_level(preset):
     cnt_frames=preset["countdown_sec"]*FPS
     cd_pad=CountdownPlatform(3240,BASE_Y-60,180,PH,
                              countdown_frames=cnt_frames,
-                             grace_frames=COUNTDOWN_GRACE)
+                             grace_frames=preset["countdown_grace"])
     add(cd_pad); countdown_platforms.append(cd_pad)
     countdown_platform_ref=cd_pad
 
@@ -1272,7 +1422,8 @@ def create_christmas_level(preset):
 
     add(Platform(3720, zz_base_y, 90, PH, PINE_GREEN))   # approach
 
-    zz_plats, zz_climb, zz_exit = build_zigzag_section(zz_base_x, zz_base_y)
+    zz_plats, zz_climb, zz_exit = build_zigzag_section(zz_base_x, zz_base_y,
+                                                         preset["zigzag_ledge_w"])
     for p in zz_plats: add(p)
     zigzag_section = zz_climb
 
@@ -1284,38 +1435,67 @@ def create_christmas_level(preset):
         label     = "F"))
 
     # ── OBSTACLE 3: TRAM + SANTA SLEIGH ──────────────────────────────────
-    # Layout:
-    #   bridge (safe landing from zigzag exit)
-    #   tram   (moving platform — starts when player lands, stops before portal)
-    #   gap    (tram stops here, santa flies in midway, player must jump to sleigh)
-    #   portal platform (player must jump off sleigh onto here, then enter portal)
     #
-    # Checkpoint: last checkpoint is F (zigzag exit). No checkpoint here —
-    # dying on the santa section respawns at the start of the bridge/tram.
-    bridge_x = zz_exit.rect.right + 30
+    # Full narrative timeline:
+    #
+    #   [bridge]  safe platform after zigzag — player walks right onto tram
+    #   [tram]    starts moving when player lands — rides it to the right
+    #             at SANTA_TRIGGER_DIST px travelled, santa flies in
+    #             at TRAM_VANISH_DIST px travelled, tram falls away
+    #             player must jump from tram to sleigh before it vanishes
+    #   [sleigh]  santa carries player rightward toward portal
+    #             player sees portal approaching — must jump off to portal platform
+    #             if player doesn't jump → kidnap → flies over portal → player dies
+    #   [portal]  player lands here, walks into portal → WIN
+    #
+    # Distances (px from tram start):
+    #   SANTA_TRIGGER_DIST = 380  santa starts flying in
+    #   TRAM_VANISH_DIST   = 560  tram falls away (player must be on sleigh)
+    #   portal distance    = 1000 lots of room for the sleigh ride
+    #
+    # NO checkpoint after F — dying here respawns at zigzag exit (checkpoint F)
+
+    bridge_x = zz_exit.rect.right + 60   # extra space after zigzag
     bridge_y = zz_exit.rect.y
-    add(Platform(bridge_x, bridge_y, 130, PH, PINE_GREEN))
+    add(Platform(bridge_x, bridge_y, 160, PH, PINE_GREEN))
 
-    tram_x   = bridge_x + 160
-    portal_x = tram_x + 550
-    portal_y = bridge_y - 80
+    tram_x = bridge_x + 200   # tram starts 200px after bridge
+    tram_y = bridge_y
 
-    # Tram stops 200px before the portal platform so there's a gap — player MUST
-    # jump to the sleigh to cross it, can't just walk across the tram to the portal.
-    tram_stop_x = portal_x - 280
-    tram = TramPlatform(tram_x, bridge_y, 160, PH,
-                        speed=preset["tram_speed"], stop_x=tram_stop_x)
+    SANTA_TRIGGER_DIST = 400  # tram travels this far before santa arrives
+    TRAM_VANISH_DIST   = preset["tram_vanish"]  # from difficulty preset
+    PORTAL_DIST        = 1300 # portal far enough for full rope-ride experience
+
+    portal_x = tram_x + PORTAL_DIST
+    portal_y = tram_y - 80
+
+    vanish_x = tram_x + TRAM_VANISH_DIST
+
+    tram = TramPlatform(tram_x, tram_y, 180, PH,
+                        speed=preset["tram_speed"], vanish_x=vanish_x)
     add(tram); tram_platform=tram
 
-    santa = SantaSleigh(portal_x=portal_x, portal_y=portal_y, tram=tram)
+    santa = SantaSleigh(
+        portal_x      = portal_x,
+        portal_y      = portal_y,
+        tram          = tram,
+        rope_len      = preset["rope_len"],
+        rope_grab_r   = preset["rope_grab_r"],
+        hover_timeout = preset["santa_timeout"],
+        kidnap_dist   = preset["kidnap_dist"],
+    )
     santa_sleigh=santa
 
-    # Portal landing platform — player jumps from sleigh onto this, then walks into portal
-    portal_plat_x = portal_x - 120
-    add(Platform(portal_plat_x, bridge_y, PW_SAFE + 80, PH, PINE_GREEN))
+    # Store santa trigger distance so Game._update can start santa at right time
+    tram.santa_trigger_dist = SANTA_TRIGGER_DIST
+
+    # Portal landing platform — extra wide, placed further from portal
+    # so player released from rope has room to land before walking into portal
+    portal_plat_x = portal_x - 220
+    add(Platform(portal_plat_x, tram_y, PW_SAFE + 200, PH, PINE_GREEN))
     portal=Portal(portal_x, portal_y)
 
-    # NO checkpoint G — last checkpoint is F, so dying here restarts from zigzag exit
+    # NO checkpoint G — last checkpoint is F
 
     return dict(
         platforms=platforms,
@@ -1375,9 +1555,14 @@ class Game:
         self.balloon                =d["balloon"]
         self.portal                 =d["portal"]
         self.section_checkpoints    =d["section_checkpoints"]
-        self.player=Player(80,BASE_Y-60,
-                           move_speed=preset["player_speed"],
-                           jump_velocity=preset["player_jump"])
+        # self.player=Player(80,BASE_Y-60,
+        #                    move_speed=preset["player_speed"],
+        #                    jump_velocity=preset["player_jump"])
+        
+        self.player=Player(4400, BASE_Y-120, # nak test direct ke santa sleigh
+                   move_speed=preset["player_speed"],
+                   jump_velocity=preset["player_jump"])
+
         self.camera=Camera(SCREEN_WIDTH,SCREEN_HEIGHT)
         self.particles.clear(); self.rings.clear(); self.flashes.clear()
         self.level_time=0; self.tick=0; self.win_timer=0
@@ -1408,10 +1593,17 @@ class Game:
             if key in (pygame.K_UP,pygame.K_w):    self.settings_cursor=(self.settings_cursor-1)%nr
             elif key in (pygame.K_DOWN,pygame.K_s): self.settings_cursor=(self.settings_cursor+1)%nr
             elif self.settings_cursor==0:
+                changed = False
                 if key in (pygame.K_LEFT,pygame.K_a):
-                    self.diff_index=(self.diff_index-1)%3; self.difficulty=self.DIFF_OPTIONS[self.diff_index]
+                    self.diff_index=(self.diff_index-1)%3
+                    self.difficulty=self.DIFF_OPTIONS[self.diff_index]
+                    changed=True
                 elif key in (pygame.K_RIGHT,pygame.K_d,pygame.K_RETURN,pygame.K_SPACE):
-                    self.diff_index=(self.diff_index+1)%3; self.difficulty=self.DIFF_OPTIONS[self.diff_index]
+                    self.diff_index=(self.diff_index+1)%3
+                    self.difficulty=self.DIFF_OPTIONS[self.diff_index]
+                    changed=True
+                if changed:
+                    self._load_level()   # rebuild level immediately with new preset
             elif self.settings_cursor==1:
                 if key in (pygame.K_LEFT,pygame.K_a):    self.music_volume=max(0.0,round(self.music_volume-0.1,1)); self._apply_volume()
                 elif key in (pygame.K_RIGHT,pygame.K_d): self.music_volume=min(1.0,round(self.music_volume+0.1,1)); self._apply_volume()
@@ -1452,15 +1644,30 @@ class Game:
             self._tram_started = False
 
         # Tram + sleigh
+        # Santa starts flying in only after tram has travelled SANTA_TRIGGER_DIST px
         if self.tram_platform and self.tram_platform.moving and not self._tram_started:
-            self._tram_started = True
-            if self.santa_sleigh: self.santa_sleigh.start(self.tram_platform.rect)
+            tram_travelled = self.tram_platform.rect.x - self.tram_platform.origin_x
+            trigger = getattr(self.tram_platform, "santa_trigger_dist", 200)
+            if tram_travelled >= trigger:
+                self._tram_started = True
+                if self.santa_sleigh:
+                    self.santa_sleigh.start(self.tram_platform.rect)
         if self.santa_sleigh and self.santa_sleigh.state != "waiting":
             sleigh_result = self.santa_sleigh.update(self.player)
             if sleigh_result == "kill_player" and self.player.alive:
                 self._death_fx()
                 self.player.die()
                 self.sfx.play("death")
+        # Kill player if still on tram when it fully disappears
+        # (but NOT if they've grabbed the rope — santa_sleigh handles that)
+        if (self.tram_platform and self.tram_platform.gone
+                and self.player.alive
+                and self.santa_sleigh
+                and not self.santa_sleigh.player_grabbed
+                and self.player.riding_platform is self.tram_platform):
+            self._death_fx()
+            self.player.die()
+            self.sfx.play("death")
 
         # Section checkpoints
         for sc in self.section_checkpoints:
@@ -1480,7 +1687,9 @@ class Game:
 
         self.balloon.update()
         if self.balloon.check_grab(self.player):
-            self._balloon_fx(); self.sfx.play("balloon")
+            self._balloon_fx()
+            self.sfx.play("balloon")
+            self.sfx.play("balloon_pop")
 
         self.portal.update()
         if self.player.alive and self.portal.check(self.player):
@@ -1541,16 +1750,66 @@ class Game:
         pygame.display.flip()
 
     def _draw_background(self):
-        ox=int(self.camera.offset_x*0.2)%80
-        for x in range(0,SCREEN_WIDTH+80,80):
-            pygame.draw.line(self.screen,GRID_COLOR,(x-ox,0),(x-ox,SCREEN_HEIGHT))
-        for y in range(0,SCREEN_HEIGHT+80,80):
-            pygame.draw.line(self.screen,GRID_COLOR,(0,y),(SCREEN_WIDTH,y))
-        for i in range(60):
-            sx=(i*137+int(self.camera.offset_x*0.05))%SCREEN_WIDTH
-            sy=(i*89)%(SCREEN_HEIGHT-60)
-            b=80+int(40*math.sin(self.tick*0.05+i))
-            pygame.draw.rect(self.screen,(b,b,b+30),(sx,sy,2,2))
+        # ── Sky gradient (deep midnight blue → dark grey-blue at horizon) ──
+        sky_top    = (8,  20,  55)
+        sky_mid    = (20, 45,  90)
+        sky_horz   = (50, 70, 110)
+        for y in range(SCREEN_HEIGHT):
+            t = y / SCREEN_HEIGHT
+            if t < 0.6:
+                c = lerp_color(sky_top, sky_mid, t / 0.6)
+            else:
+                c = lerp_color(sky_mid, sky_horz, (t - 0.6) / 0.4)
+            pygame.draw.line(self.screen, c, (0, y), (SCREEN_WIDTH, y))
+
+        # ── Stars (parallax — slow scroll) ──────────────────────────────
+        ox_slow = int(self.camera.offset_x * 0.05) % SCREEN_WIDTH
+        for i in range(80):
+            sx = (i * 173 + ox_slow) % SCREEN_WIDTH
+            sy = (i * 97)  % int(SCREEN_HEIGHT * 0.65)
+            brightness = 160 + int(50 * math.sin(self.tick * 0.03 + i))
+            r = 1 if i % 3 else 2
+            pygame.draw.circle(self.screen, (brightness, brightness, brightness), (sx, sy), r)
+
+        # ── Far mountain silhouette (distant, barely visible) ────────────
+        ox_far = int(self.camera.offset_x * 0.08) % SCREEN_WIDTH
+        far_col = (30, 50, 80)
+        far_pts = [(0, SCREEN_HEIGHT)]
+        for i in range(9):
+            px = int(SCREEN_WIDTH * i / 8)
+            heights = [380, 280, 340, 220, 300, 260, 360, 310, 380]
+            py = heights[i]
+            far_pts.append(((px - ox_far) % SCREEN_WIDTH, py))
+        far_pts.append((SCREEN_WIDTH, SCREEN_HEIGHT))
+        pygame.draw.polygon(self.screen, far_col, far_pts)
+        # Snow caps on far mountains
+        for i in range(1, len(far_pts) - 1):
+            px, py = far_pts[i]
+            if py < 310:
+                cap = [(px-18, py+20), (px, py-5), (px+18, py+20)]
+                pygame.draw.polygon(self.screen, (200, 215, 235), cap)
+
+        # ── Near mountain silhouette (closer, darker) ────────────────────
+        ox_near = int(self.camera.offset_x * 0.18) % SCREEN_WIDTH
+        near_col = (15, 28, 52)
+        near_pts = [(0, SCREEN_HEIGHT)]
+        for i in range(7):
+            px = int(SCREEN_WIDTH * i / 6)
+            heights = [SCREEN_HEIGHT, 360, 250, 420, 180, 310, SCREEN_HEIGHT]
+            py = heights[i]
+            near_pts.append(((px - ox_near) % SCREEN_WIDTH, py))
+        near_pts.append((SCREEN_WIDTH, SCREEN_HEIGHT))
+        pygame.draw.polygon(self.screen, near_col, near_pts)
+        # Snow on near mountain peaks
+        for i in range(1, len(near_pts) - 1):
+            px, py = near_pts[i]
+            if py < 300:
+                cap = [(px-25, py+30), (px, py-10), (px+25, py+30)]
+                pygame.draw.polygon(self.screen, (225, 235, 255), cap)
+
+        # ── Ground snow line at horizon ──────────────────────────────────
+        pygame.draw.rect(self.screen, (200, 215, 235),
+                         (0, SCREEN_HEIGHT - 30, SCREEN_WIDTH, 30))
 
     def _draw_game(self):
         self._draw_background()
@@ -1616,7 +1875,7 @@ class Game:
               "hard":"Fast shrink | instant drop | blink phantom"}
         ds=self.tiny_font.render(desc[self.difficulty],True,dc)
         self.screen.blit(ds,ds.get_rect(center=(SCREEN_WIDTH//2,168)))
-        items=[(f"Difficulty :  < {self.difficulty.upper()} >","Left/Right  |  R to restart"),
+        items=[(f"Difficulty :  < {self.difficulty.upper()} >","Left/Right — restarts level instantly"),
                (f"Music Volume :  < {int(self.music_volume*100)}% >","Left/Right"),
                (f"Mute Music :  {'ON' if self.music_muted else 'OFF'}","Enter to toggle"),
                ("Resume","Enter or ESC"),("Exit to Menu","Enter")]
