@@ -2417,7 +2417,6 @@ _CR_GOLD      = (180, 140, 30)
 CREDITS_DATA = [
     ("", "body", _CR_WHITE, 80),
     ("WAS IT ALL A DREAM?", "big_title", _CR_HEADER, 10),
-    ("Imaging Assignment", "subtitle", _CR_DIM, 8),
     ("A Frozen Realm  -  The Final Chapter", "body", _CR_BLUE, 6),
     ("A Christmas-themed platformer adventure", "small", _CR_DIM, 30),
     ("", "body", _CR_WHITE, 30),
@@ -2750,9 +2749,6 @@ class Game:
                 self._update_soul(); self.tick += 1
                 for sf in self.snowflakes: sf.update()
             elif self.state == "playing": self._update()
-            elif self.state == "win":
-                self.win_timer += 1
-                for sf in self.snowflakes: sf.update()
             elif self.state == "stats":
                 for sf in self.snowflakes: sf.update()
                 self.tick += 1
@@ -2908,11 +2904,6 @@ class Game:
                 else:
                     self._exit_to_menu()
             return
-        # Win
-        if self.state == "win":
-            if key in (pygame.K_RETURN, pygame.K_SPACE, pygame.K_ESCAPE):
-                self.state = "stats"; self._stats_timer = 0  # animated reveal
-            return
         # Admin mode toggle — backslash key
         if key == pygame.K_BACKSLASH:
             self.admin_mode = not getattr(self, 'admin_mode', False)
@@ -2930,7 +2921,7 @@ class Game:
             return
         # Admin: skip to win
         if key == pygame.K_1 and getattr(self, 'admin_mode', False):
-            self.state = "win"; self.win_timer = 0; self.ending_shown = False
+            self.state = "stats"; self._stats_timer = 0; self.ending_shown = False
             return
         # Playing
         if key == pygame.K_ESCAPE:
@@ -3270,7 +3261,7 @@ class Game:
                 snd = self.sfx.sounds.get("blizzard")
                 if snd: snd.stop()
                 self._blizzard_playing = False
-                self.state = "win"; self.sfx.play("win")
+                self.state = "stats"; self._stats_timer = 0; self.ending_shown = False; self.sfx.play("win")
                 # If Running Up That Hill is playing, keep it going; otherwise stop
                 if not self._running_up_playing:
                     self.sfx.stop_music()
@@ -3642,8 +3633,6 @@ class Game:
             self._draw_game()
         elif self.state == "settings":
             self._draw_game(); self._draw_settings()
-        elif self.state == "win":
-            self._draw_win()
         elif self.state == "stats":
             self._draw_stats()
         elif self.state in ("dialogue", "ending"):
@@ -4236,37 +4225,61 @@ class Game:
     def _draw_stats(self):
         self._draw_background()
         timer = getattr(self, '_stats_timer', 0)
-        # Festive particles
-        if self.tick % 10 == 0:
-            self.particles.append(Particle(random.randint(100, SCREEN_WIDTH - 100),
-                random.randint(50, 150), random.choice([XMAS_RED, XMAS_GREEN, XMAS_GOLD, WHITE]),
-                random.uniform(-1, 1), random.uniform(0.5, 2), 50, random.randint(2, 5), 0.05))
+        cx = SCREEN_WIDTH // 2
+
+        # Celebration particles
+        if self.tick % 6 == 0:
+            for _ in range(2):
+                self.particles.append(Particle(random.randint(100, SCREEN_WIDTH - 100),
+                    random.randint(30, 180), random.choice([XMAS_RED, XMAS_GREEN, XMAS_GOLD, WHITE]),
+                    random.uniform(-2, 2), random.uniform(0.5, 3), 60, random.randint(3, 6), 0.05))
         for p in self.particles: p.draw(self.screen, self.camera)
         self.particles = [p for p in self.particles if p.update()]
 
-        cx = SCREEN_WIDTH // 2
-        # Each item reveals at a delay — 30 frames apart (~0.5 sec each)
-        reveal_delay = 30
+        reveal_delay = 22
 
-        # Title — slides down from above
+        # Title — "REALM CONQUERED" drops in with scale pop
         title_progress = min(1.0, timer / 25)
         title_ease = title_progress * title_progress * (3 - 2 * title_progress)
-        title_y = int(-50 + 120 * title_ease)
-        title = self.big_font.render("LEVEL COMPLETE", True, XMAS_GOLD)
-        title_shadow = self.big_font.render("LEVEL COMPLETE", True, (80, 60, 20))
+        title_y = int(-60 + 130 * title_ease)
+        if timer < 30:
+            t_scale = 0.5 + 0.5 * title_ease
+            t_size = max(16, int(48 * t_scale))
+            tf = pygame.font.SysFont("consolas", t_size, bold=True)
+        else:
+            tf = self.big_font
+        title = tf.render("REALM CONQUERED!", True, XMAS_GREEN)
+        title_shadow = tf.render("REALM CONQUERED!", True, (20, 60, 20))
         self.screen.blit(title_shadow, title_shadow.get_rect(center=(cx + 2, title_y + 2)))
         self.screen.blit(title, title.get_rect(center=(cx, title_y)))
+        # Glow on title pop
+        if timer < 20:
+            ga = int(100 * (1.0 - timer / 20))
+            gs = pygame.Surface((500, 60), pygame.SRCALPHA)
+            pygame.draw.ellipse(gs, (*XMAS_GREEN, ga), (0, 0, 500, 60))
+            self.screen.blit(gs, (cx - 250, title_y - 20))
+        if timer == 1:
+            self.camera.add_shake(8)
 
-        # Stats box — fades in
-        box = pygame.Rect(cx - 260, 140, 520, 440)
+        # Subtitle
+        sub_t = timer - 15
+        if sub_t > 0:
+            sp = min(1.0, sub_t / 15)
+            sub_a = int(255 * sp)
+            sub = self.font.render("THE FOURTH REALM - COMPLETE!", True, XMAS_GOLD)
+            sub.set_alpha(sub_a)
+            self.screen.blit(sub, sub.get_rect(center=(cx, title_y + 45)))
+
+        # Stats box
+        box = pygame.Rect(cx - 280, 155, 560, 420)
         box_alpha = min(220, int(timer * 8))
         bg = pygame.Surface((box.width, box.height), pygame.SRCALPHA)
         bg.fill((10, 10, 28, box_alpha))
         self.screen.blit(bg, box.topleft)
         if timer > 10:
-            pygame.draw.rect(self.screen, XMAS_GOLD, box, 2, border_radius=4)
+            pygame.draw.rect(self.screen, XMAS_GOLD, box, 2, border_radius=6)
 
-        # Stats lines — each slides in from alternating sides
+        # Stats data
         t = self.level_time / FPS
         orn_total = len(self.ornaments)
         orn_got = self.player.ornament_count
@@ -4276,79 +4289,86 @@ class Game:
         elif score >= 350: rank, rank_c = "B", ICE_BLUE
         else: rank, rank_c = "C", GRAY
 
+        diff_c = XMAS_GREEN if self.difficulty == "easy" else XMAS_GOLD if self.difficulty == "medium" else XMAS_RED
         lines = [
             (f"Time: {t:.1f}s", SNOW_WHITE),
             (f"Ornaments: {orn_got} / {orn_total}", XMAS_GOLD),
             (f"Monsters Defeated: {self.player.kill_count}", XMAS_GREEN),
             (f"Deaths: {self.player.death_count}", XMAS_RED),
             (f"Best Combo: x{self.best_combo}", CYAN if self.best_combo >= 3 else SNOW_WHITE),
-            (f"Difficulty: {self.difficulty.upper()}",
-             XMAS_GREEN if self.difficulty == "easy" else XMAS_GOLD if self.difficulty == "medium" else XMAS_RED),
+            (f"Difficulty: {self.difficulty.upper()}", diff_c),
         ]
 
-        sy = box.y + 35
+        sy = box.y + 30
         for i, (text, color) in enumerate(lines):
-            line_timer = timer - 20 - i * reveal_delay
+            line_timer = timer - 25 - i * reveal_delay
             if line_timer <= 0:
-                sy += 48
+                sy += 42
                 continue
-            # Slide in from left or right
             progress = min(1.0, line_timer / 15)
             ease = progress * progress * (3 - 2 * progress)
             from_dir = -1 if i % 2 == 0 else 1
             offset_x = int((1.0 - ease) * 400 * from_dir)
-            # Scale pop effect
-            scale = min(1.0, 0.8 + 0.2 * min(1.0, line_timer / 20))
-            font_size = int(24 * scale)
+            font_size = int(22 * min(1.0, 0.8 + 0.2 * min(1.0, line_timer / 20)))
             f = pygame.font.SysFont("consolas", font_size, bold=True)
-            # Flash white briefly on reveal
             if line_timer < 8:
                 flash = 1.0 - line_timer / 8
                 rc = tuple(min(255, int(c + (255 - c) * flash * 0.6)) for c in color)
             else:
                 rc = color
-            surf = f.render(text, True, rc)
             shadow = f.render(text, True, (0, 0, 0))
+            surf = f.render(text, True, rc)
             self.screen.blit(shadow, shadow.get_rect(center=(cx + offset_x + 2, sy + 2)))
             self.screen.blit(surf, surf.get_rect(center=(cx + offset_x, sy)))
-            sy += 48
+            sy += 42
+
+        # Score
+        score_timer = timer - 25 - len(lines) * reveal_delay
+        if score_timer > 0:
+            sp2 = min(1.0, score_timer / 15)
+            se = sp2 * sp2 * (3 - 2 * sp2)
+            s_size = int(26 * (0.5 + 0.5 * se))
+            sf = pygame.font.SysFont("consolas", s_size, bold=True)
+            score_surf = sf.render(f"Score: {score}", True, SNOW_WHITE)
+            score_sh = sf.render(f"Score: {score}", True, (0, 0, 0))
+            self.screen.blit(score_sh, score_sh.get_rect(center=(cx + 2, sy + 12)))
+            self.screen.blit(score_surf, score_surf.get_rect(center=(cx, sy + 10)))
 
         # Rank — big dramatic reveal
-        rank_timer = timer - 20 - len(lines) * reveal_delay - 15
+        rank_timer = timer - 25 - len(lines) * reveal_delay - 25
         if rank_timer > 0:
             rp = min(1.0, rank_timer / 20)
             r_ease = rp * rp * (3 - 2 * rp)
-            r_scale = 0.3 + 0.7 * r_ease
-            r_size = int(56 * r_scale)
+            r_size = int(52 * (0.3 + 0.7 * r_ease))
             rf = pygame.font.SysFont("consolas", r_size, bold=True)
             rank_text = f"Rank: {rank}"
-            # Glow behind rank
+            rank_y = sy + 55
             if rank_timer < 30:
-                glow_a = int(120 * (1.0 - rank_timer / 30))
-                gs = pygame.Surface((300, 80), pygame.SRCALPHA)
-                pygame.draw.ellipse(gs, (*rank_c, glow_a), (0, 0, 300, 80))
-                self.screen.blit(gs, (cx - 150, sy + 10))
-            # Camera shake on rank reveal
+                glow_a = int(140 * (1.0 - rank_timer / 30))
+                gs = pygame.Surface((320, 90), pygame.SRCALPHA)
+                pygame.draw.ellipse(gs, (*rank_c, glow_a), (0, 0, 320, 90))
+                self.screen.blit(gs, (cx - 160, rank_y - 25))
             if rank_timer == 1:
-                self.camera.add_shake(10)
+                self.camera.add_shake(12)
             rs = rf.render(rank_text, True, rank_c)
             rsh = rf.render(rank_text, True, (0, 0, 0))
-            self.screen.blit(rsh, rsh.get_rect(center=(cx + 2, sy + 30)))
-            self.screen.blit(rs, rs.get_rect(center=(cx, sy + 28)))
+            self.screen.blit(rsh, rsh.get_rect(center=(cx + 2, rank_y + 2)))
+            self.screen.blit(rs, rs.get_rect(center=(cx, rank_y)))
 
-        # Decorative corners
+        # Decorative corners with pulse
         if timer > 10:
+            cp = abs(math.sin(self.tick * 0.06)) * 2 + 4
             for cx2, cy2 in [(box.left, box.top), (box.right, box.top), (box.left, box.bottom), (box.right, box.bottom)]:
-                pygame.draw.circle(self.screen, XMAS_RED, (cx2, cy2), 5)
-                pygame.draw.circle(self.screen, XMAS_GOLD, (cx2, cy2), 3)
+                pygame.draw.circle(self.screen, XMAS_RED, (cx2, cy2), int(cp) + 1)
+                pygame.draw.circle(self.screen, XMAS_GOLD, (cx2, cy2), int(cp) - 1)
 
-        # Continue prompt — only after everything revealed
-        total_reveal = 20 + len(lines) * reveal_delay + 40
+        # Continue prompt
+        total_reveal = 25 + len(lines) * reveal_delay + 50
         if timer > total_reveal:
             pulse = abs(math.sin(self.tick * 0.05)) * 0.5 + 0.5
             hint = self.small_font.render("Press ENTER to continue to the ending...", True, SNOW_WHITE)
             hint.set_alpha(int(128 + 127 * pulse))
-            self.screen.blit(hint, hint.get_rect(center=(cx, box.bottom + 30)))
+            self.screen.blit(hint, hint.get_rect(center=(cx, box.bottom + 25)))
 
         self._stats_timer = timer + 1
 
