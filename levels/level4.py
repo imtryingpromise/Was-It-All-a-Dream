@@ -227,6 +227,20 @@ SOUND_FILES = {
     "saw_buzz":"saw_buzz.wav","pendulum_whoosh":"pendulum_whoosh.wav",
     "geyser_burst":"geyser_burst.wav","npc_talk":"npc_talk.wav",
     "meteor_impact":"meteor_impact.wav",
+    "hit":"hit.wav","double_jump":"double_jump.wav",
+    "coin":"coin.wav","icicle_crack":"icicle_crack.wav",
+    "crumble":"crumble.wav",
+}
+# Volume levels for sound effects (0.0-1.0) — keeps them under the music
+SFX_VOLUMES = {
+    "jump": 0.07, "double_jump": 0.07, "death": 0.12, "hit": 0.1,
+    "stomp": 0.09, "monster_kill": 0.09, "shoot": 0.06, "coin": 0.1,
+    "powerup": 0.1, "unreal_end": 0.09, "checkpoint": 0.12, "win": 0.12,
+    "bomb_explode": 0.12, "bomb_defuse": 0.07, "respawn": 0.09,
+    "soul_rise": 0.09, "soul_land": 0.09, "blizzard": 0.07,
+    "saw_buzz": 0.04, "pendulum_whoosh": 0.05, "geyser_burst": 0.07,
+    "npc_talk": 0.09, "meteor_impact": 0.05, "icicle_crack": 0.07,
+    "crumble": 0.1,
 }
 MUSIC_FILE = os.path.join(_BASE_DIR, "assets", "audio", "Level4Music.mp3")
 ENDING_MUSIC_FILE = os.path.join(_BASE_DIR, "assets", "audio", "ending.mp3")
@@ -240,7 +254,13 @@ class SoundManager:
         self._pending_timer = 0
         for name, fn in SOUND_FILES.items():
             path = os.path.join(SOUND_DIR, fn)
-            try: self.sounds[name] = pygame.mixer.Sound(path) if os.path.isfile(path) else None
+            try:
+                if os.path.isfile(path):
+                    snd = pygame.mixer.Sound(path)
+                    snd.set_volume(SFX_VOLUMES.get(name, 0.4))
+                    self.sounds[name] = snd
+                else:
+                    self.sounds[name] = None
             except: self.sounds[name] = None
         if os.path.isfile(MUSIC_FILE):
             try: pygame.mixer.music.load(MUSIC_FILE); self.music_loaded = True; self.current_music_path = MUSIC_FILE
@@ -1891,67 +1911,264 @@ class Meteor:
 
 # --- Dream Debris (surreal falling objects) ---
 class DreamDebris:
-    SHAPES = ["clock", "door", "star", "key", "eye", "crystal"]
+    SHAPES = ["clock", "door", "star", "key", "eye", "crystal", "skull", "chain", "mirror"]
     def __init__(self, x, y_target):
         self.shape = random.choice(self.SHAPES)
         self.x = x + random.randint(-100, 100)
         self.y = -random.randint(50, 300)
         self.y_target = y_target
-        self.size = random.randint(15, 30)
+        self.size = random.randint(20, 40)
         self.vel_y = random.uniform(2, 4)
         self.vel_x = random.uniform(-1, 1)
         self.rotation = random.uniform(0, 360)
         self.rot_speed = random.uniform(-3, 3)
-        self.alpha = 200
+        self.alpha = 220
         self.alive = True
         self.color = random.choice([(180,160,220),(160,200,240),(220,180,200),(200,220,180),(180,220,220)])
+        self.shattered = False
+        self.shatter_particles = []
+        # Trail positions for glow effect
+        self.trail = []
     def update(self):
-        self.y += self.vel_y
-        self.x += self.vel_x
-        self.rotation += self.rot_speed
-        if self.y >= self.y_target:
-            self.alpha -= 8
-            if self.alpha <= 0: self.alive = False
+        if not self.shattered:
+            # Store trail positions
+            self.trail.append((self.x, self.y, self.alpha))
+            if len(self.trail) > 3:
+                self.trail.pop(0)
+            self.y += self.vel_y
+            self.x += self.vel_x
+            self.rotation += self.rot_speed
+            if self.y >= self.y_target:
+                # Spawn shatter particles
+                self.shattered = True
+                for _ in range(random.randint(8, 14)):
+                    sp_vx = random.uniform(-3, 3)
+                    sp_vy = random.uniform(-4, -0.5)
+                    sp_life = random.randint(15, 30)
+                    sp_size = random.randint(2, 5)
+                    self.shatter_particles.append([self.x, self.y, sp_vx, sp_vy, sp_life, sp_size, self.color])
+        else:
+            # Update shatter particles
+            new_sp = []
+            for sp in self.shatter_particles:
+                sp[0] += sp[2]  # x += vx
+                sp[1] += sp[3]  # y += vy
+                sp[3] += 0.15   # gravity
+                sp[4] -= 1      # lifetime
+                if sp[4] > 0:
+                    new_sp.append(sp)
+            self.shatter_particles = new_sp
+            if not self.shatter_particles:
+                self.alive = False
         return self.alive
+    def _draw_shape(self, ds, dc, s, c, al):
+        if self.shape == "clock":
+            # Cracked clock face
+            pygame.draw.circle(ds, c, (dc, dc), s)
+            pygame.draw.circle(ds, (*self.color, al//2), (dc, dc), s, 2)
+            # Broken hands — bent at angles
+            a1 = math.radians(self.rotation)
+            a2 = math.radians(self.rotation * 3)
+            mid1x = dc + int(math.cos(a1)*s*0.35)
+            mid1y = dc + int(math.sin(a1)*s*0.35)
+            end1x = mid1x + int(math.cos(a1+0.6)*s*0.3)
+            end1y = mid1y + int(math.sin(a1+0.6)*s*0.3)
+            pygame.draw.line(ds, c, (dc, dc), (mid1x, mid1y), 2)
+            pygame.draw.line(ds, c, (mid1x, mid1y), (end1x, end1y), 2)
+            mid2x = dc + int(math.cos(a2)*s*0.25)
+            mid2y = dc + int(math.sin(a2)*s*0.25)
+            end2x = mid2x + int(math.cos(a2-0.8)*s*0.2)
+            end2y = mid2y + int(math.sin(a2-0.8)*s*0.2)
+            pygame.draw.line(ds, c, (dc, dc), (mid2x, mid2y), 2)
+            pygame.draw.line(ds, c, (mid2x, mid2y), (end2x, end2y), 2)
+            # Cracks across the face
+            for ci in range(3):
+                ca = math.radians(self.rotation * 0.5 + ci * 120)
+                cx1 = dc + int(math.cos(ca)*s*0.3)
+                cy1 = dc + int(math.sin(ca)*s*0.3)
+                cx2 = dc + int(math.cos(ca+0.3)*s*0.9)
+                cy2 = dc + int(math.sin(ca+0.3)*s*0.9)
+                pygame.draw.line(ds, (*self.color, al//3), (cx1, cy1), (cx2, cy2), 1)
+            # Hour markers
+            for hi in range(12):
+                ha = math.radians(hi * 30)
+                hx = dc + int(math.cos(ha)*s*0.85)
+                hy = dc + int(math.sin(ha)*s*0.85)
+                pygame.draw.circle(ds, c, (hx, hy), 1)
+        elif self.shape == "door":
+            # Dark doorway, slightly ajar with eerie light
+            pygame.draw.rect(ds, c, (dc-s//2, dc-s, s, s*2), 2)
+            # Door frame - thick
+            pygame.draw.rect(ds, (*self.color, al//2), (dc-s//2-2, dc-s-2, s+4, s*2+4), 3)
+            # Door slightly open — gap with eerie yellowish light
+            gap_x = dc - s//2 + 3
+            pygame.draw.rect(ds, (200, 180, 80, al//2), (gap_x, dc-s+3, s//5, s*2-6))
+            # Light rays from gap
+            for ri in range(3):
+                ry = dc - s + 3 + ri * (s*2-6)//3
+                ray_len = s//3 + ri * 2
+                pygame.draw.line(ds, (200, 180, 80, al//4), (gap_x, ry), (gap_x - ray_len, ry + ri*2), 1)
+            # Doorknob
+            pygame.draw.circle(ds, c, (dc+s//3, dc), 3)
+            pygame.draw.circle(ds, (*self.color, al//3), (dc+s//3, dc), 4, 1)
+        elif self.shape == "star":
+            # Broken/shattered star with jagged points
+            pts = []
+            for i in range(10):
+                a = math.radians(self.rotation + i * 36)
+                if i % 2 == 0:
+                    r = s + random.randint(-3, 3)  # jagged outer points
+                else:
+                    r = s // 2 + random.randint(-2, 2)  # jagged inner
+                pts.append((dc + int(math.cos(a)*r), dc + int(math.sin(a)*r)))
+            if len(pts) >= 3:
+                pygame.draw.polygon(ds, c, pts, 2)
+                # Crack lines through the star
+                pygame.draw.line(ds, (*self.color, al//3), pts[0], pts[5], 1)
+                pygame.draw.line(ds, (*self.color, al//3), pts[2], pts[7], 1)
+        elif self.shape == "key":
+            # Rusty bent old key
+            pygame.draw.circle(ds, c, (dc, dc-s//2), s//3, 2)
+            # Cross in the key head
+            pygame.draw.line(ds, (*self.color, al//3), (dc-s//5, dc-s//2), (dc+s//5, dc-s//2), 1)
+            pygame.draw.line(ds, (*self.color, al//3), (dc, dc-s//2-s//5), (dc, dc-s//2+s//5), 1)
+            # Bent shaft
+            pygame.draw.line(ds, c, (dc, dc-s//4), (dc+2, dc+s//2), 2)
+            pygame.draw.line(ds, c, (dc+2, dc+s//2), (dc-1, dc+s), 2)
+            # Teeth — uneven
+            pygame.draw.line(ds, c, (dc-1, dc+s//2), (dc+s//4+2, dc+s//2-2), 2)
+            pygame.draw.line(ds, c, (dc-1, dc+s*3//4), (dc+s//4, dc+s*3//4+1), 2)
+            pygame.draw.line(ds, c, (dc-1, dc+s-2), (dc+s//5, dc+s-3), 2)
+            # Rust spots
+            for _ in range(3):
+                rx = dc + random.randint(-s//4, s//4)
+                ry = dc + random.randint(-s//4, s)
+                pygame.draw.circle(ds, (150, 100, 60, al//3), (rx, ry), 1)
+        elif self.shape == "eye":
+            # Bloodshot nightmare eye
+            pygame.draw.ellipse(ds, c, (dc-s, dc-s//2, s*2, s), 2)
+            # Sclera fill
+            pygame.draw.ellipse(ds, (*self.color, al//4), (dc-s+2, dc-s//2+2, s*2-4, s-4))
+            # Red veins
+            vein_col = (180, 30, 30, al//2)
+            for vi in range(5):
+                va = math.radians(vi * 72 + self.rotation * 0.5)
+                vx1 = dc + int(math.cos(va) * s * 0.3)
+                vy1 = dc + int(math.sin(va) * s * 0.15)
+                vx2 = dc + int(math.cos(va) * s * 0.8)
+                vy2 = dc + int(math.sin(va) * s * 0.35)
+                pygame.draw.line(ds, vein_col, (vx1, vy1), (vx2, vy2), 1)
+            # Iris
+            pygame.draw.circle(ds, (80, 30, 30, al), (dc, dc), s//3)
+            # Pupil — slit
+            pygame.draw.ellipse(ds, (10, 0, 0, al), (dc-2, dc-s//4, 4, s//2))
+            # Highlight
+            pygame.draw.circle(ds, (255, 255, 255, al//2), (dc-s//6, dc-s//6), 2)
+        elif self.shape == "crystal":
+            # Cracked glowing crystal
+            pts = [(dc, dc-s), (dc+s//2, dc-s//3), (dc+s//3, dc+s), (dc-s//3, dc+s), (dc-s//2, dc-s//3)]
+            pygame.draw.polygon(ds, c, pts, 2)
+            # Inner glow
+            inner = [(dc, dc-s*2//3), (dc+s//3, dc-s//5), (dc+s//5, dc+s*2//3), (dc-s//5, dc+s*2//3), (dc-s//3, dc-s//5)]
+            pygame.draw.polygon(ds, (*self.color, al//3), inner)
+            # Crack lines
+            pygame.draw.line(ds, (*self.color, al//2), (dc-s//4, dc-s//2), (dc+s//6, dc+s//2), 1)
+            pygame.draw.line(ds, (*self.color, al//2), (dc+s//5, dc-s//3), (dc-s//6, dc+s*3//4), 1)
+            # Glow spots
+            pygame.draw.circle(ds, (*self.color, al//4), (dc, dc), s//3)
+        elif self.shape == "skull":
+            # Creepy skull
+            # Cranium
+            pygame.draw.ellipse(ds, c, (dc-s*2//3, dc-s, s*4//3, s+s//3))
+            # Jaw
+            pygame.draw.arc(ds, c, (dc-s//2, dc-s//6, s, s*2//3), math.radians(200), math.radians(340), 2)
+            # Eye sockets — dark hollow
+            eye_s = s // 4
+            pygame.draw.ellipse(ds, (20, 0, 0, al), (dc-s//3-eye_s//2, dc-s//2, eye_s+2, eye_s+4))
+            pygame.draw.ellipse(ds, (20, 0, 0, al), (dc+s//3-eye_s//2, dc-s//2, eye_s+2, eye_s+4))
+            # Tiny red dots in eye sockets
+            pygame.draw.circle(ds, (200, 30, 30, al), (dc-s//3, dc-s//2+eye_s//2+1), 1)
+            pygame.draw.circle(ds, (200, 30, 30, al), (dc+s//3, dc-s//2+eye_s//2+1), 1)
+            # Nose hole
+            pygame.draw.polygon(ds, (20, 0, 0, al), [(dc, dc-s//6), (dc-s//8, dc+s//8), (dc+s//8, dc+s//8)])
+            # Teeth
+            for ti in range(5):
+                tx = dc - s//3 + ti * s//7
+                pygame.draw.line(ds, c, (tx, dc+s//6), (tx, dc+s//3), 1)
+            # Cracks
+            pygame.draw.line(ds, (*self.color, al//3), (dc-s//6, dc-s), (dc-s//4, dc-s//3), 1)
+            pygame.draw.line(ds, (*self.color, al//3), (dc+s//5, dc-s+s//4), (dc+s//8, dc-s//4), 1)
+        elif self.shape == "chain":
+            # Chain links
+            num_links = 4
+            link_h = s * 2 // num_links
+            link_w = s // 3
+            for li in range(num_links):
+                ly = dc - s + li * link_h
+                lx = dc - link_w // 2 + (3 if li % 2 else -3)
+                pygame.draw.ellipse(ds, c, (lx, ly, link_w, link_h), 2)
+            # Broken link at bottom — gap
+            by = dc + s - link_h
+            pygame.draw.arc(ds, c, (dc - link_w//2, by, link_w, link_h), math.radians(30), math.radians(300), 2)
+            # Rust spots on chain
+            for _ in range(2):
+                rx = dc + random.randint(-s//4, s//4)
+                ry = dc + random.randint(-s//2, s//2)
+                pygame.draw.circle(ds, (130, 80, 40, al//3), (rx, ry), 2)
+        elif self.shape == "mirror":
+            # Cracked mirror showing distortion
+            pygame.draw.rect(ds, c, (dc-s//2, dc-s*2//3, s, s*4//3), 2)
+            # Frame — slightly ornate
+            pygame.draw.rect(ds, (*self.color, al//2), (dc-s//2-2, dc-s*2//3-2, s+4, s*4//3+4), 3)
+            # Mirror surface
+            pygame.draw.rect(ds, (*self.color, al//5), (dc-s//2+3, dc-s*2//3+3, s-6, s*4//3-6))
+            # Cracks radiating from center
+            crack_col = (*self.color, al//2)
+            cx0, cy0 = dc, dc
+            for ci in range(6):
+                ca = math.radians(ci * 60 + 15)
+                cex = cx0 + int(math.cos(ca) * s * 0.5)
+                cey = cy0 + int(math.sin(ca) * s * 0.6)
+                pygame.draw.line(ds, crack_col, (cx0, cy0), (cex, cey), 1)
+                # Branch cracks
+                if ci % 2 == 0:
+                    bmx = (cx0 + cex) // 2
+                    bmy = (cy0 + cey) // 2
+                    bex = bmx + int(math.cos(ca + 0.7) * s * 0.2)
+                    bey = bmy + int(math.sin(ca + 0.7) * s * 0.2)
+                    pygame.draw.line(ds, crack_col, (bmx, bmy), (bex, bey), 1)
+            # Distorted reflection — wavy horizontal lines
+            for ri in range(3):
+                ry = dc - s*2//3 + 8 + ri * (s*4//3 - 16) // 3
+                wave = int(math.sin(self.rotation * 0.05 + ri) * 3)
+                pygame.draw.line(ds, (*self.color, al//6), (dc-s//2+5, ry+wave), (dc+s//2-5, ry-wave), 1)
     def draw(self, surface, camera, tick):
         cr = camera.apply(pygame.Rect(int(self.x), int(self.y), 1, 1))
         cx, cy = cr.x, cr.y
         al = max(0, min(255, self.alpha))
         s = self.size
-        ds = pygame.Surface((s*3, s*3), pygame.SRCALPHA)
-        dc = s*3//2  # center of surface
-        c = (*self.color, al)
-        if self.shape == "clock":
-            pygame.draw.circle(ds, c, (dc, dc), s)
-            pygame.draw.circle(ds, (*self.color, al//2), (dc, dc), s, 2)
-            # Clock hands
-            a1 = math.radians(self.rotation)
-            a2 = math.radians(self.rotation * 3)
-            pygame.draw.line(ds, c, (dc, dc), (dc+int(math.cos(a1)*s*0.6), dc+int(math.sin(a1)*s*0.6)), 2)
-            pygame.draw.line(ds, c, (dc, dc), (dc+int(math.cos(a2)*s*0.4), dc+int(math.sin(a2)*s*0.4)), 2)
-        elif self.shape == "door":
-            pygame.draw.rect(ds, c, (dc-s//2, dc-s, s, s*2), 2)
-            pygame.draw.circle(ds, c, (dc+s//3, dc), 3)
-        elif self.shape == "star":
-            pts = []
-            for i in range(10):
-                a = math.radians(self.rotation + i * 36)
-                r = s if i % 2 == 0 else s // 2
-                pts.append((dc + int(math.cos(a)*r), dc + int(math.sin(a)*r)))
-            if len(pts) >= 3: pygame.draw.polygon(ds, c, pts, 2)
-        elif self.shape == "key":
-            pygame.draw.circle(ds, c, (dc, dc-s//2), s//3, 2)
-            pygame.draw.line(ds, c, (dc, dc-s//4), (dc, dc+s), 2)
-            pygame.draw.line(ds, c, (dc, dc+s//2), (dc+s//4, dc+s//2), 2)
-            pygame.draw.line(ds, c, (dc, dc+s*3//4), (dc+s//4, dc+s*3//4), 2)
-        elif self.shape == "eye":
-            pygame.draw.ellipse(ds, c, (dc-s, dc-s//2, s*2, s), 2)
-            pygame.draw.circle(ds, c, (dc, dc), s//3)
-        elif self.shape == "crystal":
-            pts = [(dc, dc-s), (dc+s//2, dc), (dc, dc+s), (dc-s//2, dc)]
-            pygame.draw.polygon(ds, c, pts, 2)
-            pygame.draw.line(ds, c, (dc-s//4, dc-s//2), (dc+s//4, dc+s//2), 1)
-        surface.blit(ds, (cx - dc, cy - dc))
+        if not self.shattered:
+            # Draw trail (faint glow behind)
+            for ti, (tx, ty, ta) in enumerate(self.trail):
+                tr = camera.apply(pygame.Rect(int(tx), int(ty), 1, 1))
+                trail_al = max(0, min(255, int(ta * 0.3 * (ti + 1) / len(self.trail)))) if self.trail else 0
+                trail_s = max(4, s // 2)
+                ts = pygame.Surface((trail_s*2, trail_s*2), pygame.SRCALPHA)
+                pygame.draw.circle(ts, (*self.color, trail_al), (trail_s, trail_s), trail_s)
+                surface.blit(ts, (tr.x - trail_s, tr.y - trail_s))
+            # Draw main shape
+            ds = pygame.Surface((s*3, s*3), pygame.SRCALPHA)
+            dc = s*3//2
+            c = (*self.color, al)
+            self._draw_shape(ds, dc, s, c, al)
+            surface.blit(ds, (cx - dc, cy - dc))
+        else:
+            # Draw shatter particles
+            for sp in self.shatter_particles:
+                sp_x, sp_y, _, _, sp_life, sp_size, sp_col = sp
+                sp_al = max(0, min(255, int(255 * sp_life / 30)))
+                sr = camera.apply(pygame.Rect(int(sp_x), int(sp_y), 1, 1))
+                pygame.draw.rect(surface, (*sp_col, sp_al), (sr.x, sr.y, sp_size, sp_size))
 
 # --- Level Builder ---
 def create_level(diff_key="hard"):
@@ -2096,7 +2313,7 @@ def create_level(diff_key="hard"):
     # Ornaments as coin-trail guides along intended path (~28 total)
     orn_positions = [
         # Sec 1: above platforms guiding forward (plats at y=500,500,455,410,455,500)
-        (200, 480), (700, 480), (1250, 390), (1550, 435), (1900, 480),
+        (200, 470), (700, 470), (1250, 380), (1550, 425), (1900, 470),
         # Sec 2: above glitch/ice platforms (y=460,420,440,375,420,375,375)
         (2350, 440), (2600, 400), (3150, 355), (3650, 355),
         # Sec 3: moving plats + wall jump (plats at 400,360,320-450,380,420)
@@ -2134,7 +2351,7 @@ class Game:
         self.screen = pygame.display.get_surface()
         if self.screen is None or self.screen.get_size() != (SCREEN_WIDTH, SCREEN_HEIGHT):
             self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        pygame.display.set_caption("The Endless Dream - The Final Realm")
+        pygame.display.set_caption("Was It All A Dream? - The Final Realm")
         self.clock = pygame.time.Clock()
         self.font = pygame.font.SysFont("consolas", 24)
         self.small_font = pygame.font.SysFont("consolas", 16)
@@ -2315,6 +2532,12 @@ class Game:
         if self.state in ("dialogue", "ending"):
             if key in (pygame.K_RETURN, pygame.K_SPACE, pygame.K_e):
                 if self.dialogue_box:
+                    # Starlight cp5 dialogue: must wait for text to finish typing before advancing
+                    if getattr(self, '_cp5_dialogue_active', False) and not self.dialogue_box.done_typing:
+                        # Only allow finishing the current line's typing, not skipping to next
+                        self.dialogue_box.char_index = len(self.dialogue_box.dialogues[self.dialogue_box.index][1])
+                        self.dialogue_box.done_typing = True
+                        return
                     self.dialogue_box.advance()
                     # Starlight cp5: trigger Running Up That Hill
                     if getattr(self, '_cp5_dialogue_active', False):
@@ -2457,7 +2680,12 @@ class Game:
             elif self.player.alive and not self.player.on_ground and self.player.jump_count == 1:
                 self.player.vel_y = JUMP_VELOCITY * 0.85
                 self.player.jump_count = 2
-                self.sfx.play("jump")
+                # Stop any playing jump sound first, then play double_jump (falls back to jump)
+                snd = self.sfx.sounds.get("jump")
+                if snd: snd.stop()
+                dj = self.sfx.sounds.get("double_jump")
+                if dj: dj.play()
+                elif snd: snd.play()
                 for _ in range(4):
                     self.particles.append(Particle(
                         self.player.rect.centerx + random.randint(-6, 6), self.player.rect.bottom,
@@ -2495,8 +2723,17 @@ class Game:
             for sf in self.snowflakes: sf.update()
             return
 
-        for plat in self.platforms: plat.update()
+        for plat in self.platforms:
+            was_solid = isinstance(plat, CollapsingPlatform) and not plat.collapsed and plat.stood > 0
+            plat.update()
+            if was_solid and isinstance(plat, CollapsingPlatform) and plat.collapsed:
+                self.sfx.play("crumble")
+        was_alive = self.player.alive
         result = self.player.update(keys, self.platforms)
+        # Detect fall death (player died during update from DEATH_Y)
+        if was_alive and not self.player.alive:
+            self.sfx.play("death")
+            self._player_death_fx()
         if result == "jump":
             self.sfx.play("jump")
             if self.player.alive:
@@ -2512,6 +2749,13 @@ class Game:
         # NPC proximity
         for npc in self.npcs:
             npc.proximity_shown = npc.check_proximity(self.player)
+        # Invisible wall: can't pass Starlight until you've talked to her
+        for npc in self.npcs:
+            if npc.dialogue_key == "cp5" and not npc.talked:
+                wall_x = npc.rect.right + 20
+                if self.player.rect.right > wall_x:
+                    self.player.rect.right = wall_x
+                    self.player.vel_x = min(0, self.player.vel_x)
 
         for cp in self.checkpoints:
             cp.update()
@@ -2563,7 +2807,10 @@ class Game:
         for mon in self.monsters:
             mon.update()
             if isinstance(mon, BombMonster) and self.player.alive:
+                was_patrol = mon.state == "patrol"
                 mon.check_proximity(self.player)
+                if was_patrol and mon.state == "ticking":
+                    self.sfx.play("bomb_explode")
                 if mon.state == "ticking" and mon.alive and self.tick % max(2,mon.flash_rate)==0:
                     fx=mon.rect.centerx+8; fy=mon.rect.top-8
                     for _ in range(3):
@@ -2573,15 +2820,16 @@ class Game:
             coll = mon.check_collision(self.player)
             if coll == "kill_player":
                 if self.player.take_damage():
+                    self.sfx.play("hit" if self.player.alive else "death")
                     if self.player.alive:
-                        self.camera.add_shake(8); self.sfx.play("death")
+                        self.camera.add_shake(8)
                         self.damage_flashes.append(DamageFlash())
                         # Knockback away from damage source
                         dx = self.player.rect.centerx - mon.rect.centerx
                         self.player.vel_x = 7 * (1 if dx >= 0 else -1)
                         self.player.vel_y = -5
                     else:
-                        self._player_death_fx(); self.sfx.play("death")
+                        self._player_death_fx()
                 if isinstance(mon, BombMonster) and mon.state == "exploding":
                     self.sfx.play("bomb_explode"); self.camera.add_shake(18)
             elif coll == "kill_monster":
@@ -2611,6 +2859,7 @@ class Game:
             orn.update()
             if orn.check(self.player):
                 self.player.ornament_count += 1
+                self.sfx.play("coin")
                 cx, cy = orn.x, orn.y
                 for _ in range(12):
                     a = random.uniform(0, math.pi * 2); s = random.uniform(1, 3)
@@ -2620,17 +2869,21 @@ class Game:
 
         # Icicles
         for ic in self.icicles:
+            was_idle = ic.state == "idle"
             ic.check_player_below(self.player)
+            if was_idle and ic.state == "shaking":
+                self.sfx.play("icicle_crack")
             ic.update()
             if ic.check_hit(self.player):
                 ic.state = "done"
                 if self.player.take_damage():
+                    self.sfx.play("hit" if self.player.alive else "death")
                     if self.player.alive:
-                        self.camera.add_shake(6); self.sfx.play("death")
+                        self.camera.add_shake(6)
                         self.damage_flashes.append(DamageFlash())
                         self.player.vel_y = -4
                     else:
-                        self._player_death_fx(); self.sfx.play("death")
+                        self._player_death_fx()
 
         # Heart pickups
         for hp in self.heart_pickups:
@@ -2645,34 +2898,49 @@ class Game:
             sb2.update()
             if sb2.check_hit(self.player):
                 if self.player.take_damage():
+                    self.sfx.play("hit" if self.player.alive else "death")
+                    # Blood particles on saw blade hit
+                    for _ in range(25):
+                        bvx = random.uniform(-6, 6)
+                        bvy = random.uniform(-7, 0)
+                        bcol = random.choice([(180,20,20),(200,30,30),(150,10,10),(220,40,40)])
+                        self.particles.append(Particle(self.player.rect.centerx+random.randint(-8,8), self.player.rect.centery+random.randint(-8,8), bcol, vx=bvx, vy=bvy, lifetime=random.randint(30,50), size=random.randint(3,6), gravity=0.25))
                     if self.player.alive:
-                        self.camera.add_shake(8); self.sfx.play("death")
+                        self.camera.add_shake(8)
                         self.damage_flashes.append(DamageFlash())
                         dx=self.player.rect.centerx-sb2.rect.centerx
                         self.player.vel_x=7*(1 if dx>=0 else -1); self.player.vel_y=-5
                     else:
-                        self._player_death_fx(); self.sfx.play("death")
+                        self._player_death_fx()
 
         # Pendulums
         for pend in self.pendulums:
             pend.update()
             if pend.check_hit(self.player):
                 if self.player.take_damage():
+                    self.sfx.play("hit" if self.player.alive else "death")
+                    # Blood particles on pendulum hit
+                    for _ in range(25):
+                        bvx = random.uniform(-6, 6)
+                        bvy = random.uniform(-7, 0)
+                        bcol = random.choice([(180,20,20),(200,30,30),(150,10,10),(220,40,40)])
+                        self.particles.append(Particle(self.player.rect.centerx+random.randint(-8,8), self.player.rect.centery+random.randint(-8,8), bcol, vx=bvx, vy=bvy, lifetime=random.randint(30,50), size=random.randint(3,6), gravity=0.25))
                     if self.player.alive:
-                        self.camera.add_shake(8); self.sfx.play("death")
+                        self.camera.add_shake(8)
                         self.damage_flashes.append(DamageFlash())
                         dx=self.player.rect.centerx-pend.bx
                         self.player.vel_x=8*(1 if dx>=0 else -1); self.player.vel_y=-6
-                    else: self._player_death_fx(); self.sfx.play("death")
+                    else: self._player_death_fx()
         # Ice geysers
         for ig in self.ice_geysers:
             ig.update()
             if ig.check_hit(self.player):
                 if self.player.take_damage():
+                    self.sfx.play("hit" if self.player.alive else "death")
                     if self.player.alive:
-                        self.camera.add_shake(6); self.sfx.play("death")
+                        self.camera.add_shake(6)
                         self.damage_flashes.append(DamageFlash()); self.player.vel_y=-8
-                    else: self._player_death_fx(); self.sfx.play("death")
+                    else: self._player_death_fx()
 
         # Wind zones
         if self.player.alive:
@@ -2688,8 +2956,12 @@ class Game:
 
         # Crumbling bridges
         for cb in self.crumbling_bridges:
+            falling_before = sum(1 for t in cb.tiles if t["state"] == "falling")
             cb.check_standing(self.player)
             cb.update()
+            falling_after = sum(1 for t in cb.tiles if t["state"] == "falling")
+            if falling_after > falling_before:
+                self.sfx.play("crumble")
             # Check collision with solid tiles as platforms
             if self.player.alive:
                 for t in cb.tiles:
@@ -2800,12 +3072,13 @@ class Game:
                 self.sfx.play("meteor_impact")
             if meteors_do_damage and m.check_hit(self.player):
                 if self.player.take_damage():
+                    self.sfx.play("hit" if self.player.alive else "death")
                     if self.player.alive:
-                        self.camera.add_shake(8); self.sfx.play("death")
+                        self.camera.add_shake(8)
                         self.damage_flashes.append(DamageFlash())
                         self.player.vel_y = -5  # knockback up
                     else:
-                        self._player_death_fx(); self.sfx.play("death")
+                        self._player_death_fx()
         self.meteors = [m for m in self.meteors if m.alive]
         # Update dream debris
         self.dream_debris = [d for d in self.dream_debris if d.update()]
@@ -4062,7 +4335,7 @@ class Game:
             ("", "body", NAME_WHITE, 80),
 
             # ── Game Title - BIG ──
-            ("THE ENDLESS DREAM", "big_title", HEADER, 14),
+            ("WAS IT ALL A DREAM?", "big_title", HEADER, 14),
             ("Imaging Assignment", "subtitle", DIM, 40),
             ("A Frozen Realm  -  The Final Chapter", "body", ICE_BLUE, 10),
             ("A Christmas-themed platformer adventure", "small", DIM, 40),
@@ -4309,7 +4582,7 @@ def launch_game():
     game = Game()
     game.run()
     pygame.event.clear()  # prevent stale keys leaking to main.py
-    pygame.display.set_caption("The Endless Dream")
+    pygame.display.set_caption("Was It All A Dream?")
     try:
         pygame.mixer.music.load("assets/audio/BackgroundMusic.mp3")
         pygame.mixer.music.play(-1)
@@ -4317,8 +4590,8 @@ def launch_game():
 
 
 if __name__ == "__main__":
+    pygame.mixer.pre_init(44100, -16, 2, 512)  # small buffer = low latency
     pygame.init()
-    pygame.mixer.init()
     game = Game()
     game.run()
     pygame.quit()

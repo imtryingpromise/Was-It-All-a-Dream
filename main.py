@@ -2,14 +2,14 @@ import pygame
 import sys
 from settings import *
 
+pygame.mixer.pre_init(44100, -16, 2, 512)  # small buffer = low latency sounds
 pygame.init()
-pygame.mixer.init()
 
 from levels.level1 import launch_game as launch_level1
 from levels.level4 import launch_game as launch_level4
 
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Christmas Pixel Adventure")
+pygame.display.set_caption("Was It All A Dream?")
 
 clock = pygame.time.Clock()
 
