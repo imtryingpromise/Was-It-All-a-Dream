@@ -599,20 +599,36 @@ class DialogueBox:
 
 # --- Player ---
 class DamageFlash:
-    """Red vignette border that fades over 20 frames on damage."""
-    def __init__(self):
-        self.timer = 20; self.max_timer = 20
+    """Vignette border that fades over time on damage. Supports custom color."""
+    def __init__(self, color=(220, 30, 30)):
+        self.timer = 20; self.max_timer = 20; self.color = color
     def update(self): self.timer -= 1; return self.timer > 0
     def draw(self, surface):
         a = int(160 * (self.timer / self.max_timer))
         if a <= 0: return
-        w, h = surface.get_size(); t = 60  # border thickness
+        w, h = surface.get_size(); t = 60
         s = pygame.Surface((w, h), pygame.SRCALPHA)
         for i in range(t):
             ia = int(a * (1 - i / t))
             if ia <= 0: continue
-            pygame.draw.rect(s, (220, 30, 30, ia), (i, i, w - 2 * i, h - 2 * i), 1)
+            pygame.draw.rect(s, (*self.color, ia), (i, i, w - 2 * i, h - 2 * i), 1)
         surface.blit(s, (0, 0))
+
+
+def _draw_unreal_border(surface, tick):
+    """Persistent rainbow vignette border while unreal mode is active."""
+    w, h = surface.get_size()
+    t = 40  # border thickness
+    pulse = abs(math.sin(tick * 0.08)) * 0.4 + 0.6
+    base_a = int(90 * pulse)
+    s = pygame.Surface((w, h), pygame.SRCALPHA)
+    for i in range(t):
+        frac = i / t
+        ia = int(base_a * (1 - frac))
+        if ia <= 0: continue
+        c = xmas_cycle_color(tick + i * 3, 0.15)
+        pygame.draw.rect(s, (*c, ia), (i, i, w - 2 * i, h - 2 * i), 1)
+    surface.blit(s, (0, 0))
 
 class Player:
     WIDTH, HEIGHT = 28, 36
@@ -2792,7 +2808,7 @@ class Game:
                     if getattr(self, '_cp5_dialogue_active', False):
                         di = self.dialogue_box.index if self.dialogue_box.active else 999
                         # Load and play Running Up That Hill (line 13)
-                        if di >= 16 and not self._running_up_playing:
+                        if di >= 14 and not self._running_up_playing:
                             snd = self.sfx.sounds.get("blizzard")
                             if snd: snd.stop()
                             self._blizzard_playing = False
@@ -3784,6 +3800,8 @@ class Game:
                 random.uniform(-1, 0.5), 10, 2, 0.05))
         for f in self.flashes: f.draw(self.screen)
         for d in self.damage_flashes: d.draw(self.screen)
+        if self.player.is_unreal:
+            _draw_unreal_border(self.screen, self.tick)
         # Combo popups
         for x, y, cnt, timer in self.combo_popups:
             a = min(1.0, timer / 20)
@@ -3889,14 +3907,55 @@ class Game:
             self.screen.blit(combo_surf, combo_rect)
         # --- Unreal mode bar ---
         if self.player.is_unreal:
-            rem = self.player.unreal_timer / FPS; bw, bh = 160, 14
-            bx = SCREEN_WIDTH // 2 - bw // 2; by = 12; ratio = self.player.unreal_timer / UNREAL_DURATION
-            pygame.draw.rect(self.screen, (0, 0, 0), (bx - 3, by - 3, bw + 6, bh + 6))
-            pygame.draw.rect(self.screen, DARK_GRAY, (bx - 2, by - 2, bw + 4, bh + 4))
-            for px_i in range(int(bw * ratio)):
-                self.screen.fill(xmas_cycle_color(self.tick + px_i * 2, 0.3), (bx + px_i, by, 1, bh))
-            _hud_text(self.tiny_font, f"UNREAL  {rem:.1f}s", WHITE, bx + 4, by + 1)
-            pygame.draw.rect(self.screen, xmas_cycle_color(self.tick, 0.15), (bx - 2, by - 2, bw + 4, bh + 4), 2)
+            rem = self.player.unreal_timer / FPS
+            ratio = self.player.unreal_timer / UNREAL_DURATION
+            pulse = abs(math.sin(self.tick * 0.1)) * 0.5 + 0.5
+            bw, bh = 220, 18
+            bx = SCREEN_WIDTH // 2 - bw // 2; by = 10
+            # Outer glow
+            glow_c = xmas_cycle_color(self.tick, 0.12)
+            glow_s = pygame.Surface((bw + 20, bh + 20), pygame.SRCALPHA)
+            glow_a = int(40 + 30 * pulse)
+            pygame.draw.rect(glow_s, (*glow_c, glow_a), (0, 0, bw + 20, bh + 20), border_radius=12)
+            self.screen.blit(glow_s, (bx - 10, by - 10))
+            # Background
+            bg_s = pygame.Surface((bw + 4, bh + 4), pygame.SRCALPHA)
+            pygame.draw.rect(bg_s, (10, 10, 20, 200), (0, 0, bw + 4, bh + 4), border_radius=6)
+            self.screen.blit(bg_s, (bx - 2, by - 2))
+            # Fill with rainbow gradient
+            fill_w = int(bw * ratio)
+            fill_s = pygame.Surface((fill_w, bh), pygame.SRCALPHA)
+            for px_i in range(fill_w):
+                c = xmas_cycle_color(self.tick + px_i * 3, 0.25)
+                # Add shimmer
+                shimmer = abs(math.sin((self.tick * 0.15) + px_i * 0.08)) * 40
+                sc = tuple(min(255, int(v + shimmer)) for v in c)
+                pygame.draw.line(fill_s, sc, (px_i, 0), (px_i, bh - 1))
+            # Round the fill
+            mask_s = pygame.Surface((fill_w, bh), pygame.SRCALPHA)
+            pygame.draw.rect(mask_s, (255, 255, 255, 255), (0, 0, fill_w, bh), border_radius=4)
+            fill_s.blit(mask_s, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
+            self.screen.blit(fill_s, (bx, by))
+            # Bright edge on the fill tip
+            if fill_w > 4:
+                edge_x = bx + fill_w - 2
+                edge_s = pygame.Surface((4, bh), pygame.SRCALPHA)
+                edge_s.fill((255, 255, 255, int(80 + 60 * pulse)))
+                self.screen.blit(edge_s, (edge_x, by))
+            # Border
+            border_c = xmas_cycle_color(self.tick, 0.1)
+            pygame.draw.rect(self.screen, border_c, (bx - 1, by - 1, bw + 2, bh + 2), 2, border_radius=5)
+            # Text with shadow
+            label = f"UNREAL  {rem:.1f}s"
+            _hud_text(self.tiny_font, label, (0, 0, 0), bx + 6, by + 3)
+            _hud_text(self.tiny_font, label, WHITE, bx + 5, by + 2)
+            # Star sparkles on the bar
+            for si in range(3):
+                sx = bx + int((self.tick * 1.5 + si * 73) % bw)
+                sy = by + int(abs(math.sin(self.tick * 0.12 + si * 2.1)) * (bh - 4)) + 2
+                if sx < bx + fill_w:
+                    sc2 = (255, 255, int(200 + 55 * pulse))
+                    pygame.draw.circle(self.screen, sc2, (sx, sy), 2)
         # --- Top-right info panel ---
         info_panel = pygame.Surface((160, 80), pygame.SRCALPHA)
         info_panel.fill((0, 0, 0, 90))
