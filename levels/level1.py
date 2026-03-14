@@ -1,11 +1,10 @@
-"""
-Level 1 — Section 1: Falling Platform Precision
-================================================
-Player spawns on a wide solid platform on the far left.
-Must cross 6 narrow falling platforms (jump + dash each gap)
-on a rising slope to reach the tall landing platform.
-Santa on the landing platform activates Checkpoint 1.
-"""
+import pygame
+import sys
+import math
+import random
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from player_sprites import init_player_sprite, draw_player_sprite
 
 import pygame, math, random, os
 
@@ -176,10 +175,116 @@ class FlashOverlay:
         surf.blit(self.surf, (0, 0))
 
 
-# ── Platforms ────────────────────────────────────────────────────────────────
-class SolidPlatform:
-    """Standard immovable solid platform."""
-    def __init__(self, x, y, w, h=22):
+# ---------------------------------------------------------------------------
+# Player
+# ---------------------------------------------------------------------------
+class Player:
+    WIDTH, HEIGHT = 28, 36
+
+    def __init__(self, x, y):
+        self.rect = pygame.Rect(x, y, self.WIDTH, self.HEIGHT)
+        self.vel_x = self.vel_y = 0.0
+        self.on_ground = False
+        self.spawn_x, self.spawn_y = x, y
+        self.alive = True
+        self.respawn_timer = 0
+        self.facing_right = True
+        self.unreal_timer = 0
+        self.prev_unreal = False
+        self.kill_count = 0
+        self.riding_platform = None
+        self.squash_timer = 0
+        self.was_on_ground = False
+        init_player_sprite(self)
+
+    @property
+    def is_unreal(self): return self.unreal_timer > 0
+
+    def activate_unreal(self): self.unreal_timer = UNREAL_DURATION
+
+    def set_checkpoint(self, x, y): self.spawn_x, self.spawn_y = x, y
+
+    def die(self):
+        if self.is_unreal: return
+        self.alive = False; self.respawn_timer = 50
+
+    def respawn(self):
+        self.rect.topleft = (self.spawn_x, self.spawn_y)
+        self.vel_x = self.vel_y = 0
+        self.alive = True; self.on_ground = False; self.unreal_timer = 0
+
+    def update(self, keys, platforms):
+        self.prev_unreal = self.is_unreal
+        if not self.alive:
+            self.respawn_timer -= 1
+            if self.respawn_timer <= 0: self.respawn()
+            return
+
+        if self.unreal_timer > 0: self.unreal_timer -= 1
+
+        if self.riding_platform is not None and hasattr(self.riding_platform, 'dx'):
+            self.rect.x += self.riding_platform.dx
+            self.rect.y += self.riding_platform.dy
+
+        move = 0.0
+        speed = SPRINT_SPEED if (keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]) else MOVE_SPEED
+        if self.is_unreal: speed += UNREAL_SPEED_BOOST
+        if keys[pygame.K_LEFT]  or keys[pygame.K_a]: move -= speed; self.facing_right = False
+        if keys[pygame.K_RIGHT] or keys[pygame.K_d]: move += speed; self.facing_right = True
+
+        self.vel_x = self.vel_x + (move - self.vel_x) * 0.3 if move else self.vel_x * 0.75
+        if abs(self.vel_x) < 0.1: self.vel_x = 0
+
+        self.vel_y = min(self.vel_y + GRAVITY, MAX_FALL_SPEED)
+        jumped = False
+        if self.on_ground and (keys[pygame.K_SPACE] or keys[pygame.K_UP] or keys[pygame.K_w]):
+            self.vel_y = JUMP_VELOCITY + (-2 if self.is_unreal else 0)
+            self.on_ground = False; self.riding_platform = None; jumped = True
+
+        # Horizontal
+        self.rect.x += int(self.vel_x)
+        for plat in platforms:
+            if not plat.is_active(): continue
+            pr = plat.get_rect()
+            if self.rect.colliderect(pr):
+                if self.rect.bottom <= pr.top + 6: continue
+                if self.vel_x > 0:   self.rect.right = pr.left
+                elif self.vel_x < 0: self.rect.left  = pr.right
+                self.vel_x = 0
+
+        # Vertical
+        self.was_on_ground = self.on_ground
+        self.on_ground = False; self.riding_platform = None
+        vy = int(self.vel_y)
+        if self.vel_y > 0 and vy == 0: vy = 1
+        self.rect.y += vy
+        for plat in platforms:
+            if not plat.is_active(): continue
+            pr = plat.get_rect()
+            if self.rect.colliderect(pr):
+                if self.vel_y > 0:
+                    self.rect.bottom = pr.top; self.vel_y = 0
+                    self.on_ground = True
+                    if isinstance(plat, MovingPlatform): self.riding_platform = plat
+                    plat.on_player_land(self)
+                elif self.vel_y < 0:
+                    self.rect.top = pr.bottom; self.vel_y = 0
+
+        if self.rect.top > DEATH_Y:
+            self.alive = False; self.respawn_timer = 50
+
+        return "jump" if jumped else None
+
+    def draw(self, surface, camera, tick):
+        draw_player_sprite(self, surface, camera, tick,
+                           unreal_tint_fn=lambda t: rainbow_color(t, 0.12))
+
+
+# ---------------------------------------------------------------------------
+# Platforms
+# ---------------------------------------------------------------------------
+class Platform:
+    def __init__(self, x, y, w, h, color=None):
         self.rect = pygame.Rect(x, y, w, h)
 
     def update(self): pass
