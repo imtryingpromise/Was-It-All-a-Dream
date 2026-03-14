@@ -106,7 +106,7 @@ while running:
     screen.blit(background, (0, 0))
 
     if state == "MENU":
-        draw_text("Christmas Pixel Adventure", font_title,
+        draw_text("Was It All a Dream?", font_title,
                   (255, 255, 255), SCREEN_WIDTH // 2, 150)
         selected_index, boxes = draw_menu(menu_options, selected_index)
 

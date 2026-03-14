@@ -188,6 +188,7 @@ STORY_DIALOGUES = {
         ("", "Christmas morning. Snow falling gently outside your window."),
         ("", "Your bedroom. Your blanket. The tree in the corner, still lit from last night."),
         ("", "Presents underneath. Everything exactly as it should be."),
+        ("", "Was it all a dream?"),
         ("Elder Frost", "You are awake."),
         ("Elder Frost", "We did not think we would see you open your eyes again."),
         ("Elder Frost", "Four realms. Fire, shadow, storm, and ice. You walked through all of them."),
@@ -1911,7 +1912,7 @@ class Meteor:
 
 # --- Dream Debris (surreal falling objects) ---
 class DreamDebris:
-    SHAPES = ["clock", "door", "star", "key", "eye", "crystal", "skull", "chain", "mirror"]
+    SHAPES = ["clock", "door", "star", "key", "eye", "crystal", "spider", "chain", "mirror"]
     def __init__(self, x, y_target):
         self.shape = random.choice(self.SHAPES)
         self.x = x + random.randint(-100, 100)
@@ -1996,21 +1997,38 @@ class DreamDebris:
                 hy = dc + int(math.sin(ha)*s*0.85)
                 pygame.draw.circle(ds, c, (hx, hy), 1)
         elif self.shape == "door":
-            # Dark doorway, slightly ajar with eerie light
-            pygame.draw.rect(ds, c, (dc-s//2, dc-s, s, s*2), 2)
-            # Door frame - thick
-            pygame.draw.rect(ds, (*self.color, al//2), (dc-s//2-2, dc-s-2, s+4, s*2+4), 3)
-            # Door slightly open — gap with eerie yellowish light
-            gap_x = dc - s//2 + 3
-            pygame.draw.rect(ds, (200, 180, 80, al//2), (gap_x, dc-s+3, s//5, s*2-6))
-            # Light rays from gap
-            for ri in range(3):
-                ry = dc - s + 3 + ri * (s*2-6)//3
-                ray_len = s//3 + ri * 2
-                pygame.draw.line(ds, (200, 180, 80, al//4), (gap_x, ry), (gap_x - ray_len, ry + ri*2), 1)
-            # Doorknob
-            pygame.draw.circle(ds, c, (dc+s//3, dc), 3)
-            pygame.draw.circle(ds, (*self.color, al//3), (dc+s//3, dc), 4, 1)
+            # Bright open doorway — path to freedom, warm light pouring out
+            dw, dh = s, int(s * 1.8)
+            dx, dy = dc - dw//2, dc - dh//2
+            # Door frame (dark wood)
+            pygame.draw.rect(ds, (60, 35, 20, al), (dx-3, dy-3, dw+6, dh+6), border_radius=2)
+            pygame.draw.rect(ds, (45, 25, 15, al), (dx-3, dy-3, dw+6, dh+6), 2, border_radius=2)
+            # Bright warm light filling the doorway — gradient
+            for row in range(dh):
+                t2 = row / max(1, dh)
+                lr = int(255 - 30 * t2)
+                lg = int(230 - 60 * t2)
+                lb = int(140 - 40 * t2)
+                la = int(al * (0.7 + 0.3 * (1 - t2)))
+                pygame.draw.line(ds, (lr, lg, lb, la), (dx+1, dy+row), (dx+dw-1, dy+row))
+            # Light rays spreading outward from the door
+            for ri in range(7):
+                ray_a = math.radians(-90 + (ri - 3) * 20 + math.sin(self.rotation * 0.05 + ri) * 5)
+                ray_len = s * 0.8 + ri * 2
+                rx = dc + int(math.cos(ray_a) * ray_len)
+                ry = dc - dh//4 + int(math.sin(ray_a) * ray_len)
+                ray_al = int(al * 0.2)
+                pygame.draw.line(ds, (255, 220, 120, ray_al), (dc, dc - dh//4), (rx, ry), 2)
+            # Warm glow around doorway
+            glow = pygame.Surface((dw+30, dh+30), pygame.SRCALPHA)
+            pygame.draw.ellipse(glow, (255, 210, 100, int(al * 0.15)), (0, 0, dw+30, dh+30))
+            ds.blit(glow, (dx-15, dy-15))
+            # Arch at top
+            pygame.draw.arc(ds, (80, 50, 30, al), (dx-2, dy-dw//3, dw+4, dw//2), 0.2, 2.94, 3)
+            # Silhouette at bottom — a small figure stepping toward the light
+            fig_x, fig_y = dc, dy + dh - 4
+            pygame.draw.line(ds, (30, 20, 10, int(al*0.6)), (fig_x, fig_y-8), (fig_x, fig_y), 2)
+            pygame.draw.circle(ds, (30, 20, 10, int(al*0.6)), (fig_x, fig_y-10), 3)
         elif self.shape == "star":
             # Broken/shattered star with jagged points
             pts = []
@@ -2076,28 +2094,34 @@ class DreamDebris:
             pygame.draw.line(ds, (*self.color, al//2), (dc+s//5, dc-s//3), (dc-s//6, dc+s*3//4), 1)
             # Glow spots
             pygame.draw.circle(ds, (*self.color, al//4), (dc, dc), s//3)
-        elif self.shape == "skull":
-            # Creepy skull
-            # Cranium
-            pygame.draw.ellipse(ds, c, (dc-s*2//3, dc-s, s*4//3, s+s//3))
-            # Jaw
-            pygame.draw.arc(ds, c, (dc-s//2, dc-s//6, s, s*2//3), math.radians(200), math.radians(340), 2)
-            # Eye sockets — dark hollow
-            eye_s = s // 4
-            pygame.draw.ellipse(ds, (20, 0, 0, al), (dc-s//3-eye_s//2, dc-s//2, eye_s+2, eye_s+4))
-            pygame.draw.ellipse(ds, (20, 0, 0, al), (dc+s//3-eye_s//2, dc-s//2, eye_s+2, eye_s+4))
-            # Tiny red dots in eye sockets
-            pygame.draw.circle(ds, (200, 30, 30, al), (dc-s//3, dc-s//2+eye_s//2+1), 1)
-            pygame.draw.circle(ds, (200, 30, 30, al), (dc+s//3, dc-s//2+eye_s//2+1), 1)
-            # Nose hole
-            pygame.draw.polygon(ds, (20, 0, 0, al), [(dc, dc-s//6), (dc-s//8, dc+s//8), (dc+s//8, dc+s//8)])
-            # Teeth
-            for ti in range(5):
-                tx = dc - s//3 + ti * s//7
-                pygame.draw.line(ds, c, (tx, dc+s//6), (tx, dc+s//3), 1)
-            # Cracks
-            pygame.draw.line(ds, (*self.color, al//3), (dc-s//6, dc-s), (dc-s//4, dc-s//3), 1)
-            pygame.draw.line(ds, (*self.color, al//3), (dc+s//5, dc-s+s//4), (dc+s//8, dc-s//4), 1)
+        elif self.shape == "spider":
+            # Creepy spider
+            body_r = s // 3
+            head_r = s // 5
+            # Body
+            pygame.draw.ellipse(ds, c, (dc - body_r, dc - body_r//2, body_r*2, body_r + body_r//2))
+            # Head
+            pygame.draw.circle(ds, c, (dc, dc - body_r), head_r)
+            # Eyes — two red dots
+            pygame.draw.circle(ds, (220, 30, 30, al), (dc - head_r//2, dc - body_r - head_r//4), max(1, head_r//3))
+            pygame.draw.circle(ds, (220, 30, 30, al), (dc + head_r//2, dc - body_r - head_r//4), max(1, head_r//3))
+            # Legs — 8 legs, 4 per side, curved outward
+            for side in [-1, 1]:
+                for li in range(4):
+                    a_base = math.radians(self.rotation + side * (30 + li * 30))
+                    lx1 = dc + side * body_r
+                    ly1 = dc - body_r//3 + li * body_r//3
+                    # Joint
+                    jx = lx1 + int(math.cos(a_base) * s * 0.5)
+                    jy = ly1 + int(math.sin(a_base) * s * 0.3)
+                    # Tip — bends down
+                    tx2 = jx + int(math.cos(a_base + side * 0.8) * s * 0.4)
+                    ty2 = jy + s // 3
+                    pygame.draw.line(ds, c, (lx1, ly1), (jx, jy), 2)
+                    pygame.draw.line(ds, c, (jx, jy), (tx2, ty2), 1)
+            # Fangs
+            pygame.draw.line(ds, (200, 40, 40, al), (dc - 2, dc - body_r + head_r), (dc - 3, dc - body_r + head_r + s//6), 1)
+            pygame.draw.line(ds, (200, 40, 40, al), (dc + 2, dc - body_r + head_r), (dc + 3, dc - body_r + head_r + s//6), 1)
         elif self.shape == "chain":
             # Chain links
             num_links = 4
@@ -2279,20 +2303,35 @@ def create_level(diff_key="hard"):
     npcs.append(NPC(10350, 350, "cp5", "Starlight"))
     heart_pickups.append(HeartPickup(10450, 320))
 
-    # ---- Section 5: Running Up That Hill — Final path (10600-16600) ----
-    plats.append(Platform(10600, 350, 6000, 40))  # ~100 seconds — covers the full song
-    wind_zones.append((10600, 16600, -1.5*ws))  # headwind — dramatic but runnable
+    # ---- Section 5: Running Up That Hill — Final path (10600-19000) ----
+    # Split into segments with gaps for crumbling bridges at 15500(400), 16800(500), 17800(300)
+    plats.append(Platform(10600, 350, 4900, 40))   # 10600 - 15500
+    plats.append(Platform(15900, 350, 900, 40))    # 15900 - 16800
+    plats.append(Platform(17300, 350, 500, 40))    # 17300 - 17800
+    plats.append(Platform(18100, 350, 900, 40))    # 18100 - 19000
+    wind_zones.append((10600, 19000, -1.5*ws))  # headwind — dramatic but runnable
     # Icicles scattered along the path — same on all difficulties (visual spectacle)
-    for ix in range(10800, 16200, 350):
+    for ix in range(10800, 18600, 350):
         icicles.append(Icicle(ix + random.randint(-50, 50), random.randint(100, 170), max_fall_speed=isp))
     # Ice geysers along final path — same amount, all difficulties
-    for gx in range(11200, 15800, 800):
+    for gx in range(11200, 18200, 800):
         ice_geysers.append(IceGeyser(gx + random.randint(-60, 60), 350, interval=random.randint(70, 120)))
     # Pendulums — same on all difficulties
-    for px2 in range(11600, 15200, 900):
+    for px2 in range(11600, 17600, 900):
         pendulums.append(Pendulum(px2 + random.randint(-50, 50), random.randint(180, 220),
                                   length=random.randint(100, 140), speed=random.uniform(0.025, 0.04)))
+    # Crumbling sections in the last stretch — ground breaks under you as you run
+    crumbling_bridges.append(CrumblingBridge(15500, 350, 400, tile_delay=crd))
+    crumbling_bridges.append(CrumblingBridge(16800, 350, 500, tile_delay=max(4, crd - 2)))
+    crumbling_bridges.append(CrumblingBridge(17800, 350, 300, tile_delay=max(3, crd - 3)))
     heart_pickups.append(HeartPickup(9600, 280))
+    # Extra hearts on final path for easy/medium only
+    if diff_key in ("easy", "medium"):
+        heart_pickups.append(HeartPickup(12500, 320))
+        heart_pickups.append(HeartPickup(14500, 320))
+        heart_pickups.append(HeartPickup(16500, 320))
+        if diff_key == "easy":
+            heart_pickups.append(HeartPickup(18000, 320))
 
     # --- Saw Blades (sections 3-5) ---
     saw_blades.append(SawBlade(4650,330,4650,430,speed=1.2*ss))
@@ -2325,7 +2364,8 @@ def create_level(diff_key="hard"):
         # Sec 5: Running Up That Hill final path (y=350 surface -> 20px above = 330)
         (10900, 330), (11400, 330), (11900, 330), (12400, 330), (12900, 330),
         (13400, 330), (13900, 330), (14400, 330), (14900, 330), (15400, 330),
-        (15900, 330), (16300, 330),
+        (15900, 330), (16400, 330), (16900, 330), (17400, 330), (17900, 330),
+        (18400, 330), (18800, 330),
     ]
     for ox, oy in orn_positions:
         ornaments.append(Ornament(ox, oy))
@@ -2339,7 +2379,7 @@ def create_level(diff_key="hard"):
     for ix, iy in icicle_positions:
         icicles.append(Icicle(ix, iy, max_fall_speed=isp))
 
-    exit_door = ExitDoor(16520, 280)
+    exit_door = ExitDoor(18920, 280)
     return plats, cps, mons, pws, exit_door, npcs, ornaments, icicles, heart_pickups, saw_blades, wind_zones, crumbling_bridges, pendulums, ice_geysers
 
 
@@ -2365,7 +2405,7 @@ class Game:
         self.respawn_fade = 0  # respawn screen wipe
         self.best_combo = 0  # track best combo for stats
         self.difficulty = "hard"
-        self.music_volume = 0.5; self.music_muted = False; self.settings_cursor = 0
+        self.music_volume = 0.3; self.music_muted = False; self.settings_cursor = 0
         self.camera = Camera(SCREEN_WIDTH, SCREEN_HEIGHT)
         self.particles = []; self.rings = []; self.flashes = []
         self.damage_flashes = []  # DamageFlash instances for red vignette
@@ -2459,6 +2499,24 @@ class Game:
             if not self.running: return
             # Update music crossfade system
             self.sfx.update_music()
+            # Delayed credits music fade-in
+            if getattr(self, '_credits_music_delay', 0) > 0:
+                self._credits_music_delay -= 1
+                if self._credits_music_delay <= 0:
+                    path = getattr(self, '_credits_music_path', None)
+                    if path:
+                        pygame.mixer.music.load(path)
+                        pygame.mixer.music.set_volume(0.0)
+                        pygame.mixer.music.play(-1)
+                        self._credits_vol = 0.0
+                        self._credits_vol_target = max(0.5, self.music_volume)
+            # Credits music volume ramp
+            if getattr(self, '_credits_vol', None) is not None:
+                if self._credits_vol < self._credits_vol_target:
+                    self._credits_vol += self._credits_vol_target / 300  # 5 sec fade in
+                    pygame.mixer.music.set_volume(min(self._credits_vol, self._credits_vol_target))
+                else:
+                    self._credits_vol = None
             # Hitstop: freeze frames — skip update, just draw
             if self.freeze_frames > 0:
                 self.freeze_frames -= 1
@@ -2542,11 +2600,7 @@ class Game:
                     # Starlight cp5: trigger Running Up That Hill
                     if getattr(self, '_cp5_dialogue_active', False):
                         di = self.dialogue_box.index if self.dialogue_box.active else 999
-                        # Start fading out main music early (line 10)
-                        if di >= 10 and not getattr(self, '_main_music_fading', False) and not self._running_up_playing:
-                            pygame.mixer.music.fadeout(3000)
-                            self._main_music_fading = True
-                        # Load and play Running Up That Hill (line 12)
+                        # Load and play Running Up That Hill (line 13)
                         if di >= 12 and not self._running_up_playing:
                             snd = self.sfx.sounds.get("blizzard")
                             if snd: snd.stop()
@@ -2560,9 +2614,9 @@ class Game:
                             pygame.mixer.music.set_volume(max(0.5, self.music_volume))
                     # Ending dialogue: fade out Running Up That Hill near the end
                     if self.state == "ending" and self._running_up_playing and self.dialogue_box.active:
-                        # Line 25 = "Was it all a dream?" — fade out here, slow and gradual
-                        if self.dialogue_box.index >= 27 and not getattr(self, '_ending_music_fading', False):
-                            pygame.mixer.music.fadeout(6000)
+                        # Start fading out early — line 20 = "Thank you for not giving up."
+                        if self.dialogue_box.index >= 20 and not getattr(self, '_ending_music_fading', False):
+                            pygame.mixer.music.fadeout(10000)
                             self._ending_music_fading = True
                     if not self.dialogue_box.active:
                         if getattr(self, '_cp5_dialogue_active', False):
@@ -2572,6 +2626,7 @@ class Game:
                             self.state = "credits"
                             self.credits_scroll = 0.0
                             self.credits_max_scroll = 4200
+                            self._credits_fade_in = 120  # 2 sec fade from black
                             self._ending_music_fading = False
                             self._start_credits_music()
                         else:
@@ -2701,6 +2756,9 @@ class Game:
                     # Starlight NPC — music triggers near end of dialogue (not immediately)
                     if npc.dialogue_key == "cp5":
                         self._cp5_dialogue_active = True
+                        # Start fading out main music immediately
+                        pygame.mixer.music.fadeout(5000)
+                        self._main_music_fading = True
                     break
 
     def _update(self):
@@ -3048,7 +3106,7 @@ class Game:
             self._blizzard_playing = False
         # Meteor spawning on final path — same visuals all difficulties
         if in_final_path and self.player.alive:
-            progress = min(1.0, (px - 10600) / 5500)
+            progress = min(1.0, (px - 10600) / 7900)
             # Same spawn rate on all difficulties — full visual spectacle
             meteor_interval = max(25, int(70 - 45 * progress))
             if self.tick % meteor_interval == 0:
@@ -3358,6 +3416,14 @@ class Game:
             if self.dialogue_box: self.dialogue_box.draw(self.screen, self.tick)
         elif self.state == "credits":
             self._draw_credits()
+        # Credits fade-in from black
+        if getattr(self, '_credits_fade_in', 0) > 0:
+            alpha = int(255 * self._credits_fade_in / 120)
+            fade_s = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+            fade_s.fill(BLACK)
+            fade_s.set_alpha(min(255, alpha))
+            self.screen.blit(fade_s, (0, 0))
+            self._credits_fade_in -= 1
         # Respawn screen wipe
         if self.respawn_fade > 0:
             alpha = int(255 * (1.0 - abs(self.respawn_fade - 10) / 10.0))
@@ -4242,9 +4308,9 @@ class Game:
             credits_path = MUSIC_FILE  # fallback to level music
         self._running_up_playing = False
         pygame.mixer.music.stop()
-        pygame.mixer.music.load(credits_path)
-        pygame.mixer.music.play(-1)
-        pygame.mixer.music.set_volume(max(0.5, self.music_volume))
+        # Delay credits music — load now, play after a pause
+        self._credits_music_path = credits_path
+        self._credits_music_delay = 180  # 3 seconds of silence before credits music
 
     def _draw_credits(self):
         scroll = self.credits_scroll
@@ -4331,126 +4397,108 @@ class Game:
         fonts = self._cr_fonts
 
         # (text, font_key, color, gap_after)
+        # Consistent spacing: heading=12 after, name=4 role, role=14 after, section gap=30
         credits = [
             ("", "body", NAME_WHITE, 80),
 
-            # ── Game Title - BIG ──
-            ("WAS IT ALL A DREAM?", "big_title", HEADER, 14),
-            ("Imaging Assignment", "subtitle", DIM, 40),
-            ("A Frozen Realm  -  The Final Chapter", "body", ICE_BLUE, 10),
-            ("A Christmas-themed platformer adventure", "small", DIM, 40),
+            # ── Game Title ──
+            ("WAS IT ALL A DREAM?", "big_title", HEADER, 10),
+            ("Imaging Assignment", "subtitle", DIM, 8),
+            ("A Frozen Realm  -  The Final Chapter", "body", ICE_BLUE, 6),
+            ("A Christmas-themed platformer adventure", "small", DIM, 30),
 
-            ("", "body", NAME_WHITE, 40),
+            ("", "body", NAME_WHITE, 30),
 
             # ── The Team ──
-            ("The Team", "heading", HEADER, 15),
-
-            ("Muqeet", "name", WARM_RED, 4),
-            ("Developer", "role", DIM, 20),
-
-            ("Omar", "name", WARM_GREEN, 4),
-            ("Developer", "role", DIM, 20),
-
-            ("John", "name", ICE_BLUE, 4),
-            ("Developer", "role", DIM, 20),
-
-            ("Danial", "name", SOFT_PINK, 4),
-            ("Developer", "role", DIM, 20),
+            ("The Team", "heading", HEADER, 12),
+            ("Muqeet", "name", WARM_RED, 2),
+            ("Developer", "role", DIM, 22),
+            ("Omar", "name", WARM_GREEN, 2),
+            ("Developer", "role", DIM, 22),
+            ("John", "name", ICE_BLUE, 2),
+            ("Developer", "role", DIM, 22),
+            ("Danial", "name", SOFT_PINK, 2),
+            ("Developer", "role", DIM, 22),
 
             ("", "body", NAME_WHITE, 30),
 
             # ── Roles ──
             ("Game Design", "subheading", SUBHEADER, 4),
-            ("Muqeet  /  Omar  /  John  /  Danial", "role", BODY, 20),
-
+            ("Muqeet  /  Omar  /  John  /  Danial", "role", BODY, 14),
             ("Art & Visuals", "subheading", SUBHEADER, 4),
-            ("Muqeet  /  Omar  /  John  /  Danial", "role", BODY, 20),
-
+            ("Muqeet  /  Omar  /  John  /  Danial", "role", BODY, 14),
             ("Music & Sound", "subheading", SUBHEADER, 4),
-            ("Muqeet  /  Omar  /  John  /  Danial", "role", BODY, 20),
-
+            ("Muqeet  /  Omar  /  John  /  Danial", "role", BODY, 14),
             ("Level Design", "subheading", SUBHEADER, 4),
-            ("Muqeet  /  Omar  /  John  /  Danial", "role", BODY, 20),
-
+            ("Muqeet  /  Omar  /  John  /  Danial", "role", BODY, 14),
             ("Story & Narrative", "subheading", SUBHEADER, 4),
-            ("Muqeet  /  Omar  /  John  /  Danial", "role", BODY, 20),
-
+            ("Muqeet  /  Omar  /  John  /  Danial", "role", BODY, 14),
             ("QA & Playtesting", "subheading", SUBHEADER, 4),
-            ("Muqeet  /  Omar  /  John  /  Danial", "role", BODY, 20),
+            ("Muqeet  /  Omar  /  John  /  Danial", "role", BODY, 14),
+
+            ("", "body", NAME_WHITE, 30),
+
+            # ── Music Credits ──
+            ("Music Credits", "heading", HEADER, 12),
+            ("\"Running Up That Hill\"", "body", NAME_WHITE, 2),
+            ("by Kate Bush", "role", DIM, 20),
+            ("\"Civilian\"", "body", NAME_WHITE, 2),
+            ("by Wye Oak", "role", DIM, 20),
+            ("\"City of Tears\"", "body", NAME_WHITE, 2),
+            ("from Hollow Knight  -  by Christopher Larkin", "role", DIM, 20),
 
             ("", "body", NAME_WHITE, 30),
 
             # ── Built With ──
-            ("Built With", "subheading", SUBHEADER, 6),
+            ("Built With", "heading", HEADER, 12),
             ("Python 3  /  Pygame", "role", BODY, 4),
             ("Pixel Art  /  Retro Sound Design", "role", BODY, 4),
-            ("Passion  /  Sleepless Nights  /  Coffee", "role", BODY, 30),
-
-            ("", "body", NAME_WHITE, 30),
-
-            # ── Instructor ──
-            ("Instructor", "heading", HEADER, 15),
-            ("Mary Ting", "name", NAME_WHITE, 4),
-            ("Course Professor", "role", DIM, 20),
+            ("Passion  /  Sleepless Nights  /  Coffee", "role", BODY, 14),
 
             ("", "body", NAME_WHITE, 30),
 
             # ── Special Thanks ──
-            ("Special Thanks", "heading", HEADER, 15),
-
-            ("Mary Ting", "body", NAME_WHITE, 4),
-            ("For the guidance and inspiration", "role", DIM, 18),
-
-            ("Our Classmates", "body", NAME_WHITE, 4),
-            ("For the feedback, support, and laughs", "role", DIM, 18),
-
-            ("The Pygame Community", "body", NAME_WHITE, 4),
-            ("For the tools that made this possible", "role", DIM, 18),
-
-            ("Every Playtester", "body", NAME_WHITE, 4),
-            ("Who found the bugs we missed", "role", DIM, 18),
-
-            ("Open-Source Creators", "body", NAME_WHITE, 4),
+            ("Special Thanks", "heading", HEADER, 12),
+            ("Mary Ting", "body", NAME_WHITE, 2),
+            ("For the guidance and inspiration", "role", DIM, 20),
+            ("Our Classmates", "body", NAME_WHITE, 2),
+            ("For the feedback, support, and laughs", "role", DIM, 20),
+            ("The Pygame Community", "body", NAME_WHITE, 2),
+            ("For the tools that made this possible", "role", DIM, 20),
+            ("Every Playtester", "body", NAME_WHITE, 2),
+            ("Who found the bugs we missed", "role", DIM, 20),
+            ("Open-Source Creators", "body", NAME_WHITE, 2),
             ("Whose sprites, fonts, and sounds", "role", DIM, 2),
-            ("brought this world to life", "role", DIM, 18),
+            ("brought this world to life", "role", DIM, 20),
+            ("Our Families", "body", NAME_WHITE, 2),
+            ("For putting up with us during crunch", "role", DIM, 20),
 
-            ("Our Families", "body", NAME_WHITE, 4),
-            ("For putting up with us during crunch", "role", DIM, 25),
-
-            ("", "body", NAME_WHITE, 40),
+            ("", "body", NAME_WHITE, 30),
 
             # ── A Note to the Player ──
-            ("A Note to the Player", "heading", HEADER, 15),
-
-            ("You braved the four realms.", "body", ICE_BLUE, 6),
+            ("A Note to the Player", "heading", HEADER, 12),
+            ("You braved the four realms.", "body", ICE_BLUE, 4),
             ("You faced every monster, every trap,", "role", BODY, 2),
             ("every impossible jump.", "role", BODY, 14),
-
             ("You refused to give up.", "body", WARM_GREEN, 14),
-
             ("The dream is over now.", "role", BODY, 2),
             ("You can finally wake up.", "role", BODY, 14),
-
             ("But we hope a little piece", "role", DIM, 2),
-            ("of this adventure stays with you.", "role", DIM, 30),
+            ("of this adventure stays with you.", "role", DIM, 14),
 
-            ("", "body", NAME_WHITE, 40),
+            ("", "body", NAME_WHITE, 30),
 
             # ── Final ──
-            ("Thank You for Playing", "heading", HEADER, 15),
-
-            ("This game was made with heart.", "body", BODY, 6),
-            ("We hope it made you smile.", "body", BODY, 30),
-
-            ("", "body", NAME_WHITE, 20),
-
+            ("Thank You for Playing", "heading", HEADER, 12),
+            ("This game was made with heart.", "body", BODY, 4),
+            ("We hope it made you smile.", "body", BODY, 14),
             ("Every snowflake, every light, every pixel", "role", ICE_BLUE, 2),
-            ("was crafted in the spirit of Christmas.", "role", ICE_BLUE, 30),
+            ("was crafted in the spirit of Christmas.", "role", ICE_BLUE, 14),
 
-            ("", "body", NAME_WHITE, 150),
+            ("", "body", NAME_WHITE, 120),
 
-            # ── End Title — scrolls in and stops centered ──
-            ("THE ENDLESS DREAM", "big_title", HEADER, 8),
+            # ── End Title ──
+            ("WAS IT ALL A DREAM?", "big_title", HEADER, 8),
             ("Imaging Assignment  -  2026", "subtitle", DIM, 40),
         ]
 
