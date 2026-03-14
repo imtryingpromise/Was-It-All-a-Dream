@@ -6,6 +6,7 @@ pygame.mixer.pre_init(44100, -16, 2, 512)
 pygame.init()
 
 from levels.level1 import launch_game as launch_level1
+from levels.level2 import launch_game as launch_level2
 from levels.level4 import launch_game as launch_level4
 
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -84,8 +85,9 @@ def handle_level_select(index):
         pygame.mixer.music.load("assets/audio/BackgroundMusic.mp3")
         pygame.mixer.music.play(-1)
     elif index == 1:
-        current_level = "Level 2"
-        state = "LEVEL_PREVIEW"
+        launch_level2()
+        pygame.mixer.music.load("assets/audio/BackgroundMusic.mp3")
+        pygame.mixer.music.play(-1)
     elif index == 2:
         current_level = "Level 3"
         state = "LEVEL_PREVIEW"
