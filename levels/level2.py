@@ -1555,14 +1555,10 @@ class Game:
         self.balloon                =d["balloon"]
         self.portal                 =d["portal"]
         self.section_checkpoints    =d["section_checkpoints"]
-        # self.player=Player(80,BASE_Y-60,
-        #                    move_speed=preset["player_speed"],
-        #                    jump_velocity=preset["player_jump"])
+        self.player=Player(80,BASE_Y-60,
+                           move_speed=preset["player_speed"],
+                           jump_velocity=preset["player_jump"])        
         
-        self.player=Player(4400, BASE_Y-120, # nak test direct ke santa sleigh
-                   move_speed=preset["player_speed"],
-                   jump_velocity=preset["player_jump"])
-
         self.camera=Camera(SCREEN_WIDTH,SCREEN_HEIGHT)
         self.particles.clear(); self.rings.clear(); self.flashes.clear()
         self.level_time=0; self.tick=0; self.win_timer=0
