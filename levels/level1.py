@@ -39,10 +39,10 @@ XMAS_GOLD    = (255, 200,  50)
 CANDY_PINK   = (255, 140, 170)
 SNOW_WHITE   = (240, 248, 255)
 ICE_BLUE     = (160, 215, 245)
-PLAT_CLOUD   = (240, 248, 235)
-PLAT_MOVE    = (255, 235, 175)
-PLAT_FALL    = (255, 150, 150)
-PLAT_TELE    = (200, 140, 255)
+PLAT_CLOUD   = (210, 170, 120)
+PLAT_MOVE    = (200, 140, 90)
+PLAT_FALL    = (220, 130, 100)
+PLAT_TELE    = (180, 110, 200)
 PLAT_ICE     = (180, 232, 255)
 PLAT_GLITCH  = (185, 145, 255)
 RAINBOW_COLS = [(255,80,80),(255,170,60),(255,240,60),(80,240,100),(60,200,255),(130,100,255),(230,80,230)]
@@ -57,7 +57,7 @@ STAR_GOLD    = (255, 215,  80)
 UPDRAFT_COL  = (180, 240, 255)
 BROWN        = (139,  90,  43)
 DARK_BROWN   = (100,  60,  30)
-DARK_BG      = (255, 225, 150)
+DARK_BG      = (200, 120, 60)
 
 GRAVITY         =  0.6
 JUMP_VELOCITY   = -14
@@ -262,14 +262,34 @@ class Particle:
 class BGCloud:
     def __init__(self, x, y, size, speed=0.1):
         self.x = float(x); self.y = y; self.size = size; self.speed = speed
-    def draw(self, surface, camera):
-        sx = int(self.x - camera.offset_x * self.speed)
-        sy = int(self.y - camera.offset_y * 0.05)
-        s  = self.size
-        for ox, oy, r in [(0,0,s),(s,5,int(s*.8)),(-s,5,int(s*.75)),(int(s*1.8),10,int(s*.6))]:
-            pygame.draw.circle(surface, (255, 252, 242), (sx+ox, sy+oy), r)
+        self._cached = None
+    def _build_cache(self):
+        s = self.size
+        puffs = [(0,0,s),(s,5,int(s*.8)),(-s,5,int(s*.75)),(int(s*1.8),10,int(s*.6))]
+        # Determine bounding box
+        min_x = min(ox-r for ox,oy,r in puffs) - 4
+        max_x = max(ox+r for ox,oy,r in puffs) + 4
+        min_y = min(oy-r for ox,oy,r in puffs) - 4
+        max_y = max(oy+r for ox,oy,r in puffs) + 4
+        w = max_x - min_x; h = max_y - min_y
+        surf = pygame.Surface((w, h), pygame.SRCALPHA)
+        ox_off = -min_x; oy_off = -min_y
+        # Sunset-lit clouds: warm orange/peach tones with dark underbelly
+        for ox, oy, r in puffs:
+            pygame.draw.circle(surf, (120, 60, 50, 25), (ox+ox_off+2, oy+oy_off+4), r)
+        for ox, oy, r in puffs:
+            pygame.draw.circle(surf, (255, 190, 130), (ox+ox_off, oy+oy_off), r)
+        for ox, oy, r in puffs[:3]:
             if r > 8:
-                pygame.draw.circle(surface, (255, 248, 235), (sx+ox+r//3, sy+oy-r//3), max(1, r//5))
+                pygame.draw.circle(surf, (255, 220, 160), (ox+ox_off, oy+oy_off-r//3), max(1, int(r*0.7)))
+        self._cached = surf
+        self._cache_offset = (min_x, min_y)
+    def draw(self, surface, camera):
+        if self._cached is None: self._build_cache()
+        sx = int(self.x - camera.offset_x * self.speed) + self._cache_offset[0]
+        sy = int(self.y - camera.offset_y * 0.05) + self._cache_offset[1]
+        if sx > SCREEN_WIDTH + 20 or sx + self._cached.get_width() < -20: return
+        surface.blit(self._cached, (sx, sy))
 
 
 class RingEffect:
@@ -436,28 +456,51 @@ class Platform:
     def draw(self, surface, camera):
         sr = camera.apply(self.rect)
         if sr.right < -10 or sr.left > SCREEN_WIDTH+10: return
-        pygame.draw.rect(surface, self.color, sr, border_radius=10)
-        hi = tuple(min(c+50, 255) for c in self.color)
-        pygame.draw.rect(surface, hi, (sr.x+4, sr.y, sr.width-8, 5), border_radius=4)
-        sun_edge = lerp_color(self.color, (255, 230, 120), 0.35)
-        pygame.draw.rect(surface, sun_edge, (sr.right-5, sr.y+4, 4, sr.height-8), border_radius=3)
-        shadow = lerp_color(self.color, (150, 170, 200), 0.3)
-        pygame.draw.rect(surface, shadow, (sr.x+1, sr.y+4, 4, sr.height-8), border_radius=3)
-        rng = random.Random(sr.x * 31 + sr.y * 17)
-        for bx in range(sr.x + 4, sr.right - 4, 14):
-            bw = rng.randint(10, 18)
-            puff_c = lerp_color(CLOUD_WHITE, (255, 248, 235), 0.4)
-            pygame.draw.ellipse(surface, puff_c, (bx, sr.y - 5, bw, 8))
-        if sr.width >= 100:
-            lcs = [(255, 120, 140), (255, 200, 60), (255, 160, 80), (120, 210, 255), (255, 180, 220)]
-            for i, lx in enumerate(range(sr.x + 8, sr.right - 8, 18)):
-                ly = sr.bottom + 4 + int(math.sin(i * 0.9) * 2)
+        # Rich wooden plank body bathed in sunset warmth
+        body_col = lerp_color(self.color, (160, 100, 60), 0.35)
+        pygame.draw.rect(surface, body_col, sr, border_radius=10)
+        # Plank grain lines
+        rng = random.Random(self.rect.x * 31 + self.rect.y * 17)
+        grain_col = lerp_color(body_col, (120, 70, 40), 0.25)
+        for gi in range(sr.x + 6, sr.right - 6, max(12, sr.width // 5)):
+            pygame.draw.line(surface, grain_col, (gi, sr.y+4), (gi, sr.bottom-2), 1)
+        # Top snow cap with sunset-pink tint
+        snow_pts = [(sr.x-2, sr.y+4)]
+        for bx in range(sr.x, sr.right+6, 8):
+            bump = rng.randint(3, 7)
+            snow_pts.append((bx, sr.y - bump))
+        snow_pts.append((sr.right+2, sr.y+4))
+        if len(snow_pts) >= 3:
+            pygame.draw.polygon(surface, (255, 225, 210), snow_pts)       # sunset-kissed snow
+            pygame.draw.polygon(surface, (255, 200, 180), snow_pts, 1)    # warm outline
+        # Golden sunset highlight on top
+        hi = lerp_color(body_col, (255, 200, 100), 0.5)
+        pygame.draw.rect(surface, hi, (sr.x+4, sr.y+3, sr.width-8, 4), border_radius=3)
+        # Right edge warm sunlight
+        sun_edge = lerp_color(body_col, (255, 180, 80), 0.45)
+        pygame.draw.rect(surface, sun_edge, (sr.right-4, sr.y+5, 3, sr.height-10), border_radius=2)
+        # Left edge deep shadow
+        shadow = lerp_color(body_col, (60, 35, 25), 0.4)
+        pygame.draw.rect(surface, shadow, (sr.x+1, sr.y+5, 3, sr.height-10), border_radius=2)
+        # Bottom edge
+        bot_col = lerp_color(body_col, (70, 40, 25), 0.35)
+        pygame.draw.line(surface, bot_col, (sr.x+4, sr.bottom-1), (sr.right-4, sr.bottom-1))
+        # Christmas lights — glowing warm in the sunset
+        if sr.width >= 80:
+            lcs = [(255, 80, 60), (255, 200, 50), (80, 200, 80), (255, 140, 60), (255, 100, 140)]
+            for i, lx in enumerate(range(sr.x + 8, sr.right - 8, 16)):
+                ly = sr.bottom + 3 + int(math.sin(i * 0.9) * 2)
                 if i > 0:
-                    px2 = lx - 18; py2 = sr.bottom + 4 + int(math.sin((i-1) * 0.9) * 2)
-                    pygame.draw.line(surface, (200, 190, 170), (px2, py2), (lx, ly), 1)
+                    px2 = lx - 16; py2 = sr.bottom + 3 + int(math.sin((i-1) * 0.9) * 2)
+                    pygame.draw.line(surface, (80, 45, 25), (px2, py2), (lx, ly), 1)
                 c = lcs[i % len(lcs)]
                 pygame.draw.circle(surface, c, (lx, ly), 3)
-                pygame.draw.circle(surface, WHITE, (lx - 1, ly - 1), 1)
+                pygame.draw.circle(surface, (255, 255, 220), (lx-1, ly-1), 1)
+        # Holly leaf accents on platform edges
+        if sr.width >= 50:
+            for hx in [sr.x + 8, sr.right - 14]:
+                pygame.draw.ellipse(surface, (40, 120, 50), (hx, sr.y+5, 6, 4))
+                pygame.draw.circle(surface, (200, 40, 40), (hx+3, sr.y+4), 2)
 
 
 class MovingPlatform(Platform):
@@ -477,19 +520,28 @@ class MovingPlatform(Platform):
     def draw(self, surface, camera):
         sr = camera.apply(self.rect)
         if sr.right < -10 or sr.left > SCREEN_WIDTH+10: return
-        pygame.draw.rect(surface, (255, 235, 180), sr, border_radius=8)
-        stripe_c = (255, 195, 90)
-        for si in range(-sr.height, sr.width + sr.height, 14):
-            x0 = sr.x + si; x1 = x0 + 8
-            pts = [(max(sr.x, x0), sr.y), (min(sr.right, x1), sr.y),
-                   (min(sr.right, x1 + sr.height), sr.bottom), (max(sr.x, x0 + sr.height), sr.bottom)]
-            if len(set(pts)) >= 3:
-                pygame.draw.polygon(surface, stripe_c, pts)
-        pygame.draw.rect(surface, (255, 235, 180), sr, border_radius=8, width=2)
-        rng = random.Random(sr.x * 17 + sr.y * 31)
-        for bx in range(sr.x + 4, sr.right - 4, 12):
+        # Gift-wrapped moving platform — deep red with gold ribbon
+        base = (170, 45, 35)
+        pygame.draw.rect(surface, base, sr, border_radius=8)
+        # Gold ribbon cross
+        mid_x = sr.x + sr.width // 2
+        mid_y = sr.y + sr.height // 2
+        pygame.draw.rect(surface, (220, 180, 50), (mid_x-3, sr.y, 6, sr.height))
+        pygame.draw.rect(surface, (220, 180, 50), (sr.x, mid_y-2, sr.width, 4))
+        # Ribbon bow on top center
+        pygame.draw.ellipse(surface, (240, 200, 60), (mid_x-8, sr.y-5, 8, 6))
+        pygame.draw.ellipse(surface, (240, 200, 60), (mid_x+1, sr.y-5, 8, 6))
+        pygame.draw.circle(surface, (255, 220, 80), (mid_x, sr.y-2), 3)
+        # Sunset highlight on top edge
+        hi = lerp_color(base, (255, 180, 80), 0.4)
+        pygame.draw.rect(surface, hi, (sr.x+3, sr.y, sr.width-6, 3), border_radius=2)
+        # Border glow
+        pygame.draw.rect(surface, (200, 70, 50), sr, 2, border_radius=8)
+        # Snow puffs on top
+        rng = random.Random(self.sx * 17 + self.sy * 31)
+        for bx in range(sr.x + 3, sr.right - 3, 10):
             bw = rng.randint(8, 14)
-            pygame.draw.ellipse(surface, (255, 252, 240), (bx, sr.y - 4, bw, 7))
+            pygame.draw.ellipse(surface, (255, 220, 200), (bx, sr.y - 4, bw, 6))
 
 
 class IcePlatform(Platform):
@@ -501,17 +553,32 @@ class IcePlatform(Platform):
     def draw(self, surface, camera):
         sr = camera.apply(self.rect)
         if sr.right < -10 or sr.left > SCREEN_WIDTH+10: return
-        pygame.draw.rect(surface, self.color, sr, border_radius=10)
-        hi = tuple(min(c+65, 255) for c in self.color)
-        pygame.draw.rect(surface, hi, (sr.x+4, sr.y, sr.width-8, 5), border_radius=4)
+        # Sunset-tinted ice — amber reflections on frozen surface
+        ice_base = (180, 170, 200)
+        pygame.draw.rect(surface, ice_base, sr, border_radius=10)
+        # Warm sunset reflection on top
+        hi = (230, 190, 160)
+        pygame.draw.rect(surface, hi, (sr.x+3, sr.y, sr.width-6, 6), border_radius=4)
+        # Amber sparkles
         for i in range(5):
             phase = (self.tick*0.09 + i*1.3) % (2*math.pi)
-            bri = int(150 + 105*abs(math.sin(phase)))
-            sx2 = sr.x + 10 + i*max(1, (sr.width-20)//4)
-            pygame.draw.circle(surface, (bri, bri, 255), (sx2, sr.y+8), 2)
-        font = pygame.font.SysFont("consolas", 10, bold=True)
-        lbl  = font.render("ICE", True, (80, 160, 215))
-        surface.blit(lbl, (sr.centerx-lbl.get_width()//2, sr.y+8))
+            bri = abs(math.sin(phase))
+            sx2 = sr.x + 8 + i*max(1, (sr.width-16)//4)
+            sy2 = sr.y + 5 + int(math.sin(i+self.tick*0.05)*3)
+            sc = (int(220+35*bri), int(180+40*bri), int(120+60*bri))
+            pygame.draw.circle(surface, sc, (sx2, sy2), 2)
+        # Icicles with warm tips from sunset light
+        rng = random.Random(self.rect.x*13 + self.rect.y*7)
+        for ix in range(sr.x+6, sr.right-6, max(1, sr.width//5)):
+            ih = rng.randint(5, 12)
+            iw = rng.randint(2, 4)
+            pts = [(ix-iw, sr.bottom), (ix+iw, sr.bottom), (ix, sr.bottom+ih)]
+            pygame.draw.polygon(surface, (200, 190, 220), pts)
+            pygame.draw.polygon(surface, (230, 210, 200), pts, 1)
+        pygame.draw.rect(surface, (160, 140, 170), sr, 1, border_radius=10)
+        font = pygame.font.SysFont("consolas", 9, bold=True)
+        lbl  = font.render("ICE", True, (200, 160, 130))
+        surface.blit(lbl, (sr.centerx-lbl.get_width()//2, sr.y+7))
 
 
 class GlitchPlatform(Platform):
@@ -594,20 +661,65 @@ class CollapsingPlatform(Platform):
         if sr.right < -10 or sr.left > SCREEN_WIDTH+10: return
         if self.stood > 0:
             r = min(self.stood/self.delay, 1.0)
-            col = (min(255,int(self.base_color[0]+(255-self.base_color[0])*r)),
-                   max(0,int(self.base_color[1]*(1-r))), max(0,int(self.base_color[2]*(1-r))))
-        else: col = self.base_color
+            col = lerp_color(self.base_color, (255, 80, 30), r)
+        else:
+            col = self.base_color
+        # Main body — warm gingerbread style
         pygame.draw.rect(surface, col, sr, border_radius=8)
-        pygame.draw.rect(surface, tuple(min(c+30,255) for c in col), (sr.x+4,sr.y,sr.width-8,4), border_radius=3)
-        if self.stood > self.delay*0.5:
-            pygame.draw.line(surface, BLACK, (sr.centerx-8,sr.y), (sr.centerx+4,sr.bottom), 2)
-        # ── countdown bar: full-width at stood=0, shrinks to 0 at stood=delay
+        # Frosting/icing decoration on top
+        rng = random.Random(self.rect.x*13 + self.rect.y*7)
+        if self.stood == 0:
+            frost_col = (255, 220, 190)
+            frost_pts = [(sr.x+2, sr.y+3)]
+            for fx in range(sr.x+4, sr.right-2, 6):
+                drip = rng.randint(0, 4)
+                frost_pts.append((fx, sr.y - 2 + drip))
+            frost_pts.append((sr.right-2, sr.y+3))
+            if len(frost_pts) >= 3:
+                pygame.draw.polygon(surface, frost_col, frost_pts)
+        # Warm sunset highlight on top
+        hi = lerp_color(col, (255, 200, 100), 0.4)
+        pygame.draw.rect(surface, hi, (sr.x+4, sr.y+1, sr.width-8, 3), border_radius=2)
+        # Decorative dots (candy buttons) when not crumbling
+        if self.stood == 0:
+            dot_cols = [(255, 80, 60), (255, 200, 50), (80, 180, 80)]
+            for i, dx in enumerate(range(sr.x+8, sr.right-8, max(14, sr.width//4))):
+                pygame.draw.circle(surface, dot_cols[i % len(dot_cols)], (dx, sr.centery), 3)
+                pygame.draw.circle(surface, (255, 240, 220), (dx-1, sr.centery-1), 1)
+        # Plank grain
+        grain_col = lerp_color(col, (80, 40, 20), 0.2)
+        for gi in range(sr.x+8, sr.right-8, max(10, sr.width//4)):
+            pygame.draw.line(surface, grain_col, (gi, sr.y+4), (gi, sr.bottom-2), 1)
+        # Dark edges
+        shadow = lerp_color(col, (50, 25, 10), 0.4)
+        pygame.draw.rect(surface, shadow, (sr.x+1, sr.y+4, 2, sr.height-8), border_radius=1)
+        bot_col = lerp_color(col, (60, 30, 15), 0.35)
+        pygame.draw.line(surface, bot_col, (sr.x+4, sr.bottom-1), (sr.right-4, sr.bottom-1))
+        # Crack lines when close to breaking
+        if self.stood > self.delay*0.3:
+            crack_r = min(1.0, (self.stood - self.delay*0.3) / (self.delay*0.7))
+            crack_col = lerp_color(col, (30, 10, 5), crack_r*0.7)
+            for ci in range(int(3 + crack_r*5)):
+                cx2 = sr.x + rng.randint(6, max(7, sr.width-6))
+                cy2 = sr.y + rng.randint(2, max(3, sr.height-2))
+                clen = rng.randint(4, int(8 + crack_r*12))
+                ca = rng.uniform(-0.6, 0.6)
+                ex = cx2 + int(math.cos(ca)*clen)
+                ey = cy2 + int(math.sin(ca)*clen)
+                pygame.draw.line(surface, crack_col, (cx2,cy2), (ex,ey), max(1, int(1+crack_r*2)))
+        # Warning symbol when about to fall (blink on/off)
+        if self.stood > self.delay*0.7 and (self.stood // 4) % 2 == 0:
+            wx, wy = sr.centerx, sr.y - 10
+            pygame.draw.polygon(surface, (255, 200, 40), [(wx, wy-8), (wx-7, wy+5), (wx+7, wy+5)])
+            pygame.draw.line(surface, (60, 30, 10), (wx, wy-4), (wx, wy+1), 2)
+            pygame.draw.circle(surface, (60, 30, 10), (wx, wy+3), 1)
+        # Countdown bar
         if self.stood > 0 and sr.width > 8:
             ratio = max(0.0, 1.0 - (self.stood / self.delay))
             bar_w = int((sr.width - 8) * ratio)
-            bar_col = lerp_color((80, 220, 80), (255, 60, 60),
+            bar_col = lerp_color((100, 220, 80), (255, 50, 30),
                                  min(1.0, self.stood / self.delay))
-            pygame.draw.rect(surface, (30, 30, 30), (sr.x+4, sr.bottom-5, sr.width-8, 4), border_radius=2)
+            pygame.draw.rect(surface, (30, 15, 10), (sr.x+4, sr.bottom-5, sr.width-8, 4), border_radius=2)
             if bar_w > 0:
                 pygame.draw.rect(surface, bar_col, (sr.x+4, sr.bottom-5, bar_w, 4), border_radius=2)
 
@@ -819,23 +931,44 @@ class StompMonster:
         sr = camera.apply(self.rect)
         if sr.right < -40 or sr.left > SCREEN_WIDTH + 40: return
         cx, cy = sr.centerx, sr.centery
-        alpha = 255 if self.alive else max(0, int(255 * self.death_timer / 20))
-        body_col = (100, 140, 255); wing_col = (160, 190, 255)
+        # Color per monster (based on spawn position)
+        orn_cols = [(210, 50, 50), (50, 180, 80), (60, 100, 220), (200, 60, 180), (220, 160, 30)]
+        orn_idx = int(self.base_y * 7 + self.patrol_x1) % len(orn_cols)
+        body_col = orn_cols[orn_idx]
+        body_hi = tuple(min(c+80, 255) for c in body_col)
         flap = int(math.sin(self.tick * 0.25) * 5)
-        wing_surf = pygame.Surface((sr.width + 20, sr.height + 20), pygame.SRCALPHA)
-        pygame.draw.ellipse(wing_surf, (*wing_col, alpha), (0, sr.height//2-4+flap, 14, 10))
-        pygame.draw.ellipse(wing_surf, (*wing_col, alpha), (sr.width+6, sr.height//2-4+flap, 14, 10))
-        surface.blit(wing_surf, (sr.x - 10, sr.y - 10))
-        body_surf = pygame.Surface((sr.width, sr.height), pygame.SRCALPHA)
-        pygame.draw.ellipse(body_surf, (*body_col, alpha), (0, 0, sr.width, sr.height))
-        pygame.draw.ellipse(body_surf, (*(min(c+50,255) for c in body_col), alpha),
-            (4, 2, sr.width-8, sr.height//2))
-        surface.blit(body_surf, sr.topleft)
-        ex = cx - 6 if self.dir >= 0 else cx + 2
-        pygame.draw.circle(surface, (255,255,255), (ex, cy-2), 4)
-        pygame.draw.circle(surface, (30,30,80), (ex+self.dir, cy-1), 2)
-        if not self.alive:
-            for ox, oy in [(-6,-4),(2,-4)]:
+        wing_col = lerp_color(body_col, (40,30,50), 0.5)
+        # Bat-like wings (direct draw, no SRCALPHA)
+        for side in [-1, 1]:
+            wx = cx + side * (sr.width//2 + 5)
+            pts = [(cx + side*sr.width//2, cy+flap),
+                   (wx, cy-6+flap), (wx-side*4, cy+6+flap)]
+            pygame.draw.polygon(surface, wing_col, pts)
+        # Ornament body — round with shine
+        pygame.draw.ellipse(surface, body_col, (sr.x, sr.y, sr.width, sr.height))
+        # Decorative stripe
+        pygame.draw.ellipse(surface, body_hi, (sr.x+4, cy-3, sr.width-8, 6))
+        # Shine highlight (top-left)
+        pygame.draw.ellipse(surface, body_hi, (sr.x+5, sr.y+2, sr.width//3, sr.height//3))
+        # Gold cap on top
+        pygame.draw.rect(surface, (200, 180, 60), (cx-5, sr.y-5, 10, 6), border_radius=2)
+        pygame.draw.circle(surface, (220, 200, 80), (cx, sr.y-6), 3)
+        # Angry eyes
+        if self.alive:
+            ex1 = cx - 5 if self.dir >= 0 else cx + 1
+            ex2 = ex1 + 6
+            pygame.draw.circle(surface, (255, 255, 240), (ex1, cy-1), 4)
+            pygame.draw.circle(surface, (255, 255, 240), (ex2, cy-1), 4)
+            pd = 1 if self.dir >= 0 else -1
+            pygame.draw.circle(surface, (30, 10, 10), (ex1+pd, cy), 2)
+            pygame.draw.circle(surface, (30, 10, 10), (ex2+pd, cy), 2)
+            brow_col = lerp_color(body_col, (40, 20, 20), 0.6)
+            pygame.draw.line(surface, brow_col, (ex1-3, cy-5), (ex1+2, cy-3), 2)
+            pygame.draw.line(surface, brow_col, (ex2+3, cy-5), (ex2-2, cy-3), 2)
+            pygame.draw.line(surface, (180, 40, 40), (cx-4, cy+5), (cx, cy+7), 1)
+            pygame.draw.line(surface, (180, 40, 40), (cx, cy+7), (cx+4, cy+5), 1)
+        else:
+            for ox, oy in [(-5,-2),(3,-2)]:
                 bx2, by2 = cx+ox, cy+oy
                 pygame.draw.line(surface, (255,80,80), (bx2-2,by2-2), (bx2+2,by2+2), 2)
                 pygame.draw.line(surface, (255,80,80), (bx2+2,by2-2), (bx2-2,by2+2), 2)
@@ -918,10 +1051,13 @@ class MiniBoss:
         self.alive = True; self.death_timer = 0; self.tick = random.randint(0,120)
         self.hit_flash = 0
         self.projectiles = []
-        self.phase = "descend"   # descend → active → dead
+        self.phase = "descend"   # descend → active → retreat → dead
         self.target_y = float(spawn_y - 80)
         self.vel_x = 0.0; self.vel_y = 0.0
         self.W = 48; self.H = 48
+        # Zone boundaries — boss only chases within [zone_left, zone_right)
+        self.zone_left = -999999
+        self.zone_right = 999999
 
     @property
     def rect(self):
@@ -936,25 +1072,43 @@ class MiniBoss:
         self.tick += 1
         if self.hit_flash > 0: self.hit_flash -= 1
 
+        # Check if player has left this boss's zone → retreat
+        player_in_zone = self.zone_left <= player.rect.centerx < self.zone_right
+
         if self.phase == "descend":
             # Glide down to target_y
             self.cy += (self.target_y - self.cy) * 0.06
             self.cx += (player.rect.centerx - self.cx) * 0.02
             if abs(self.cy - self.target_y) < 5:
                 self.phase = "active"
+            if not player_in_zone:
+                self.phase = "retreat"
 
         elif self.phase == "active" and player.alive:
-            # Smooth follow with slight sine wobble
-            dx = player.rect.centerx - self.cx
-            dy = (player.rect.centery - 90) - self.cy
-            self.cx += dx * 0.025 + math.sin(self.tick * 0.04) * 0.8
-            self.cy += dy * 0.025 + math.cos(self.tick * 0.035) * 0.6
+            if not player_in_zone:
+                self.phase = "retreat"
+            else:
+                # Smooth follow with slight sine wobble
+                dx = player.rect.centerx - self.cx
+                dy = (player.rect.centery - 90) - self.cy
+                self.cx += dx * 0.025 + math.sin(self.tick * 0.04) * 0.8
+                self.cy += dy * 0.025 + math.cos(self.tick * 0.035) * 0.6
 
-            # Shooting
-            self.shot_timer -= 1
-            if self.shot_timer <= 0:
-                self.shot_timer = self.shot_cd
-                self._shoot(player)
+                # Shooting
+                self.shot_timer -= 1
+                if self.shot_timer <= 0:
+                    self.shot_timer = self.shot_cd
+                    self._shoot(player)
+
+        elif self.phase == "retreat":
+            # Fly back to spawn and hover there
+            dx = self.spawn_x - self.cx
+            dy = self.target_y - self.cy
+            self.cx += dx * 0.06
+            self.cy += dy * 0.06
+            # If player comes back into zone, resume active
+            if player_in_zone:
+                self.phase = "active"
 
         for p in self.projectiles: p.update()
         self.projectiles = [p for p in self.projectiles if p.alive]
@@ -985,7 +1139,7 @@ class MiniBoss:
         return False
 
     def check_body_hit(self, player):
-        return self.alive and self.rect.colliderect(player.rect)
+        return self.alive and self.phase != "retreat" and self.rect.colliderect(player.rect)
 
     def draw(self, surface, camera, tick):
         # Draw projectiles
@@ -1312,11 +1466,14 @@ class HugeBirdBoss(MiniBoss):
 # ── Boss factory ──────────────────────────────────────────────────────────
 BOSS_TYPES = [SnowmanBoss, EvilElfBoss, FrostWraithBoss, GiftGolemBoss, HugeBirdBoss]
 
-def make_boss(cp_index, spawn_x, spawn_y, difficulty):
+def make_boss(cp_index, spawn_x, spawn_y, difficulty, zone_left=-999999, zone_right=999999):
     cls = BOSS_TYPES[cp_index % len(BOSS_TYPES)]
     hp = BOSS_HITS[difficulty]
     shot_cd = BOSS_SHOT_CD[difficulty]
-    return cls(spawn_x, spawn_y, hp, shot_cd)
+    b = cls(spawn_x, spawn_y, hp, shot_cd)
+    b.zone_left = zone_left
+    b.zone_right = zone_right
+    return b
 
 
 class StarRing:
@@ -1333,13 +1490,18 @@ class StarRing:
         pos=camera.apply(pygame.Rect(self.x,self.y+bob,1,1)); sx,sy=pos.x,pos.y
         if sx<-20 or sx>SCREEN_WIDTH+20: return
         self.tick+=1; pulse=abs(math.sin(self.tick*0.1))*0.4+0.6
+        # Star shape
         gc=lerp_color(STAR_GOLD, WHITE, pulse*0.4)
         r_out,r_in=10,4; pts=[]
+        spin = self.tick * 0.02  # slow spin
         for k in range(10):
-            angle=-math.pi/2+k*math.pi/5; r=r_out if k%2==0 else r_in
+            angle=-math.pi/2+k*math.pi/5+spin; r=r_out if k%2==0 else r_in
             pts.append((sx+int(math.cos(angle)*r),sy+int(math.sin(angle)*r)))
         pygame.draw.polygon(surface, gc, pts)
-        pygame.draw.polygon(surface, SUN_ORANGE, pts, 1)
+        pygame.draw.polygon(surface, lerp_color(SUN_ORANGE, STAR_GOLD, pulse*0.5), pts, 1)
+        # Center sparkle
+        pygame.draw.circle(surface, (255, 250, 220), (sx, sy), 3)
+        pygame.draw.circle(surface, WHITE, (sx-1, sy-1), 1)
 
 
 class Checkpoint:
@@ -1355,28 +1517,53 @@ class Checkpoint:
         return False
     def draw(self, surface, camera):
         sr=camera.apply(self.rect); cx=sr.centerx
-        pygame.draw.rect(surface, BROWN, (cx-3,sr.bottom-12,6,12))
-        tc = (100, 200, 160) if self.activated else (80, 150, 120)
-        tc_hi = tuple(min(c+35, 255) for c in tc)
-        for w2, h2, yo in [(34, 20, 32), (26, 17, 20), (20, 14, 10)]:
-            ty = sr.bottom - 12 - yo
+        # Trunk
+        pygame.draw.rect(surface, (110, 70, 35), (cx-4, sr.bottom-14, 8, 14), border_radius=2)
+        pygame.draw.rect(surface, (140, 90, 45), (cx-3, sr.bottom-14, 3, 14), border_radius=1)
+        # Tree layers with gradient coloring
+        tc = (50, 140, 70) if self.activated else (45, 100, 55)
+        tc_hi = tuple(min(c+40, 255) for c in tc)
+        tc_dk = tuple(max(c-25, 0) for c in tc)
+        for w2, h2, yo in [(36, 22, 34), (28, 18, 22), (22, 15, 12)]:
+            ty = sr.bottom - 14 - yo
             pts = [(cx, ty-h2), (cx-w2//2, ty), (cx+w2//2, ty)]
             pygame.draw.polygon(surface, tc, pts)
-            pygame.draw.polygon(surface, tc_hi, [(cx, ty-h2), (cx-w2//2+2, ty-2), (cx-4, ty-h2+4)])
-        sc = (255, 220, 60) if self.activated else DARK_GRAY
+            # Light side highlight
+            pygame.draw.polygon(surface, tc_hi, [(cx, ty-h2), (cx-w2//4, ty-h2//2), (cx-w2//2+3, ty-1)])
+            # Dark side
+            pygame.draw.polygon(surface, tc_dk, [(cx, ty-h2), (cx+w2//4, ty-h2//2), (cx+w2//2-3, ty-1)])
+            # Snow on tips — sunset-pink tinted
+            pygame.draw.line(surface, (255, 215, 195), (cx-w2//2, ty), (cx-w2//2+8, ty-3), 2)
+            pygame.draw.line(surface, (255, 215, 195), (cx+w2//2, ty), (cx+w2//2-8, ty-3), 2)
+        # Star on top
+        star_y = sr.bottom - 14 - 34 - 22
+        sc = (255, 230, 60) if self.activated else (120, 120, 130)
         if self.activated:
-            for gr2, ga2 in [(10, 50), (7, 100)]:
-                gs2 = pygame.Surface((gr2*2, gr2*2), pygame.SRCALPHA)
-                pygame.draw.circle(gs2, (255, 230, 80, ga2), (gr2, gr2), gr2)
-                surface.blit(gs2, (cx-gr2, sr.bottom-12-10-14-4-gr2))
-        pygame.draw.circle(surface, sc, (cx, sr.bottom-12-10-14-4), 5)
-        pygame.draw.circle(surface, WHITE, (cx-1, sr.bottom-12-10-14-5), 2)
+            # Bright circle behind star (no SRCALPHA)
+            pygame.draw.circle(surface, (255, 240, 140), (cx, star_y), 10)
+        # Draw star shape
+        star_pts = []
+        for k in range(10):
+            angle = -math.pi/2 + k*math.pi/5
+            r = 7 if k%2==0 else 3
+            star_pts.append((cx+int(math.cos(angle)*r), star_y+int(math.sin(angle)*r)))
+        pygame.draw.polygon(surface, sc, star_pts)
         if self.activated:
-            for j,(ox,oy,oc) in enumerate([(-9,-22,(255,140,160)),(7,-18,(255,210,60)),(-6,-32,(120,210,255)),(9,-28,(255,180,220)),(0,-42,(255,230,100))]):
-                if abs(math.sin(math.radians(self.glow+j*60)))>0.3:
-                    pygame.draw.circle(surface,oc,(cx+ox,sr.bottom-12+oy),3)
-            i=abs(math.sin(math.radians(self.glow)))*0.6+0.4
-            pygame.draw.rect(surface,tuple(int(v*i) for v in XMAS_GREEN),sr.inflate(8,8),2)
+            pygame.draw.polygon(surface, (255, 250, 200), star_pts, 1)
+        # Ornament decorations when activated
+        if self.activated:
+            orn_colors = [(255,80,80),(255,200,50),(100,180,255),(255,140,200),(80,220,130)]
+            for j,(ox,oy,_) in enumerate([(-9,-22,0),(7,-18,0),(-6,-32,0),(9,-28,0),(0,-40,0)]):
+                pulse = abs(math.sin(math.radians(self.glow+j*72)))
+                if pulse > 0.2:
+                    oc = orn_colors[j % len(orn_colors)]
+                    oy2 = sr.bottom - 14 + oy
+                    pygame.draw.circle(surface, oc, (cx+ox, oy2), 3)
+                    pygame.draw.circle(surface, (255,255,240), (cx+ox-1, oy2-1), 1)
+            # Active glow border
+            glow_a = abs(math.sin(math.radians(self.glow)))*0.6+0.4
+            glow_c = tuple(int(v*glow_a) for v in (100, 220, 150))
+            pygame.draw.rect(surface, glow_c, sr.inflate(10,10), 2, border_radius=4)
 
 
 class ExitDoor:
@@ -1386,23 +1573,43 @@ class ExitDoor:
     def check(self, player): return player.rect.colliderect(self.rect)
     def draw(self, surface, camera):
         sr=camera.apply(self.rect); p=abs(math.sin(math.radians(self.pulse)))
-        pygame.draw.rect(surface, DARK_GRAY, sr.inflate(10,10), border_radius=10)
-        portal_col = lerp_color((255, 220, 80), (255, 255, 200), p)
-        pygame.draw.rect(surface, portal_col, sr, border_radius=8)
         cx2, cy2 = sr.centerx, sr.centery
-        for i in range(12):
-            angle = math.radians(i * 30 + self.pulse * 0.3)
-            ray_len = int(22 + p * 12)
-            ex2 = cx2 + int(math.cos(angle) * ray_len)
-            ey2 = cy2 + int(math.sin(angle) * ray_len)
-            pygame.draw.line(surface, lerp_color((255,200,50),WHITE,p*0.6), (cx2,cy2), (ex2,ey2), 2)
-        pygame.draw.circle(surface, (255,200,40), (cx2,cy2), int(12+p*5))
-        pygame.draw.circle(surface, (255,240,150), (cx2,cy2), int(7+p*3))
-        pygame.draw.circle(surface, WHITE, (cx2,cy2), 4)
-        font = pygame.font.SysFont("consolas", 11, bold=True)
-        surface.blit(font.render("GATE", True, (80,50,10)),
-            (sr.centerx-font.size("GATE")[0]//2, sr.bottom-16))
-        pygame.draw.rect(surface, lerp_color((255,210,60),WHITE,p), sr.inflate(6,6), 2, border_radius=10)
+        # Stone frame
+        frame_col = (60, 55, 65)
+        frame_hi = (90, 85, 95)
+        pygame.draw.rect(surface, frame_col, sr.inflate(12,12), border_radius=10)
+        pygame.draw.rect(surface, frame_hi, sr.inflate(10,10), 2, border_radius=10)
+        # Rune markings on frame
+        rune_col = lerp_color((180, 160, 50), (255, 230, 100), p)
+        for i in range(4):
+            ry = sr.y + 8 + i*(sr.height-16)//3
+            pygame.draw.circle(surface, rune_col, (sr.x-3, ry), 3)
+            pygame.draw.circle(surface, rune_col, (sr.right+3, ry), 3)
+        # Portal interior — swirling golden light
+        portal_col = lerp_color((255, 200, 60), (255, 240, 180), p)
+        pygame.draw.rect(surface, portal_col, sr, border_radius=8)
+        # Swirl rays (direct draw on main surface)
+        for i in range(8):
+            angle = math.radians(i * 45 + self.pulse * 0.8)
+            ray_len = int(18 + p * 10)
+            rx = cx2 + int(math.cos(angle) * ray_len)
+            ry = cy2 + int(math.sin(angle) * ray_len)
+            ray_col = lerp_color((255, 210, 70), (255, 240, 160), p*0.6)
+            pygame.draw.line(surface, ray_col, (cx2, cy2), (rx, ry), 2)
+        # Center star
+        star_r = int(14 + p*6)
+        pygame.draw.circle(surface, (255, 220, 60), (cx2, cy2), star_r)
+        pygame.draw.circle(surface, (255, 245, 160), (cx2, cy2), int(star_r*0.6))
+        pygame.draw.circle(surface, (255, 255, 240), (cx2, cy2), 5)
+        # "HORIZON GATE" label
+        font = pygame.font.SysFont("consolas", 10, bold=True)
+        lbl = font.render("HORIZON", True, (100, 70, 20))
+        surface.blit(lbl, (sr.centerx - lbl.get_width()//2, sr.bottom - 14))
+        lbl2 = font.render("GATE", True, lerp_color((200, 170, 50), (255, 230, 100), p))
+        surface.blit(lbl2, (sr.centerx - lbl2.get_width()//2, sr.bottom + 2))
+        # Outer glowing border
+        border_col = lerp_color((255, 210, 60), WHITE, p*0.4)
+        pygame.draw.rect(surface, border_col, sr.inflate(8,8), 2, border_radius=11)
 
 
 class Player:
@@ -1657,9 +1864,9 @@ class Player:
 
 def make_bg_clouds():
     rng = random.Random(77); out = []
-    for _ in range(100):
-        out.append(BGCloud(rng.randint(-200, 1400), rng.randint(-900, 900),
-                           rng.randint(28, 70), rng.uniform(0.04, 0.18)))
+    for _ in range(25):
+        out.append(BGCloud(rng.randint(-200, 1400), rng.randint(-600, 500),
+                           rng.randint(30, 65), rng.uniform(0.04, 0.15)))
     return out
 
 
@@ -1772,9 +1979,9 @@ def create_level(diff_key="medium"):
     plats.append(P(6300, GROUND - 220, 80, 20))
     plats.append(P(6980, GROUND - 420, 90, 20))
 
-    monster_defs.append(dict(x=6480, y=GROUND-300, x1=6440, x2=6540, spd=0.8))
-    monster_defs.append(dict(x=6660, y=GROUND-360, x1=6620, x2=6720, spd=0.8))
-    monster_defs.append(dict(x=6840, y=GROUND-400, x1=6800, x2=6880, spd=0.8))
+    monster_defs.append(dict(x=6480, y=GROUND-300, x1=6440, x2=6540, spd=0.8, cp=3))
+    monster_defs.append(dict(x=6660, y=GROUND-360, x1=6620, x2=6720, spd=0.8, cp=3))
+    monster_defs.append(dict(x=6840, y=GROUND-400, x1=6800, x2=6880, spd=0.8, cp=3))
 
     # ── S8 — TRAP ──────────────────────────────────────────────────────────
     plats.append(P(7260, GROUND - 380, 70, 20))
@@ -1810,7 +2017,7 @@ def create_level(diff_key="medium"):
     for bx, by, bw in final:
         plats.append(P(bx, by, bw, 20))
 
-    monster_defs.append(dict(x=9460, y=GROUND-360, x1=9420, x2=9500, spd=1.0))
+    monster_defs.append(dict(x=9460, y=GROUND-360, x1=9420, x2=9500, spd=1.0, cp=4))
 
     plats.append(Platform(9780, GROUND-360, 180, 22))   # exit rest — stable
     stars.append(StarRing(9820, GROUND - 410))
@@ -1843,7 +2050,7 @@ class Game:
         self.state      = "playing"
         self.difficulty = "medium"
         self.level_time = self.tick = self.win_timer = 0
-        self.music_volume = 0.5; self.sfx_volume = 0.5; self.music_muted = False
+        self.music_volume = 0.25; self.sfx_volume = 0.2; self.music_muted = False
         self.settings_cursor = 0
         self._settings_boxes = []; self._settings_vol_slider = pygame.Rect(0,0,0,0)
         self._settings_sfx_slider = pygame.Rect(0,0,0,0); self._last_mouse_pos = (0,0)
@@ -1863,6 +2070,7 @@ class Game:
         self.mini_bosses    = []   # active flying mini bosses
         self.combo_popups   = []   # (x, y, count, timer)
         self.player       = Player(100, 504)
+        self.admin_mode   = False
         self.dialogue_box = None; self.pending_state = None
         self.soul_state = None; self.soul_x = 0; self.soul_y = 0
         self.soul_target_y = 0; self.soul_timer = 0; self.soul_trail = []
@@ -1892,19 +2100,26 @@ class Game:
         self.combo_popups = []
 
     def _rebuild_monsters(self):
+        # Determine which checkpoint the player is currently at
+        current_cp = -1
+        for i, cp in enumerate(self.checkpoints):
+            if cp.activated:
+                current_cp = i
+        # Only rebuild stomp monsters belonging to current checkpoint zone (or untagged)
         self.stomp_monsters = [
             StompMonster(d['x'], d['y'], d['x1'], d['x2'], d['spd'])
             for d in self.monster_defs
+            if d.get('cp', current_cp) == current_cp
         ]
-        # Re-spawn mini bosses for any already-activated checkpoints
-        active_indices = {getattr(b, '_cp_index', None) for b in self.mini_bosses}
-        new_bosses = []
-        for i, cp in enumerate(self.checkpoints):
-            if cp.activated and i not in active_indices:
-                b = make_boss(i, cp.spawn_x, cp.spawn_y, self.difficulty)
-                b._cp_index = i
-                new_bosses.append(b)
-        self.mini_bosses = new_bosses
+        # Only respawn the boss for the current checkpoint, not past ones
+        self.mini_bosses = []
+        if current_cp >= 0:
+            cp = self.checkpoints[current_cp]
+            zl = cp.spawn_x - 200
+            zr = self.checkpoints[current_cp+1].spawn_x if current_cp+1 < len(self.checkpoints) else 999999
+            b = make_boss(current_cp, cp.spawn_x, cp.spawn_y, self.difficulty, zl, zr)
+            b._cp_index = current_cp
+            self.mini_bosses.append(b)
 
     def _exit_to_menu(self):
         self.sfx.stop_music(); self.running = False; pygame.event.clear()
@@ -1980,6 +2195,7 @@ class Game:
                                         self._apply_difficulty()
                                     elif i == 4: self.state = "playing"
                                     elif i == 5: self.load_level(); self.state="playing"; self.sfx.start_music(volume=self.music_volume)
+                                    elif i == 6: self._exit_to_menu()
             if not self.running: return
             # Settings mouse clicks
             if self.state == "settings":
@@ -2009,7 +2225,7 @@ class Game:
                         else: self.state = self.pending_state or "playing"
             return
         if self.state == "settings":
-            n = 6
+            n = 7
             if key == pygame.K_ESCAPE: self.state = "playing"
             elif key in (pygame.K_UP,   pygame.K_w): self.settings_cursor = (self.settings_cursor-1)%n
             elif key in (pygame.K_DOWN, pygame.K_s): self.settings_cursor = (self.settings_cursor+1)%n
@@ -2034,6 +2250,7 @@ class Game:
                 elif self.settings_cursor == 4: self.state = "playing"
                 elif self.settings_cursor == 5:
                     self.load_level(); self.state = "playing"; self.sfx.start_music(volume=self.music_volume)
+                elif self.settings_cursor == 6: self._exit_to_menu()
             return
         if self.state == "win":
             if key in (pygame.K_RETURN, pygame.K_SPACE, pygame.K_ESCAPE):
@@ -2044,6 +2261,10 @@ class Game:
                 else: self._exit_to_menu()
             return
         # Playing
+        # Admin mode toggle — backslash key
+        if key == pygame.K_BACKSLASH:
+            self.admin_mode = not self.admin_mode
+            return
         if key == pygame.K_ESCAPE:
             self.state = "settings"; self.settings_cursor = 3
         elif key == pygame.K_r:
@@ -2079,11 +2300,33 @@ class Game:
     def _update(self):
         self.tick += 1
         keys = pygame.key.get_pressed()
+        # Admin mode: free fly, no gravity, no collisions, invincible
+        if self.admin_mode:
+            spd = 10
+            if keys[pygame.K_LEFT] or keys[pygame.K_a]: self.player.rect.x -= spd
+            if keys[pygame.K_RIGHT] or keys[pygame.K_d]: self.player.rect.x += spd
+            if keys[pygame.K_UP] or keys[pygame.K_w]: self.player.rect.y -= spd
+            if keys[pygame.K_DOWN] or keys[pygame.K_s]: self.player.rect.y += spd
+            self.player.vel_y = 0; self.player.vel_x = 0
+            self.player.alive = True; self.player.hearts = PLAYER_MAX_HEARTS
+            self.player.invincibility = 0
+            self.camera.update(self.player.rect)
+            for p in self.platforms: p.update()
+            for cp in self.checkpoints:
+                cp.update()
+                if cp.check(self.player):
+                    self.sfx.play("checkpoint"); self._cp_fx(cp)
+            for st in self.stars_list:
+                if st.check(self.player):
+                    self.player.star_count += 1; self.sfx.play("star"); self._star_fx(st)
+            self.exit_door.update()
+            if self.player.alive and self.exit_door.check(self.player):
+                self.state = "win"; self.sfx.play("win"); self.sfx.stop_music()
+            self.particles = [p for p in self.particles if p.update()]
+            self.rings = [r for r in self.rings if r.update()]
+            return
         for p in self.platforms:
-            was_solid = isinstance(p, CollapsingPlatform) and not p.collapsed and p.stood > 0
             p.update()
-            if was_solid and isinstance(p, CollapsingPlatform) and p.collapsed:
-                self.sfx.play("crumble")
         for w in self.winds:     w.update()
         for sb in self.saw_blades: sb.update()
         for k in self.kunais:    k.update()
@@ -2092,6 +2335,10 @@ class Game:
 
         result = self.player.update(keys, self.platforms)
         if result == "jump": self.sfx.play("jump")
+        # Play crumble sound immediately when player first lands on a collapsing platform
+        for p in self.platforms:
+            if isinstance(p, CollapsingPlatform) and p.stood == 1:
+                self.sfx.play("crumble")
         if self.player.alive:
             self.camera.update(self.player.rect)
         for w in self.winds: w.apply_to_player(self.player)
@@ -2147,9 +2394,16 @@ class Game:
                 cp_idx = self.checkpoints.index(cp)
                 already = any(getattr(b, '_cp_index', None) == cp_idx for b in self.mini_bosses)
                 if not already:
-                    b = make_boss(cp_idx, cp.spawn_x, cp.spawn_y, self.difficulty)
+                    zl = cp.spawn_x - 200
+                    zr = self.checkpoints[cp_idx+1].spawn_x if cp_idx+1 < len(self.checkpoints) else 999999
+                    b = make_boss(cp_idx, cp.spawn_x, cp.spawn_y, self.difficulty, zl, zr)
                     b._cp_index = cp_idx
                     self.mini_bosses.append(b)
+                # Kill/deactivate bosses from previous checkpoints
+                for old_b in self.mini_bosses:
+                    old_cp = getattr(old_b, '_cp_index', -1)
+                    if old_cp < cp_idx and old_b.alive:
+                        old_b.alive = False; old_b.death_timer = 0
         for npc in self.npcs:
             npc.proximity_shown = npc.check_proximity(self.player)
         for st in self.stars_list:
@@ -2397,16 +2651,86 @@ class Game:
                 ov.set_alpha(min(255,a)); self.screen.blit(ov,(0,0))
         pygame.display.flip()
 
+    def _build_sky_cache(self):
+        """Pre-render the static sunset sky gradient + sun glow."""
+        surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        # Sunset gradient: deep purple-blue top → coral → warm orange → golden horizon
+        sky_cols = [(45, 30, 80), (80, 45, 110), (140, 60, 100),
+                    (210, 90, 70), (245, 140, 60), (255, 180, 70),
+                    (255, 210, 100), (255, 225, 130)]
+        band_h = SCREEN_HEIGHT // (len(sky_cols) - 1)
+        for i in range(len(sky_cols)-1):
+            for y2 in range(band_h):
+                t = y2 / band_h
+                c = lerp_color(sky_cols[i], sky_cols[i+1], t)
+                yy = i*band_h + y2
+                pygame.draw.line(surf, c, (0, yy), (SCREEN_WIDTH, yy))
+        for yy in range((len(sky_cols)-1)*band_h, SCREEN_HEIGHT):
+            pygame.draw.line(surf, sky_cols[-1], (0, yy), (SCREEN_WIDTH, yy))
+        # Warm sun glow baked in
+        sun_x = SCREEN_WIDTH // 2 + 100; sun_y = SCREEN_HEIGHT - 160
+        for r, col in [(120, (255, 160, 40)), (80, (255, 190, 60)), (50, (255, 210, 90))]:
+            gs = pygame.Surface((r*2+4, r*2+4), pygame.SRCALPHA)
+            pygame.draw.circle(gs, (*col, 18), (r+2, r+2), r)
+            surf.blit(gs, (sun_x-r-2, sun_y-r-2))
+        return surf
+
+    def _build_mountain_layers(self):
+        """Pre-render mountain silhouette strips for parallax blitting."""
+        layers = []
+        mtn_rng = random.Random(42)
+        strip_w = SCREEN_WIDTH + 800
+        # Warm sunset mountain silhouettes — dark purples and warm grays
+        for col, scale in [((60, 35, 70), 1.0), ((80, 50, 75), 0.8), ((110, 70, 80), 0.6)]:
+            s = pygame.Surface((strip_w, SCREEN_HEIGHT), pygame.SRCALPHA)
+            pts = [(0, SCREEN_HEIGHT)]
+            for mx in range(0, strip_w, 40):
+                base_h = 280 + mtn_rng.randint(-80, 80)
+                my = SCREEN_HEIGHT - int(base_h * scale) + int(math.sin(mx*0.005)*30)
+                pts.append((mx, my))
+            pts.append((strip_w, SCREEN_HEIGHT))
+            pygame.draw.polygon(s, col, pts)
+            layers.append(s)
+        # Dark pine tree silhouettes
+        tree_s = pygame.Surface((strip_w, SCREEN_HEIGHT), pygame.SRCALPHA)
+        tree_rng = random.Random(123)
+        for i in range(60):
+            tx = tree_rng.randint(0, strip_w)
+            th = tree_rng.randint(18, 40)
+            ty = SCREEN_HEIGHT - 140 + tree_rng.randint(-40, 30)
+            tc = (35+tree_rng.randint(0,20), 50+tree_rng.randint(0,20), 35+tree_rng.randint(0,15))
+            pygame.draw.polygon(tree_s, tc,
+                [(tx, ty), (tx-th//3, ty+th), (tx+th//3, ty+th)])
+            pygame.draw.rect(tree_s, (50, 30, 20), (tx-2, ty+th, 4, 6))
+        layers.append(tree_s)
+        return layers
+
     def _draw_background(self):
-        top_col = (200, 230, 255); bot_col = (255, 220, 140)
-        for y in range(0, SCREEN_HEIGHT, 2):
-            col = lerp_color(top_col, bot_col, y/SCREEN_HEIGHT)
-            pygame.draw.rect(self.screen, col, (0, y, SCREEN_WIDTH, 2))
-        sun_x = SCREEN_WIDTH - 110; sun_y = 70
-        pulse = abs(math.sin(self.tick*0.018))*6
-        pygame.draw.circle(self.screen, (255,170,30), (sun_x,sun_y), int(38+pulse))
-        pygame.draw.circle(self.screen, (255,220,60), (sun_x,sun_y), int(24+pulse*0.5))
-        pygame.draw.circle(self.screen, WHITE, (sun_x,sun_y), 10)
+        # Build caches on first call
+        if not hasattr(self, '_sky_cache'):
+            self._sky_cache = self._build_sky_cache()
+            self._mtn_layers = self._build_mountain_layers()
+
+        # Blit cached sky (instant)
+        self.screen.blit(self._sky_cache, (0, 0))
+
+        # Sunset sun — large, low, warm orange
+        sun_x = SCREEN_WIDTH // 2 + 100; sun_y = SCREEN_HEIGHT - 160
+        pulse = abs(math.sin(self.tick*0.015))*4
+        pygame.draw.circle(self.screen, (255, 120, 30), (sun_x, sun_y), int(44+pulse))
+        pygame.draw.circle(self.screen, (255, 170, 50), (sun_x, sun_y), int(34+pulse*0.6))
+        pygame.draw.circle(self.screen, (255, 210, 100), (sun_x, sun_y), int(20+pulse*0.3))
+        pygame.draw.circle(self.screen, (255, 240, 180), (sun_x, sun_y), 10)
+
+        # Mountain parallax layers (pre-rendered strips, just offset)
+        parallax_rates = [0.06, 0.09, 0.13, 0.1]
+        for i, layer_surf in enumerate(self._mtn_layers):
+            ox = int(-self.camera.offset_x * parallax_rates[i]) % layer_surf.get_width()
+            self.screen.blit(layer_surf, (-ox, 0))
+            # Wrap if needed
+            if ox > layer_surf.get_width() - SCREEN_WIDTH:
+                self.screen.blit(layer_surf, (layer_surf.get_width()-ox, 0))
+
         for cloud in self.bg_clouds: cloud.draw(self.screen, self.camera)
 
     def _draw_game(self):
@@ -2541,6 +2865,12 @@ class Game:
         if not self.player.alive and self.soul_state is None:
             txt=self.font.render("Respawning...",True,XMAS_RED)
             self.screen.blit(txt,txt.get_rect(center=(SCREEN_WIDTH//2,SCREEN_HEIGHT//2)))
+        # Admin mode indicator
+        if self.admin_mode:
+            admin_pulse = abs(math.sin(self.tick*0.08))*0.4+0.6
+            admin_col = tuple(int(v*admin_pulse) for v in (255,80,80))
+            pygame.draw.rect(self.screen, (30,10,10), (SCREEN_WIDTH//2-80, 56, 160, 22), border_radius=6)
+            _hud_text(self.small_font, "ADMIN MODE", admin_col, SCREEN_WIDTH//2-50, 58)
         self.screen.blit(self.tiny_font.render(
             "SPACE-Jump  SHIFT-Dash  LEFT CLICK-Snowball  E-Talk  R-Respawn  ESC-Menu",
             True,(80,100,130)),(10,SCREEN_HEIGHT-16))
@@ -2561,7 +2891,7 @@ class Game:
             self.screen.blit(sf_s, (sx2 - sz, sy2 - sz))
 
         # Main panel
-        panel_w, panel_h = 500, 550
+        panel_w, panel_h = 500, 595
         panel_x = SCREEN_WIDTH // 2 - panel_w // 2
         panel_y = 55
         panel_surf = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
@@ -2596,8 +2926,9 @@ class Game:
             f"Difficulty:  < {self.difficulty.upper()} >",
             "Resume",
             "Restart Level",
+            "Exit to Menu",
         ]
-        item_colors = [SNOW_WHITE, SNOW_WHITE, SNOW_WHITE, SNOW_WHITE, XMAS_GREEN, XMAS_RED]
+        item_colors = [SNOW_WHITE, SNOW_WHITE, SNOW_WHITE, SNOW_WHITE, XMAS_GREEN, XMAS_RED, (255,140,100)]
 
         start_y = panel_y + 80
         bar_w = 420; bar_h = 36
@@ -2672,6 +3003,11 @@ class Game:
                 # Restart arrow
                 pygame.draw.arc(self.screen, color, (icon_x+2,icon_cy-7,14,14), 0.5, 5.5, 2)
                 pygame.draw.polygon(self.screen, color, [(icon_x+14,icon_cy-7),(icon_x+14,icon_cy+1),(icon_x+19,icon_cy-3)])
+            elif i == 6:
+                # Door/exit icon
+                pygame.draw.rect(self.screen, color, (icon_x+2,icon_cy-8,12,16), border_radius=2)
+                pygame.draw.rect(self.screen, (0,0,0), (icon_x+4,icon_cy-6,8,12), border_radius=1)
+                pygame.draw.polygon(self.screen, color, [(icon_x+14,icon_cy),(icon_x+20,icon_cy-5),(icon_x+20,icon_cy+5)])
 
             txt = self.small_font.render(item, True, color)
             self.screen.blit(txt, (bar_x+42, y+(bar_h-txt.get_height())//2))

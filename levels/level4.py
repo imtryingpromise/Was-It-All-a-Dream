@@ -67,13 +67,13 @@ ICICLE_FALL_SPEED = 8
 DIFFICULTY = {
     "easy":   {"bomb_fuse": 300, "bomb_detect": 180, "bomb_spd": 0.6, "mon_spd": 0.4, "bomb_hits": 1,
                "plat_spd": 0.6, "glitch_on": 140, "glitch_off": 40, "collapse_delay": 70, "tp_interval": 200,
-               "saw_spd": 0.5, "wind_str": 0.5, "crumble_delay": 16, "icicle_spd": 3, "ornament_gate": 0},
+               "saw_spd": 0.5, "wind_str": 0.5, "crumble_delay": 16, "icicle_spd": 3, "ornament_gate": 0, "max_hearts": 3},
     "medium": {"bomb_fuse": 220, "bomb_detect": 230, "bomb_spd": 0.8, "mon_spd": 0.7, "bomb_hits": 2,
                "plat_spd": 0.85, "glitch_on": 110, "glitch_off": 55, "collapse_delay": 55, "tp_interval": 150,
-               "saw_spd": 0.75, "wind_str": 0.75, "crumble_delay": 11, "icicle_spd": 5, "ornament_gate": 13},
+               "saw_spd": 0.75, "wind_str": 0.75, "crumble_delay": 11, "icicle_spd": 5, "ornament_gate": 13, "max_hearts": 3},
     "hard":   {"bomb_fuse": 150, "bomb_detect": 300, "bomb_spd": 1.0, "mon_spd": 1.0,  "bomb_hits": 2,
                "plat_spd": 1.0, "glitch_on": 80, "glitch_off": 65, "collapse_delay": 40, "tp_interval": 110,
-               "saw_spd": 1.0, "wind_str": 1.0, "crumble_delay": 8, "icicle_spd": 7, "ornament_gate": 15},
+               "saw_spd": 1.0, "wind_str": 1.0, "crumble_delay": 8, "icicle_spd": 7, "ornament_gate": 15, "max_hearts": 3},
 }
 
 XMAS_COLORS = [(220,30,30),(255,200,50),(30,180,60),(255,255,255),(220,30,30),(50,180,220),(255,130,160)]
@@ -645,7 +645,7 @@ class Player:
         self.dash_timer=0; self.dash_cooldown=0; self.dash_dir=0; self.dashing=False
         self.dash_afterimages=[]  # list of (x,y,alpha)
         # Health
-        self.hearts=PLAYER_MAX_HEARTS; self.invincibility=0; self.death_count=0
+        self.max_hearts=PLAYER_MAX_HEARTS; self.hearts=self.max_hearts; self.invincibility=0; self.death_count=0
         # Ice
         self.on_ice=False
         # Ornaments
@@ -678,7 +678,7 @@ class Player:
     def respawn(self):
         self.rect.topleft=(self.spawn_x,self.spawn_y)
         self.vel_x=self.vel_y=0; self.alive=True; self.on_ground=False; self.unreal_timer=0
-        self.hearts=PLAYER_MAX_HEARTS; self.invincibility=0; self.jump_count=0
+        self.hearts=self.max_hearts; self.invincibility=0; self.jump_count=0
         self.dash_timer=0; self.dash_cooldown=0; self.dashing=False
     def start_dash(self):
         if self.dash_cooldown <= 0 and not self.on_ground and not self.dashing and self.alive:
@@ -1512,7 +1512,7 @@ class HeartPickup:
     def update(self): self.tick += 1
     def check(self, player):
         if self.collected or not player.alive: return False
-        if self.rect.colliderect(player.rect) and player.hearts < PLAYER_MAX_HEARTS:
+        if self.rect.colliderect(player.rect) and player.hearts < player.max_hearts:
             self.collected = True; return True
         return False
     def draw(self, surface, camera, tick):
@@ -2324,13 +2324,20 @@ def create_level(diff_key="hard"):
     crumbling_bridges.append(CrumblingBridge(16800, 350, 500, tile_delay=max(4, crd - 2)))
     crumbling_bridges.append(CrumblingBridge(17800, 350, 300, tile_delay=max(3, crd - 3)))
     heart_pickups.append(HeartPickup(9600, 280))
-    # Extra hearts on final path for easy/medium only
-    if diff_key in ("easy", "medium"):
+    # Extra hearts on final path
+    if diff_key == "easy":
         heart_pickups.append(HeartPickup(12500, 320))
         heart_pickups.append(HeartPickup(14500, 320))
         heart_pickups.append(HeartPickup(16500, 320))
-        if diff_key == "easy":
-            heart_pickups.append(HeartPickup(18000, 320))
+        heart_pickups.append(HeartPickup(18000, 320))
+    elif diff_key == "medium":
+        heart_pickups.append(HeartPickup(12500, 320))
+        heart_pickups.append(HeartPickup(14500, 320))
+        heart_pickups.append(HeartPickup(16500, 320))
+    elif diff_key == "hard":
+        heart_pickups.append(HeartPickup(13000, 320))
+        heart_pickups.append(HeartPickup(15500, 320))
+        heart_pickups.append(HeartPickup(17500, 320))
 
     # --- Saw Blades (sections 3-5) ---
     saw_blades.append(SawBlade(4650,330,4650,430,speed=1.2*ss))
@@ -2621,6 +2628,8 @@ class Game:
         self._red_atmosphere = 0.0  # Red sky atmosphere (0.0-1.0) during cp5/final path
         self.ORNAMENT_GATE = DIFFICULTY[self.difficulty]["ornament_gate"]
         self.player = Player(100, 400)
+        self.player.max_hearts = DIFFICULTY[self.difficulty]["max_hearts"]
+        self.player.hearts = self.player.max_hearts
         self.dialogue_box = None
         self.pending_state = None  # state to return to after dialogue
         self.ending_shown = False
@@ -2644,6 +2653,8 @@ class Game:
          self.pendulums, self.ice_geysers) = create_level(self.difficulty)
         self.ORNAMENT_GATE = DIFFICULTY[self.difficulty]["ornament_gate"]
         self.player = Player(100, 400)
+        self.player.max_hearts = DIFFICULTY[self.difficulty]["max_hearts"]
+        self.player.hearts = self.player.max_hearts
         self.camera = Camera(SCREEN_WIDTH, SCREEN_HEIGHT)
         self.particles.clear(); self.rings.clear(); self.flashes.clear()
         self.damage_flashes.clear()
@@ -3171,7 +3182,7 @@ class Game:
         for hp in self.heart_pickups:
             hp.update()
             if hp.check(self.player):
-                self.player.hearts = min(PLAYER_MAX_HEARTS, self.player.hearts + 1)
+                self.player.hearts = min(self.player.max_hearts, self.player.hearts + 1)
                 self.score_popups.append((hp.x, hp.y - 15, "+1 HEART", 50, XMAS_RED))
                 self.sfx.play("powerup")
 
@@ -3838,12 +3849,13 @@ class Game:
             self.screen.blit(font.render(text, True, (0,0,0)), (x+1, y+1))
             self.screen.blit(font.render(text, True, color), (x, y))
         # --- Hearts background panel ---
-        hearts_panel_w = PLAYER_MAX_HEARTS * 34 + 12
+        _max_h = self.player.max_hearts
+        hearts_panel_w = _max_h * 34 + 12
         hearts_panel = pygame.Surface((hearts_panel_w, 30), pygame.SRCALPHA)
         hearts_panel.fill((0, 0, 0, 90))
         self.screen.blit(hearts_panel, (hud_x - 6, hud_y - 6))
         # Hearts - bigger, with glossy highlight
-        for i in range(PLAYER_MAX_HEARTS):
+        for i in range(_max_h):
             hx = hud_x + i * 34; hy = hud_y
             c = XMAS_RED if i < self.player.hearts else (50, 50, 50)
             hscale = 0
@@ -3861,7 +3873,7 @@ class Game:
         # --- Ornament counter with background pill ---
         orn_total = len(self.ornaments)
         orn_got = self.player.ornament_count
-        orn_x = hud_x + PLAYER_MAX_HEARTS * 34 + 14
+        orn_x = hud_x + _max_h * 34 + 14
         orn_text = f"{orn_got}/{orn_total}"
         orn_tw = self.small_font.size(orn_text)[0]
         orn_pill = pygame.Surface((orn_tw + 30, 24), pygame.SRCALPHA)
