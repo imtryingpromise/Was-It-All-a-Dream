@@ -83,3 +83,176 @@ def draw_wooden_slider(surface, x, y, w, volume, muted, font_tiny):
     pct = font_tiny.render(f"{int(volume * 100)}%", True, (180, 150, 100))
     surface.blit(pct, (x + w + 14, y - 2))
     return slider_rect
+
+
+_GUIDE_MAIN = [
+    ("CONTROLS", [
+        "WASD / Arrow Keys - Move",
+        "SPACE / W / UP - Jump",
+        "SHIFT - Sprint / Dash",
+        "E - Talk to NPCs",
+        "R - Respawn / Restart",
+        "ESC - Settings Menu",
+        "LEFT CLICK - Shoot (Level 2, 3 & 4)",
+    ]),
+    ("GAMEPLAY", [
+        "Four dream realms to conquer",
+        "Each realm has unique mechanics",
+        "Reach checkpoints to save progress",
+        "Find the exit gate to clear the realm",
+    ]),
+    ("TIPS", [
+        "Talk to NPCs for story and hints",
+        "Try different difficulties in settings",
+        "Each level gets harder - good luck!",
+    ]),
+]
+
+_GUIDE_L1 = [
+    ("CONTROLS", [
+        "WASD / Arrow Keys - Move",
+        "SPACE / W - Jump (double jump!)",
+        "E - Talk to NPCs",
+        "R - Restart Level",
+        "ESC - Settings Menu",
+    ]),
+    ("PLATFORMS", [
+        "Ice platforms shrink when you stand",
+        "Wood platforms fall after landing",
+        "Phantom platforms blink in and out",
+        "Countdown platforms need timing",
+        "Zigzag sections test precision",
+    ]),
+    ("TIPS", [
+        "Double jump to reach higher areas",
+        "Grab the balloon for a boost",
+        "Watch the countdown timer on blue platforms",
+        "Checkpoints save your progress",
+    ]),
+]
+
+_GUIDE_L2 = [
+    ("CONTROLS", [
+        "WASD / Arrow Keys - Move",
+        "SPACE / W - Jump (double jump!)",
+        "SHIFT - Sprint",
+        "LEFT CLICK - Fire ice arrow",
+        "E - Talk to NPCs",
+        "ESC - Settings Menu",
+    ]),
+    ("COMBAT", [
+        "Stomp mushrooms by landing on top",
+        "Shoot enemies with ice arrows",
+        "Watch out for the Santa boss!",
+        "Arrows can hit multiple targets",
+    ]),
+    ("TIPS", [
+        "Sprint to build speed for long gaps",
+        "Stomp chains give combo bonuses",
+        "Use arrows from a safe distance",
+        "Boss fights need patience and aim",
+    ]),
+]
+
+_GUIDE_L3 = [
+    ("CONTROLS", [
+        "WASD / Arrow Keys - Move",
+        "SPACE - Jump (single jump)",
+        "SHIFT - Sprint / Airborne Dash",
+        "LEFT CLICK - Throw snowball",
+        "E - Talk to NPCs",
+        "R - Respawn",
+        "ESC - Settings Menu",
+    ]),
+    ("MECHANICS", [
+        "Dash mid-air for extra distance",
+        "Wall slide by pressing into walls",
+        "Wall jump off walls with SPACE",
+        "Stomp flying monsters from above",
+        "Snowball bosses at checkpoints",
+    ]),
+    ("TIPS", [
+        "Dash is key for crossing big gaps",
+        "Wall jump between narrow walls",
+        "Bosses retreat past checkpoints",
+        "Collapsing platforms reset on death",
+    ]),
+]
+
+_GUIDE_L4 = [
+    ("CONTROLS", [
+        "WASD / Arrow Keys - Move",
+        "SPACE - Jump (double jump!)",
+        "SHIFT - Sprint / Dash",
+        "LEFT CLICK - Shoot",
+        "F / X - Shoot (alternate)",
+        "E - Talk to NPCs",
+        "ESC - Settings Menu",
+    ]),
+    ("COMBAT & HAZARDS", [
+        "Stomp mushrooms from above",
+        "Shoot or stomp bomb enemies",
+        "Dodge saw blades and icicles",
+        "Collect ornaments to unlock exit",
+        "Survive the final meteor run!",
+    ]),
+    ("TIPS", [
+        "Wall jump between narrow walls",
+        "Dash mid-air to dodge hazards",
+        "Heart pickups restore health",
+        "The final path tests everything",
+    ]),
+]
+
+
+def draw_guide_screen(surface, tick, font_title_path, sections=None):
+    """Draw a fullscreen game guide overlay. Pass sections for level-specific guide."""
+    if sections is None:
+        sections = _GUIDE_MAIN
+    W, H = surface.get_width(), surface.get_height()
+
+    # Dark overlay
+    ov = pygame.Surface((W, H), pygame.SRCALPHA)
+    ov.fill((10, 8, 5, 220))
+    surface.blit(ov, (0, 0))
+
+    # Wooden panel
+    panel_w = min(600, W - 40)
+    panel_h = min(560, H - 40)
+    panel_x = W // 2 - panel_w // 2
+    panel_y = H // 2 - panel_h // 2
+    panel_rect = pygame.Rect(panel_x, panel_y, panel_w, panel_h)
+    title_font = pygame.font.Font(font_title_path, 22)
+    draw_wooden_panel(surface, panel_rect, "GAME GUIDE", title_font)
+
+    header_font = pygame.font.Font(font_title_path, 18)
+    body_font = pygame.font.Font(font_title_path, 13)
+
+    header_col = (220, 180, 60)
+    body_col = (200, 190, 170)
+    shadow_col = (20, 15, 10)
+
+    cx = W // 2
+    y = panel_y + 65
+
+    for sec_title, lines in sections:
+        sh = header_font.render(sec_title, True, shadow_col)
+        surface.blit(sh, sh.get_rect(center=(cx + 1, y + 1)))
+        ht = header_font.render(sec_title, True, header_col)
+        surface.blit(ht, ht.get_rect(center=(cx, y)))
+        y += 22
+        for line in lines:
+            bs = body_font.render(line, True, shadow_col)
+            surface.blit(bs, bs.get_rect(center=(cx + 1, y + 1)))
+            bt = body_font.render(line, True, body_col)
+            surface.blit(bt, bt.get_rect(center=(cx, y)))
+            y += 16
+        y += 8
+
+    close_font = pygame.font.Font(font_title_path, 13)
+    cs = close_font.render("Press ESC or ENTER to close", True, shadow_col)
+    surface.blit(cs, cs.get_rect(center=(cx + 1, panel_y + panel_h - 18)))
+    ct = close_font.render("Press ESC or ENTER to close", True, header_col)
+    surface.blit(ct, ct.get_rect(center=(cx, panel_y + panel_h - 20)))
+
+    return True

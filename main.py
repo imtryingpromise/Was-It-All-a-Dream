@@ -3,6 +3,7 @@ import sys
 import math
 import random
 from settings import *
+from wood_ui import draw_guide_screen
 
 TITLE_FONT_PATH = "assets/fonts/title_font.ttf"
 BTN_FONT_PATH = "assets/fonts/button_font.ttf"
@@ -47,7 +48,8 @@ _last_mouse_pos = (0, 0)
 # --- Settings state ---
 settings_cursor = 0
 fullscreen = False
-settings_items = ["Volume", "Mute", "Fullscreen", "Back"]
+settings_items = ["Volume", "Mute", "Fullscreen", "Guide", "Back"]
+guide_open = False
 _settings_boxes = []
 _settings_vol_slider = pygame.Rect(0, 0, 0, 0)
 
@@ -370,6 +372,7 @@ def draw_settings():
         f"Volume:  < {int(music_volume * 100)}% >",
         f"Mute:  {'ON' if music_muted else 'OFF'}",
         f"Fullscreen:  {'ON' if is_fs else 'OFF'}",
+        "Guide",
         "Back",
     ]
 
@@ -480,7 +483,10 @@ while running:
 
     elif state == "SETTINGS":
         screen.blit(menu_bg, (0, 0))
-        draw_settings()
+        if guide_open:
+            draw_guide_screen(screen, tick, TITLE_FONT_PATH)
+        else:
+            draw_settings()
 
     elif state == "CREDITS":
         if credits_scroll < credits_max_scroll:
@@ -527,34 +533,42 @@ while running:
                         handle_level_select(selected_index)
 
             elif state == "SETTINGS":
-                if event.key in (pygame.K_UP, pygame.K_w):
-                    settings_cursor = (settings_cursor - 1) % len(settings_items)
-                elif event.key in (pygame.K_DOWN, pygame.K_s):
-                    settings_cursor = (settings_cursor + 1) % len(settings_items)
-                elif event.key in (pygame.K_LEFT, pygame.K_a):
-                    if settings_cursor == 0:
-                        music_volume = max(0.0, round(music_volume - 0.1, 1))
-                        apply_volume()
-                elif event.key in (pygame.K_RIGHT, pygame.K_d):
-                    if settings_cursor == 0:
-                        music_volume = min(1.0, round(music_volume + 0.1, 1))
-                        apply_volume()
-                elif event.key == pygame.K_RETURN:
-                    if settings_cursor == 1:
-                        music_muted = not music_muted
-                        apply_volume()
-                    elif settings_cursor == 2:
-                        pygame.display.toggle_fullscreen()
-                    elif settings_cursor == 3:
-                        state = "MENU"
-                        selected_index = 0
+                if guide_open:
+                    if event.key in (pygame.K_ESCAPE, pygame.K_RETURN):
+                        guide_open = False
+                else:
+                    if event.key in (pygame.K_UP, pygame.K_w):
+                        settings_cursor = (settings_cursor - 1) % len(settings_items)
+                    elif event.key in (pygame.K_DOWN, pygame.K_s):
+                        settings_cursor = (settings_cursor + 1) % len(settings_items)
+                    elif event.key in (pygame.K_LEFT, pygame.K_a):
+                        if settings_cursor == 0:
+                            music_volume = max(0.0, round(music_volume - 0.1, 1))
+                            apply_volume()
+                    elif event.key in (pygame.K_RIGHT, pygame.K_d):
+                        if settings_cursor == 0:
+                            music_volume = min(1.0, round(music_volume + 0.1, 1))
+                            apply_volume()
+                    elif event.key == pygame.K_RETURN:
+                        if settings_cursor == 1:
+                            music_muted = not music_muted
+                            apply_volume()
+                        elif settings_cursor == 2:
+                            pygame.display.toggle_fullscreen()
+                        elif settings_cursor == 3:
+                            guide_open = True
+                        elif settings_cursor == 4:
+                            state = "MENU"
+                            selected_index = 0
 
             elif state == "CREDITS":
                 if event.key == pygame.K_RETURN:
                     exit_credits()
 
             if event.key == pygame.K_ESCAPE:
-                if state == "CREDITS":
+                if state == "SETTINGS" and guide_open:
+                    pass  # handled above
+                elif state == "CREDITS":
                     exit_credits()
                 else:
                     state = "MENU"
@@ -583,7 +597,9 @@ while running:
                         elif state == "LEVEL_SELECT":
                             handle_level_select(i)
             elif state == "SETTINGS":
-                if _settings_vol_slider.collidepoint(mouse_pos):
+                if guide_open:
+                    guide_open = False
+                elif _settings_vol_slider.collidepoint(mouse_pos):
                     music_volume = max(0.0, min(1.0, round((mouse_pos[0] - _settings_vol_slider.x) / _settings_vol_slider.width, 2)))
                     apply_volume()
                     settings_cursor = 0
@@ -597,6 +613,8 @@ while running:
                             elif i == 2:
                                 pygame.display.toggle_fullscreen()
                             elif i == 3:
+                                guide_open = True
+                            elif i == 4:
                                 state = "MENU"
                                 selected_index = 0
 

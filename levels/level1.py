@@ -9,7 +9,7 @@ _FONT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file_
 TITLE_FONT_PATH = os.path.join(_FONT_DIR, "title_font.ttf")
 BTN_FONT_PATH = os.path.join(_FONT_DIR, "button_font.ttf")
 from player_sprites import init_player_sprite, draw_player_sprite
-from wood_ui import draw_wooden_bar, draw_wooden_panel, draw_wooden_slider
+from wood_ui import draw_wooden_bar, draw_wooden_panel, draw_wooden_slider, draw_guide_screen, _GUIDE_L1
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -1620,7 +1620,7 @@ class Game:
         self.tiny_font =pygame.font.Font(TITLE_FONT_PATH, 12)
         self.cp_font   =pygame.font.Font(TITLE_FONT_PATH, 11)
         self.sfx=SoundManager()
-        self.diff_index=1; self.difficulty=self.DIFF_OPTIONS[1]
+        self.diff_index=0; self.difficulty=self.DIFF_OPTIONS[0]
         self.state="playing"; self.settings_cursor=0
         self.music_volume=0.5; self.music_muted=False
         self.tick=0; self.level_time=0; self.win_timer=0
@@ -1634,6 +1634,7 @@ class Game:
         self._settings_boxes = []
         self._settings_vol_slider = pygame.Rect(0, 0, 0, 0)
         self._last_mouse_pos = (0, 0)
+        self.guide_open = False
         # Soul death/respawn animation
         self.soul_state=None; self.soul_x=0; self.soul_y=0
         self.soul_target_y=0; self.soul_timer=0; self.soul_trail=[]
@@ -1693,23 +1694,27 @@ class Game:
                 if ev.type==pygame.KEYDOWN: self._handle_key(ev.key)
                 if ev.type==pygame.MOUSEBUTTONDOWN and ev.button==1:
                     if self.state=="settings":
-                        mpos = ev.pos
-                        if self._settings_vol_slider.collidepoint(mpos):
-                            self.music_volume = max(0.0, min(1.0, round((mpos[0]-self._settings_vol_slider.x)/max(1,self._settings_vol_slider.width),2)))
-                            self._apply_volume(); self.settings_cursor = 1
+                        if self.guide_open:
+                            self.guide_open = False
                         else:
-                            for i, rect in enumerate(self._settings_boxes):
-                                if rect.collidepoint(mpos):
-                                    self.settings_cursor = i
-                                    if i == 0:
-                                        dl = self.DIFF_OPTIONS
-                                        self.diff_index = (self.diff_index+1)%3
-                                        self.difficulty = dl[self.diff_index]
-                                        self._load_level()
-                                    elif i == 2: self.music_muted = not self.music_muted; self._apply_volume()
-                                    elif i == 3: pygame.display.toggle_fullscreen()
-                                    elif i == 4: self.state = "playing"
-                                    elif i == 5: self._exit_to_menu()
+                            mpos = ev.pos
+                            if self._settings_vol_slider.collidepoint(mpos):
+                                self.music_volume = max(0.0, min(1.0, round((mpos[0]-self._settings_vol_slider.x)/max(1,self._settings_vol_slider.width),2)))
+                                self._apply_volume(); self.settings_cursor = 1
+                            else:
+                                for i, rect in enumerate(self._settings_boxes):
+                                    if rect.collidepoint(mpos):
+                                        self.settings_cursor = i
+                                        if i == 0:
+                                            dl = self.DIFF_OPTIONS
+                                            self.diff_index = (self.diff_index+1)%3
+                                            self.difficulty = dl[self.diff_index]
+                                            self._load_level()
+                                        elif i == 2: self.music_muted = not self.music_muted; self._apply_volume()
+                                        elif i == 3: pygame.display.toggle_fullscreen()
+                                        elif i == 4: self.guide_open = True
+                                        elif i == 5: self.state = "playing"
+                                        elif i == 6: self._exit_to_menu()
             if not self.running: return
             if self.state=="playing" and self.soul_state is not None:
                 self._update_soul(); self.tick += 1
@@ -1735,8 +1740,11 @@ class Game:
 
         # ── Settings state ────────────────────────────────────────────────
         if self.state=="settings":
+            if self.guide_open:
+                if key in (pygame.K_ESCAPE, pygame.K_RETURN): self.guide_open = False
+                return
             if key==pygame.K_ESCAPE: self.state="playing"; return
-            nr=6
+            nr=7
             if key in (pygame.K_UP,pygame.K_w):    self.settings_cursor=(self.settings_cursor-1)%nr
             elif key in (pygame.K_DOWN,pygame.K_s): self.settings_cursor=(self.settings_cursor+1)%nr
             elif self.settings_cursor==0:
@@ -1756,8 +1764,10 @@ class Game:
             elif self.settings_cursor==3:
                 if key in (pygame.K_RETURN,pygame.K_SPACE): pygame.display.toggle_fullscreen()
             elif self.settings_cursor==4:
-                if key in (pygame.K_RETURN,pygame.K_SPACE): self.state="playing"
+                if key in (pygame.K_RETURN,pygame.K_SPACE): self.guide_open = True
             elif self.settings_cursor==5:
+                if key in (pygame.K_RETURN,pygame.K_SPACE): self.state="playing"
+            elif self.settings_cursor==6:
                 if key in (pygame.K_RETURN,pygame.K_SPACE): self._exit_to_menu()
             return
 
@@ -1768,7 +1778,7 @@ class Game:
 
         # ── Playing state ─────────────────────────────────────────────────
         if key==pygame.K_ESCAPE:
-            self.state="settings"; self.settings_cursor=4
+            self.state="settings"; self.settings_cursor=5
         elif key==pygame.K_r:
             self._load_level()
         elif key==pygame.K_e:
@@ -1996,6 +2006,8 @@ class Game:
             self._draw_game()
         if self.state=="settings":
             self._draw_settings()
+            if self.guide_open:
+                draw_guide_screen(self.screen, self.tick, TITLE_FONT_PATH, _GUIDE_L1)
         elif self.state=="dialogue":
             # Dim the game world during dialogue
             dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
@@ -2150,6 +2162,7 @@ class Game:
                  (f"Music Volume :  < {int(self.music_volume * 100)}% >", "Left/Right"),
                  (f"Mute Music :  {'OFF' if self.music_muted else 'ON'}", "Enter to toggle"),
                  (f"Fullscreen :  {'ON' if is_fs else 'OFF'}", "Enter to toggle"),
+                 ("Guide", "View controls and tips"),
                  ("Resume", "Enter or ESC"), ("Exit to Menu", "Enter")]
         bar_w = 460
         bar_h = 34

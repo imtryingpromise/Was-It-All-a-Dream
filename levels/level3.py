@@ -22,7 +22,7 @@ try:
     _SPRITES_AVAILABLE = True
 except ImportError:
     _SPRITES_AVAILABLE = False
-from wood_ui import draw_wooden_bar, draw_wooden_panel, draw_wooden_slider
+from wood_ui import draw_wooden_bar, draw_wooden_panel, draw_wooden_slider, draw_guide_screen, _GUIDE_L3
 
 SCREEN_WIDTH  = 1280
 SCREEN_HEIGHT = 720
@@ -1902,7 +1902,7 @@ def create_level(diff_key="medium"):
     def P(x, y, w, h=20, force_stable=False):
         if force_stable or x in CP_PLAT_XS:
             return Platform(x, y, w, h)
-        return CollapsingPlatform(x, y, w, h, delay=cd, respawn_time=300)
+        return CollapsingPlatform(x, y, w, h, delay=cd, respawn_time=120)
 
     # ── S1 — START (spawn platform always stable) ──────────────────────────
     plats.append(Platform(0, GROUND, 220, 22))          # spawn — stable
@@ -1995,7 +1995,7 @@ def create_level(diff_key="medium"):
     stars.append(StarRing(7520, GROUND - 430))
 
     # This one keeps its original instant-collapse behaviour (delay=8)
-    plats.append(CollapsingPlatform(7490, GROUND-380, 70, 20, delay=8, respawn_time=400))
+    plats.append(CollapsingPlatform(7490, GROUND-380, 70, 20, delay=8, respawn_time=120))
 
     plats.append(P(7760, GROUND - 380, 75, 20))         # CP5 platform — stable
     cps.append(Checkpoint(7770, GROUND - 380))
@@ -2056,12 +2056,13 @@ class Game:
         self.title_font = pygame.font.Font(TITLE_FONT_PATH, 36)
         self.sfx        = SoundManager()
         self.state      = "playing"
-        self.difficulty = "medium"
+        self.difficulty = "easy"
         self.level_time = self.tick = self.win_timer = 0
         self.music_volume = 0.25; self.sfx_volume = 0.2; self.music_muted = False
         self.settings_cursor = 0
         self._settings_boxes = []; self._settings_vol_slider = pygame.Rect(0,0,0,0)
         self._settings_sfx_slider = pygame.Rect(0,0,0,0); self._last_mouse_pos = (0,0)
+        self.guide_open = False
         self.freeze_frames = 0; self.respawn_fade = 0; self.ending_shown = False
         self.camera     = Camera(SCREEN_WIDTH, SCREEN_HEIGHT)
         self.particles  = []; self.rings = []; self.flashes = []
@@ -2113,12 +2114,16 @@ class Game:
         for i, cp in enumerate(self.checkpoints):
             if cp.activated:
                 current_cp = i
-        # Only rebuild stomp monsters belonging to current checkpoint zone (or untagged)
+        # Rebuild ALL stomp monsters so they're always present
         self.stomp_monsters = [
             StompMonster(d['x'], d['y'], d['x1'], d['x2'], d['spd'])
             for d in self.monster_defs
-            if d.get('cp', current_cp) == current_cp
         ]
+        # Reset all collapsed platforms instantly on respawn
+        for p in self.platforms:
+            if isinstance(p, CollapsingPlatform) and p.collapsed:
+                p.collapsed = False; p.rc = 0; p.stood = 0
+                p.rect.y = p.oy; p.shake = 0
         # Only respawn the boss for the current checkpoint, not past ones
         self.mini_bosses = []
         if current_cp >= 0:
@@ -2186,25 +2191,29 @@ class Game:
                                 vx*0.3+random.uniform(-1,1), vy*0.3+random.uniform(-1,1),
                                 12, 3, 0.05))
                     elif self.state == "settings":
-                        mpos = event.pos
-                        if self._settings_vol_slider.collidepoint(mpos):
-                            self.music_volume = max(0.0, min(1.0, round((mpos[0]-self._settings_vol_slider.x)/max(1,self._settings_vol_slider.width),2)))
-                            self._apply_volume(); self.settings_cursor = 0
-                        elif self._settings_sfx_slider.collidepoint(mpos):
-                            self.sfx_volume = max(0.0, min(1.0, round((mpos[0]-self._settings_sfx_slider.x)/max(1,self._settings_sfx_slider.width),2)))
-                            self._apply_volume(); self.settings_cursor = 1
+                        if self.guide_open:
+                            self.guide_open = False
                         else:
-                            for i, rect in enumerate(self._settings_boxes):
-                                if rect.collidepoint(mpos):
-                                    self.settings_cursor = i
-                                    if i == 2: self.music_muted = not self.music_muted; self._apply_volume()
-                                    elif i == 3:
-                                        dl=["easy","medium","hard"]; self.difficulty=dl[(dl.index(self.difficulty)+1)%3]
-                                        self._apply_difficulty()
-                                    elif i == 4: pygame.display.toggle_fullscreen()
-                                    elif i == 5: self.state = "playing"
-                                    elif i == 6: self.load_level(); self.state="playing"; self.sfx.start_music(volume=self.music_volume)
-                                    elif i == 7: self._exit_to_menu()
+                            mpos = event.pos
+                            if self._settings_vol_slider.collidepoint(mpos):
+                                self.music_volume = max(0.0, min(1.0, round((mpos[0]-self._settings_vol_slider.x)/max(1,self._settings_vol_slider.width),2)))
+                                self._apply_volume(); self.settings_cursor = 0
+                            elif self._settings_sfx_slider.collidepoint(mpos):
+                                self.sfx_volume = max(0.0, min(1.0, round((mpos[0]-self._settings_sfx_slider.x)/max(1,self._settings_sfx_slider.width),2)))
+                                self._apply_volume(); self.settings_cursor = 1
+                            else:
+                                for i, rect in enumerate(self._settings_boxes):
+                                    if rect.collidepoint(mpos):
+                                        self.settings_cursor = i
+                                        if i == 2: self.music_muted = not self.music_muted; self._apply_volume()
+                                        elif i == 3:
+                                            dl=["easy","medium","hard"]; self.difficulty=dl[(dl.index(self.difficulty)+1)%3]
+                                            self._apply_difficulty()
+                                        elif i == 4: pygame.display.toggle_fullscreen()
+                                        elif i == 5: self.guide_open = True
+                                        elif i == 6: self.state = "playing"
+                                        elif i == 7: self.load_level(); self.state="playing"; self.sfx.start_music(volume=self.music_volume)
+                                        elif i == 8: self._exit_to_menu()
             if not self.running: return
             # Settings mouse clicks
             if self.state == "settings":
@@ -2234,7 +2243,10 @@ class Game:
                         else: self.state = self.pending_state or "playing"
             return
         if self.state == "settings":
-            n = 8
+            if self.guide_open:
+                if key in (pygame.K_ESCAPE, pygame.K_RETURN): self.guide_open = False
+                return
+            n = 9
             if key == pygame.K_ESCAPE: self.state = "playing"
             elif key in (pygame.K_UP,   pygame.K_w): self.settings_cursor = (self.settings_cursor-1)%n
             elif key in (pygame.K_DOWN, pygame.K_s): self.settings_cursor = (self.settings_cursor+1)%n
@@ -2257,10 +2269,11 @@ class Game:
             elif key in (pygame.K_RETURN, pygame.K_SPACE):
                 if   self.settings_cursor == 2: self.music_muted = not self.music_muted; self._apply_volume()
                 elif self.settings_cursor == 4: pygame.display.toggle_fullscreen()
-                elif self.settings_cursor == 5: self.state = "playing"
-                elif self.settings_cursor == 6:
+                elif self.settings_cursor == 5: self.guide_open = True
+                elif self.settings_cursor == 6: self.state = "playing"
+                elif self.settings_cursor == 7:
                     self.load_level(); self.state = "playing"; self.sfx.start_music(volume=self.music_volume)
-                elif self.settings_cursor == 7: self._exit_to_menu()
+                elif self.settings_cursor == 8: self._exit_to_menu()
             return
         if self.state == "win":
             if key in (pygame.K_RETURN, pygame.K_SPACE, pygame.K_ESCAPE):
@@ -2276,7 +2289,7 @@ class Game:
             self.admin_mode = not self.admin_mode
             return
         if key == pygame.K_ESCAPE:
-            self.state = "settings"; self.settings_cursor = 5
+            self.state = "settings"; self.settings_cursor = 6
         elif key == pygame.K_r:
             self.player.hearts = 0
             self.player.die(); self.sfx.play("death")
@@ -2650,7 +2663,10 @@ class Game:
         self.screen.fill(DARK_BG)
         if self.state in ("playing","settings","dialogue","ending"):
             self._draw_game()
-        if self.state == "settings": self._draw_settings()
+        if self.state == "settings":
+            self._draw_settings()
+            if self.guide_open:
+                draw_guide_screen(self.screen, self.tick, TITLE_FONT_PATH, _GUIDE_L3)
         elif self.state == "win":    self._draw_win()
         elif self.state in ("dialogue","ending"):
             if self.dialogue_box: self.dialogue_box.draw(self.screen, self.tick)
@@ -2900,6 +2916,7 @@ class Game:
             f"Mute:   {'ON' if self.music_muted else 'OFF'}",
             f"Difficulty:  < {self.difficulty.upper()} >",
             f"Fullscreen:  {'ON' if is_fs else 'OFF'}",
+            "Guide",
             "Resume",
             "Restart Level",
             "Exit to Menu",

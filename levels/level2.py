@@ -13,7 +13,7 @@ try:
     _SPRITES_AVAILABLE = True
 except ImportError:
     _SPRITES_AVAILABLE = False
-from wood_ui import draw_wooden_bar, draw_wooden_panel, draw_wooden_slider
+from wood_ui import draw_wooden_bar, draw_wooden_panel, draw_wooden_slider, draw_guide_screen, _GUIDE_L2
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -1723,6 +1723,7 @@ class Game:
         self._settings_boxes = []
         self._settings_vol_slider = pygame.Rect(0, 0, 0, 0)
         self._last_mouse_pos = (0, 0)
+        self.guide_open = False
 
         self.camera = Camera(SCREEN_WIDTH, SCREEN_HEIGHT)
         self.particles = []
@@ -1812,19 +1813,23 @@ class Game:
                     self._handle_key(event.key)
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if self.state == "settings":
-                        mpos = event.pos
-                        if self._settings_vol_slider.collidepoint(mpos):
-                            self.music_volume = max(0.0, min(1.0, round((mpos[0]-self._settings_vol_slider.x)/max(1,self._settings_vol_slider.width),2)))
-                            self._apply_volume(); self.settings_cursor = 0
+                        if self.guide_open:
+                            self.guide_open = False
                         else:
-                            for i, rect in enumerate(self._settings_boxes):
-                                if rect.collidepoint(mpos):
-                                    self.settings_cursor = i
-                                    if i == 1: self.music_muted = not self.music_muted; self._apply_volume()
-                                    elif i == 2: pygame.display.toggle_fullscreen()
-                                    elif i == 3: self.state = "playing"
-                                    elif i == 4: self.load_level(); self.state = "playing"; self.sfx.start_music(volume=self.music_volume)
-                                    elif i == 5: self._exit_to_menu()
+                            mpos = event.pos
+                            if self._settings_vol_slider.collidepoint(mpos):
+                                self.music_volume = max(0.0, min(1.0, round((mpos[0]-self._settings_vol_slider.x)/max(1,self._settings_vol_slider.width),2)))
+                                self._apply_volume(); self.settings_cursor = 0
+                            else:
+                                for i, rect in enumerate(self._settings_boxes):
+                                    if rect.collidepoint(mpos):
+                                        self.settings_cursor = i
+                                        if i == 1: self.music_muted = not self.music_muted; self._apply_volume()
+                                        elif i == 2: pygame.display.toggle_fullscreen()
+                                        elif i == 3: self.guide_open = True
+                                        elif i == 4: self.state = "playing"
+                                        elif i == 5: self.load_level(); self.state = "playing"; self.sfx.start_music(volume=self.music_volume)
+                                        elif i == 6: self._exit_to_menu()
                     else:
                         self._handle_mouse_click(event.pos)
             if not self.running:
@@ -1890,7 +1895,10 @@ class Game:
             return
 
         if self.state == "settings":
-            n_items = 6
+            if self.guide_open:
+                if key in (pygame.K_ESCAPE, pygame.K_RETURN): self.guide_open = False
+                return
+            n_items = 7
             if key == pygame.K_ESCAPE:
                 self.state = "playing"
             elif key in (pygame.K_UP, pygame.K_w):
@@ -1912,12 +1920,14 @@ class Game:
                 elif self.settings_cursor == 2:
                     pygame.display.toggle_fullscreen()
                 elif self.settings_cursor == 3:
-                    self.state = "playing"
+                    self.guide_open = True
                 elif self.settings_cursor == 4:
+                    self.state = "playing"
+                elif self.settings_cursor == 5:
                     self.load_level()
                     self.state = "playing"
                     self.sfx.start_music(volume=self.music_volume)
-                elif self.settings_cursor == 5:
+                elif self.settings_cursor == 6:
                     self._exit_to_menu()
             return
 
@@ -1933,7 +1943,7 @@ class Game:
         # Playing
         if key == pygame.K_ESCAPE:
             self.state = "settings"
-            self.settings_cursor = 3
+            self.settings_cursor = 4
         elif key == pygame.K_r:
             self.player.hearts = 0
             self.player.die()
@@ -2381,6 +2391,8 @@ class Game:
         elif self.state == "settings":
             self._draw_game()
             self._draw_settings()
+            if self.guide_open:
+                draw_guide_screen(self.screen, self.tick, TITLE_FONT_PATH, _GUIDE_L2)
         elif self.state == "win":
             self._draw_win()
         elif self.state in ("dialogue", "ending"):
@@ -2645,6 +2657,7 @@ class Game:
             f"Music Volume:  < {int(self.music_volume * 100)}% >",
             f"Mute Music:    {'ON' if self.music_muted else 'OFF'}",
             f"Fullscreen:    {'ON' if is_fs else 'OFF'}",
+            "Guide",
             "Resume Game",
             "Restart Level",
             "Exit to Main Menu",

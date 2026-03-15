@@ -9,7 +9,7 @@ _FONT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file_
 TITLE_FONT_PATH = os.path.join(_FONT_DIR, "title_font.ttf")
 BTN_FONT_PATH = os.path.join(_FONT_DIR, "button_font.ttf")
 from player_sprites import init_player_sprite, draw_player_sprite
-from wood_ui import draw_wooden_bar, draw_wooden_panel, draw_wooden_slider
+from wood_ui import draw_wooden_bar, draw_wooden_panel, draw_wooden_slider, draw_guide_screen, _GUIDE_L4
 
 SCREEN_WIDTH  = 1280
 SCREEN_HEIGHT = 720
@@ -1712,8 +1712,8 @@ class CrumblingBridge:
         for t in self.tiles:
             if t["state"]=="solid":
                 pr=t["rect"]
-                if (player.rect.bottom>=pr.top and player.rect.bottom<=pr.top+10
-                    and player.rect.right>pr.left and player.rect.left<pr.right):
+                if (player.rect.colliderect(pr) and player.vel_y >= 0
+                    and player.rect.bottom <= pr.bottom):
                     self.trigger(); return
     def draw(self, surface, camera, tick):
         for t in self.tiles:
@@ -2647,10 +2647,11 @@ class Game:
         self.freeze_frames = 0  # hitstop effect
         self.respawn_fade = 0  # respawn screen wipe
         self.best_combo = 0  # track best combo for stats
-        self.difficulty = "hard"
+        self.difficulty = "easy"
         self.music_volume = 0.35; self.sfx_volume = 0.2; self.music_muted = False; self.settings_cursor = 0
         self._settings_boxes = []; self._settings_vol_slider = pygame.Rect(0,0,0,0); self._settings_sfx_slider = pygame.Rect(0,0,0,0)
         self._last_mouse_pos = (0, 0)
+        self.guide_open = False
         self.camera = Camera(SCREEN_WIDTH, SCREEN_HEIGHT)
         self.particles = []; self.rings = []; self.flashes = []
         self.damage_flashes = []  # DamageFlash instances for red vignette
@@ -2746,37 +2747,42 @@ class Game:
                     if self.state == "playing":
                         mx, my = event.pos
                         if mx >= SCREEN_WIDTH - 50 and my <= 50:
-                            self.state = "settings"; self.settings_cursor = 5
+                            self.state = "settings"; self.settings_cursor = 6
                     elif self.state == "settings":
-                        mpos = event.pos
-                        # Volume slider clicks
-                        if self._settings_vol_slider.collidepoint(mpos):
-                            self.music_volume = max(0.0, min(1.0, round((mpos[0] - self._settings_vol_slider.x) / self._settings_vol_slider.width, 2)))
-                            self._apply_volume()
-                            self.settings_cursor = 0
-                        elif self._settings_sfx_slider.collidepoint(mpos):
-                            self.sfx_volume = max(0.0, min(1.0, round((mpos[0] - self._settings_sfx_slider.x) / self._settings_sfx_slider.width, 2)))
-                            self._apply_volume()
-                            self.settings_cursor = 1
+                        if self.guide_open:
+                            self.guide_open = False
                         else:
-                            for i, rect in enumerate(self._settings_boxes):
-                                if rect.collidepoint(mpos):
-                                    self.settings_cursor = i
-                                    if i == 2:
-                                        self.music_muted = not self.music_muted; self._apply_volume()
-                                    elif i == 3:
-                                        diffs = ["easy","medium","hard"]
-                                        idx = diffs.index(self.difficulty)
-                                        self.difficulty = diffs[(idx + 1) % 3]
-                                    elif i == 4:
-                                        pygame.display.toggle_fullscreen()
-                                    elif i == 5:
-                                        self.state = "playing"
-                                    elif i == 6:
-                                        self.load_level(); self.state = "playing"
-                                        self.sfx.start_music(volume=self.music_volume)
-                                    elif i == 7:
-                                        self._exit_to_menu()
+                            mpos = event.pos
+                            # Volume slider clicks
+                            if self._settings_vol_slider.collidepoint(mpos):
+                                self.music_volume = max(0.0, min(1.0, round((mpos[0] - self._settings_vol_slider.x) / self._settings_vol_slider.width, 2)))
+                                self._apply_volume()
+                                self.settings_cursor = 0
+                            elif self._settings_sfx_slider.collidepoint(mpos):
+                                self.sfx_volume = max(0.0, min(1.0, round((mpos[0] - self._settings_sfx_slider.x) / self._settings_sfx_slider.width, 2)))
+                                self._apply_volume()
+                                self.settings_cursor = 1
+                            else:
+                                for i, rect in enumerate(self._settings_boxes):
+                                    if rect.collidepoint(mpos):
+                                        self.settings_cursor = i
+                                        if i == 2:
+                                            self.music_muted = not self.music_muted; self._apply_volume()
+                                        elif i == 3:
+                                            diffs = ["easy","medium","hard"]
+                                            idx = diffs.index(self.difficulty)
+                                            self.difficulty = diffs[(idx + 1) % 3]
+                                        elif i == 4:
+                                            pygame.display.toggle_fullscreen()
+                                        elif i == 5:
+                                            self.guide_open = True
+                                        elif i == 6:
+                                            self.state = "playing"
+                                        elif i == 7:
+                                            self.load_level(); self.state = "playing"
+                                            self.sfx.start_music(volume=self.music_volume)
+                                        elif i == 8:
+                                            self._exit_to_menu()
             if not self.running: return
             # Update music crossfade system
             self.sfx.update_music()
@@ -2912,7 +2918,10 @@ class Game:
             return
         # Settings
         if self.state == "settings":
-            n_items = 8
+            if self.guide_open:
+                if key in (pygame.K_ESCAPE, pygame.K_RETURN): self.guide_open = False
+                return
+            n_items = 9
             if key == pygame.K_ESCAPE: self.state = "playing"
             elif key in (pygame.K_UP, pygame.K_w): self.settings_cursor = (self.settings_cursor - 1) % n_items
             elif key in (pygame.K_DOWN, pygame.K_s): self.settings_cursor = (self.settings_cursor + 1) % n_items
@@ -2940,11 +2949,12 @@ class Game:
                 elif self.settings_cursor == 3:
                     pass  # use arrows
                 elif self.settings_cursor == 4: pygame.display.toggle_fullscreen()
-                elif self.settings_cursor == 5: self.state = "playing"
-                elif self.settings_cursor == 6:
+                elif self.settings_cursor == 5: self.guide_open = True
+                elif self.settings_cursor == 6: self.state = "playing"
+                elif self.settings_cursor == 7:
                     self.load_level(); self.state = "playing"
                     self.sfx.start_music(volume=self.music_volume)
-                elif self.settings_cursor == 7:
+                elif self.settings_cursor == 8:
                     self._exit_to_menu()
             return
         # Stats screen
@@ -2982,7 +2992,7 @@ class Game:
             return
         # Playing
         if key == pygame.K_ESCAPE:
-            self.state = "settings"; self.settings_cursor = 5
+            self.state = "settings"; self.settings_cursor = 6
         elif key == pygame.K_r:
             self.player.unreal_timer = 0; self.player.hearts = 0; self.player.die(); self.sfx.play("death")
         elif key in (pygame.K_f, pygame.K_x):
@@ -3306,8 +3316,8 @@ class Game:
                 for t in cb.tiles:
                     if t["state"] in ("solid","shaking"):
                         pr=t["rect"]
-                        if self.player.rect.colliderect(pr) and self.player.vel_y>0:
-                            if self.player.rect.bottom<=pr.top+10:
+                        if self.player.rect.colliderect(pr) and self.player.vel_y>=0:
+                            if self.player.rect.bottom<=pr.bottom and self.player.rect.bottom>=pr.top:
                                 self.player.rect.bottom=pr.top; self.player.vel_y=0
                                 self.player.on_ground=True; self.player.jump_count=0
 
@@ -3690,6 +3700,8 @@ class Game:
             self._draw_game()
         elif self.state == "settings":
             self._draw_game(); self._draw_settings()
+            if self.guide_open:
+                draw_guide_screen(self.screen, self.tick, TITLE_FONT_PATH, _GUIDE_L4)
         elif self.state == "stats":
             self._draw_stats()
         elif self.state in ("dialogue", "ending"):
@@ -4291,6 +4303,7 @@ class Game:
             f"Mute:  {'ON' if self.music_muted else 'OFF'}",
             f"Difficulty:  < {self.difficulty.upper()} >",
             f"Fullscreen:  {'ON' if is_fs else 'OFF'}",
+            "Guide",
             "Resume",
             "Restart Level",
             "Exit to Menu",
