@@ -60,23 +60,6 @@ CYAN = (0, 220, 255)
 PURPLE = (160, 50, 200)
 BROWN = (139, 90, 43)
 
-# ── Ice arrow colours ─────────────────────────────────────────────────────────
-ICE_BLUE      = (140, 210, 255)
-ICE_WHITE     = (220, 245, 255)
-ICE_DARK      = ( 80, 160, 220)
-ICE_CORE      = (200, 240, 255)
-
-# ── Sky monster colours ───────────────────────────────────────────────────────
-SPECTER_BLUE  = ( 60, 100, 200)
-SPECTER_DARK  = ( 30,  50, 140)
-SPECTER_GLOW  = (120, 180, 255)
-HARPY_PURPLE  = (140,  50, 190)
-HARPY_DARK    = ( 90,  20, 130)
-
-# ── Boss phase colours ────────────────────────────────────────────────────────
-PHASE2_RED    = (240,  30,  30)
-PHASE3_DARK   = ( 80,   0,   0)
-
 # ── Physics ───────────────────────────────────────────────────────────────────
 GRAVITY = 0.55
 JUMP_VELOCITY = -13
@@ -91,14 +74,10 @@ ARROW_LIFETIME = 80
 ARROW_COOLDOWN = 22
 
 # ── Santa boss ────────────────────────────────────────────────────────────────
-SANTA_MAX_HP = 15          # hits to kill (more HP for 3 phases)
-SANTA_BALLOON_INTERVAL = 120  # frames between balloon throws (phase 1)
+SANTA_MAX_HP = 12  # hits to kill
+SANTA_BALLOON_INTERVAL = 120  # frames between balloon throws
 SANTA_BALLOON_SPEED = 5
 BALLOON_LIFETIME = 90
-
-# Boss phase thresholds (HP values)
-SANTA_PHASE2_HP = 10   # at or below → phase 2
-SANTA_PHASE3_HP = 5    # at or below → phase 3
 
 # ── Story dialogues ──────────────────────────────────────────────────────────
 STORY_DIALOGUES = {
@@ -386,34 +365,70 @@ class DamageFlash:
 
 
 # ---------------------------------------------------------------------------
-# Cloud (background decoration)
+# Cloud (pixel-art style with shadow blobs — like the reference screenshot)
 # ---------------------------------------------------------------------------
 class Cloud:
     def __init__(self, x=None, y=None, speed=None, size=None):
         self.x = x if x is not None else random.uniform(0, SCREEN_WIDTH)
         self.y = y if y is not None else random.uniform(30, SCREEN_HEIGHT * 0.55)
-        self.speed = speed if speed is not None else random.uniform(0.15, 0.5)
-        self.size = size if size is not None else random.uniform(0.7, 1.6)
-        self.alpha = random.uniform(0.55, 0.95)
+        self.speed = speed if speed is not None else random.uniform(0.15, 0.45)
+        self.size = size if size is not None else random.uniform(0.8, 1.8)
+        # Each cloud gets a fixed random seed so it looks consistent every frame
+        self.seed = random.randint(0, 9999)
 
     def update(self):
         self.x += self.speed
-        if self.x > SCREEN_WIDTH + 200:
-            self.x = -200
+        if self.x > SCREEN_WIDTH + 300:
+            self.x = -300
             self.y = random.uniform(30, SCREEN_HEIGHT * 0.55)
 
     def draw(self, surface):
         cx, cy = int(self.x), int(self.y)
         s = self.size
-        base_c = tuple(min(255, int(v * self.alpha)) for v in CLOUD_WHITE)
-        for ox, oy, r in [
-            (0, 0, int(28 * s)),
-            (int(-25 * s), int(8 * s), int(20 * s)),
-            (int(25 * s), int(8 * s), int(20 * s)),
-            (int(-12 * s), int(14 * s), int(18 * s)),
-            (int(12 * s), int(14 * s), int(18 * s)),
-        ]:
-            pygame.draw.circle(surface, base_c, (cx + ox, cy + oy), r)
+        rng = random.Random(self.seed)
+
+        # ── Shadow blobs (purple-grey, offset down-right) ──
+        shadow_c = (160, 150, 185)   # muted purple-grey like the screenshot
+        shadow_blobs = [
+            (int(10 * s),  int(10 * s),  int(24 * s)),
+            (int(-14 * s), int(14 * s),  int(18 * s)),
+            (int(28 * s),  int(14 * s),  int(16 * s)),
+            (int(6 * s),   int(20 * s),  int(14 * s)),
+        ]
+        for ox, oy, r in shadow_blobs:
+            pygame.draw.circle(surface, shadow_c, (cx + ox, cy + oy), max(1, r))
+
+        # ── Main white cloud blobs (chunky, blocky like pixel art) ──
+        # Use large overlapping circles with flat bottom feel
+        main_c  = (245, 248, 255)   # near-white
+        light_c = (255, 255, 255)   # brightest highlight
+
+        main_blobs = [
+            (0,            0,           int(28 * s)),
+            (int(-26 * s), int(8 * s),  int(20 * s)),
+            (int(26 * s),  int(8 * s),  int(22 * s)),
+            (int(-10 * s), int(14 * s), int(18 * s)),
+            (int(14 * s),  int(16 * s), int(16 * s)),
+            (int(-38 * s), int(14 * s), int(13 * s)),
+            (int(40 * s),  int(16 * s), int(12 * s)),
+        ]
+        for ox, oy, r in main_blobs:
+            pygame.draw.circle(surface, main_c, (cx + ox, cy + oy), max(1, r))
+
+        # ── Pixel-art "blocky" highlight on top-left of each main blob ──
+        highlight_offsets = [
+            (int(-6 * s),  int(-10 * s), int(10 * s)),
+            (int(-30 * s), int(-2 * s),  int(8 * s)),
+            (int(20 * s),  int(-4 * s),  int(9 * s)),
+        ]
+        for ox, oy, r in highlight_offsets:
+            pygame.draw.circle(surface, light_c, (cx + ox, cy + oy), max(1, r))
+
+        # ── Hard pixel-art edge: draw a 1-pixel dark outline on bottom ──
+        # Gives that crisp retro look
+        outline_c = (180, 185, 200)
+        for ox, oy, r in main_blobs:
+            pygame.draw.circle(surface, outline_c, (cx + ox, cy + oy), max(1, r), 1)
 
 
 # ---------------------------------------------------------------------------
@@ -437,29 +452,119 @@ class IslandPlatform:
 
     def draw(self, surface, camera):
         sr = camera.apply(self.rect)
-        if sr.right < -20 or sr.left > SCREEN_WIDTH + 20:
+        if sr.right < -80 or sr.left > SCREEN_WIDTH + 80:
             return
-        # Dirt body
-        body = pygame.Rect(sr.x, sr.y + 8, sr.width, sr.height + 18)
-        pygame.draw.rect(surface, DIRT_BROWN, body, border_radius=4)
-        # Darker bottom edge
-        pygame.draw.rect(surface, (110, 70, 30),
-                         (sr.x + 2, sr.bottom + 20, sr.width - 4, 4), border_radius=2)
-        # Grass top
-        pygame.draw.rect(surface, GRASS_GREEN,
-                         (sr.x - 2, sr.y - 2, sr.width + 4, 14), border_radius=5)
-        pygame.draw.rect(surface, GRASS_DARK,
-                         (sr.x, sr.y + 6, sr.width, 4))
-        # Grass tufts
-        rng = random.Random(sr.x * 31 + sr.y * 17)
-        for tx in range(sr.x + 4, sr.right - 4, rng.randint(10, 18)):
-            th = rng.randint(4, 8)
-            pygame.draw.line(surface, (100, 200, 80), (tx, sr.y - 2), (tx + rng.randint(-2, 2), sr.y - 2 - th), 1)
-        # Hanging roots
-        for rx in range(sr.x + 8, sr.right - 8, rng.randint(16, 28)):
-            rl = rng.randint(6, 14)
-            pygame.draw.line(surface, (120, 80, 40), (rx, body.bottom - 2), (rx + rng.randint(-2, 2), body.bottom + rl),
-                             1)
+
+        # ── Stone brick body ──
+        STONE_MID   = (140,  80,  90)   # main brick colour (pinkish-red like screenshot)
+        STONE_DARK  = ( 90,  45,  55)   # mortar / shadow
+        STONE_LIGHT = (175, 110, 120)   # highlight face of brick
+        STONE_TOP   = (110,  60,  70)   # top row darker cap
+
+        body = pygame.Rect(sr.x, sr.y + 10, sr.width, sr.height + 40)
+        # Fill solid
+        pygame.draw.rect(surface, STONE_MID, body)
+
+        # Horizontal mortar lines every 10px
+        for my in range(body.top + 10, body.bottom, 10):
+            pygame.draw.line(surface, STONE_DARK, (body.left, my), (body.right, my), 1)
+
+        # Vertical brick joints — stagger every row
+        rng = random.Random(sr.x * 13 + sr.y * 7)
+        brick_w = rng.randint(18, 26)
+        for row_i, my in enumerate(range(body.top, body.bottom, 10)):
+            offset = (brick_w // 2) if row_i % 2 == 1 else 0
+            bx = body.left - offset
+            while bx < body.right:
+                pygame.draw.line(surface, STONE_DARK, (bx, my), (bx, min(my + 10, body.bottom)), 1)
+                # Light highlight on left face of each brick
+                pygame.draw.line(surface, STONE_LIGHT, (bx + 1, my + 1), (bx + 1, min(my + 9, body.bottom - 1)), 1)
+                bx += brick_w
+
+        # Dark shadow on right and bottom edges
+        pygame.draw.rect(surface, STONE_DARK, (body.right - 3, body.top, 3, body.height))
+        pygame.draw.rect(surface, STONE_DARK, (body.left, body.bottom - 3, body.width, 3))
+
+        # Top cap row (slightly darker)
+        pygame.draw.rect(surface, STONE_TOP, (sr.x, sr.y + 8, sr.width, 6))
+
+        # ── Grass top strip ──
+        GRASS_TOP   = ( 80, 170,  70)
+        GRASS_SHADE = ( 55, 120,  50)
+        GRASS_DARK2 = ( 40,  90,  40)
+        pygame.draw.rect(surface, GRASS_TOP,   (sr.x - 1, sr.y - 2, sr.width + 2, 12), border_radius=2)
+        pygame.draw.rect(surface, GRASS_SHADE, (sr.x,     sr.y + 5, sr.width,      4))
+
+        # Pixel-art grass tufts — blocky 2px wide spikes
+        rng2 = random.Random(sr.x * 31 + sr.y * 17)
+        tx = sr.x + 3
+        while tx < sr.right - 3:
+            th = rng2.randint(3, 7)
+            pygame.draw.rect(surface, GRASS_DARK2, (tx, sr.y - 2 - th, 2, th))
+            tx += rng2.randint(5, 11)
+
+        # ── Pixel-art trees on top (like the screenshot) ──
+        # Only add trees based on platform width and a deterministic seed
+        tree_rng = random.Random(sr.x * 99 + sr.y * 43)
+        # Decide how many trees (0 to 2 depending on width)
+        n_trees = 0
+        if sr.width > 60:  n_trees = 1
+        if sr.width > 110: n_trees = 2
+        if sr.width > 180: n_trees = 3
+
+        # Pick tree x positions spread across the platform
+        tree_positions = []
+        if n_trees == 1:
+            tree_positions = [sr.x + sr.width // 2]
+        elif n_trees == 2:
+            tree_positions = [sr.x + sr.width // 3, sr.x + 2 * sr.width // 3]
+        elif n_trees == 3:
+            tree_positions = [sr.x + sr.width // 4,
+                              sr.x + sr.width // 2,
+                              sr.x + 3 * sr.width // 4]
+
+        for tx2 in tree_positions:
+            self._draw_pixel_tree(surface, tx2, sr.y - 2, tree_rng)
+
+    def _draw_pixel_tree(self, surface, cx, base_y, rng):
+        """Draw a chunky pixel-art tree like the reference screenshot."""
+        TRUNK_DARK  = (100,  60,  30)
+        TRUNK_LIGHT = (140,  90,  45)
+        POT_RED     = (160,  60,  60)
+        POT_DARK    = (110,  35,  35)
+        LEAF_MID    = ( 55, 130,  55)
+        LEAF_DARK   = ( 35,  90,  40)
+        LEAF_LIGHT  = ( 80, 170,  65)
+
+        # Randomise tree height a little
+        trunk_h = rng.randint(14, 22)
+        canopy_r = rng.randint(12, 18)
+
+        # Pot (small brick-style pot at base)
+        pot_w, pot_h = 14, 10
+        pot_x = cx - pot_w // 2
+        pot_y = base_y - pot_h
+        pygame.draw.rect(surface, POT_RED,  (pot_x,     pot_y,     pot_w,     pot_h), border_radius=2)
+        pygame.draw.rect(surface, POT_DARK, (pot_x,     pot_y,     pot_w,     2))       # top rim
+        pygame.draw.rect(surface, POT_DARK, (pot_x,     pot_y + pot_h - 2, pot_w, 2))  # bottom
+        pygame.draw.rect(surface, POT_DARK, (pot_x + pot_w - 2, pot_y, 2, pot_h))      # right shadow
+
+        # Trunk (2 wide for pixel art feel)
+        trunk_top = pot_y - trunk_h
+        pygame.draw.rect(surface, TRUNK_DARK,  (cx - 2, trunk_top, 4, trunk_h))
+        pygame.draw.rect(surface, TRUNK_LIGHT, (cx - 2, trunk_top, 2, trunk_h))  # highlight left
+
+        # Canopy — layered circles for chunky pixel feel
+        canopy_cy = trunk_top
+        # Shadow layer (dark, slightly offset down)
+        pygame.draw.circle(surface, LEAF_DARK,  (cx + 2, canopy_cy + 3), canopy_r)
+        # Main canopy
+        pygame.draw.circle(surface, LEAF_MID,   (cx,     canopy_cy),     canopy_r)
+        # Highlight (top-left dome)
+        pygame.draw.circle(surface, LEAF_LIGHT, (cx - canopy_r // 3, canopy_cy - canopy_r // 3),
+                           max(3, canopy_r // 2))
+        # Hard outline (1px dark ring — pixel art style)
+        pygame.draw.circle(surface, LEAF_DARK,  (cx,     canopy_cy),     canopy_r, 1)
 
 
 # ---------------------------------------------------------------------------
@@ -773,7 +878,7 @@ class ExitPortal:
 
 
 # ---------------------------------------------------------------------------
-# Ice Arrow  (player projectile — ice-tipped with frost trail)
+# Arrow  (player projectile)
 # ---------------------------------------------------------------------------
 class Arrow:
     RADIUS = 4
@@ -787,18 +892,12 @@ class Arrow:
         self.lifetime = ARROW_LIFETIME
         self.alive = True
         self.angle = math.atan2(vy, vx)
-        self.trail = []   # list of (x, y, alpha)
 
     def update(self):
-        # Save trail position
-        self.trail.append((self.x, self.y, 200))
-        if len(self.trail) > 10:
-            self.trail.pop(0)
-        self.trail = [(x, y, a - 22) for x, y, a in self.trail if a > 22]
-
         self.x += self.vx
         self.y += self.vy
-        self.vy += 0.08   # slight gravity
+        # Very slight gravity on arrow
+        self.vy += 0.08
         self.angle = math.atan2(self.vy, self.vx)
         self.lifetime -= 1
         if self.lifetime <= 0:
@@ -812,47 +911,23 @@ class Arrow:
     def draw(self, surface, camera, tick):
         if not self.alive:
             return
-
-        # ── Frost trail ──
-        for i, (tx, ty, ta) in enumerate(self.trail):
-            tp = camera.apply(pygame.Rect(int(tx), int(ty), 1, 1))
-            frac = (i + 1) / max(1, len(self.trail))
-            r = max(1, int(4 * frac))
-            a = max(0, min(255, int(ta * frac)))
-            ts = pygame.Surface((r * 2 + 2, r * 2 + 2), pygame.SRCALPHA)
-            c = lerp_color(ICE_DARK, ICE_WHITE, frac)
-            pygame.draw.circle(ts, (*c, a), (r + 1, r + 1), r)
-            surface.blit(ts, (tp.x - r - 1, tp.y - r - 1))
-
         p = camera.apply(pygame.Rect(int(self.x), int(self.y), 1, 1))
-
-        # ── Shaft ──
+        # Arrow shaft
         length = 18
         ex = p.x + int(math.cos(self.angle) * length)
         ey = p.y + int(math.sin(self.angle) * length)
-        # Shadow
-        pygame.draw.line(surface, (60, 60, 80), (p.x + 1, p.y + 1), (ex + 1, ey + 1), 2)
-        # Main shaft — icy gradient effect (two lines)
-        pygame.draw.line(surface, ICE_DARK, (p.x, p.y), (ex, ey), 3)
-        pygame.draw.line(surface, ICE_WHITE, (p.x, p.y), (ex, ey), 1)
-
-        # ── Ice crystal tip ──
-        pygame.draw.circle(surface, ICE_BLUE, (ex, ey), 4)
-        pygame.draw.circle(surface, ICE_WHITE, (ex, ey), 2)
-        # Sparkle on tip
-        if tick % 4 < 2:
-            pygame.draw.line(surface, WHITE, (ex - 3, ey), (ex + 3, ey), 1)
-            pygame.draw.line(surface, WHITE, (ex, ey - 3), (ex, ey + 3), 1)
-
-        # ── Tail feathers (icy white) ──
+        pygame.draw.line(surface, ARROW_BROWN, (p.x, p.y), (ex, ey), 2)
+        # Arrowhead
+        pygame.draw.circle(surface, (180, 180, 200), (ex, ey), 3)
+        # Tail feathers
         bx = p.x + int(math.cos(self.angle + math.pi) * 8)
         by = p.y + int(math.sin(self.angle + math.pi) * 8)
-        pygame.draw.line(surface, ICE_WHITE, (bx, by),
-                         (bx + int(math.cos(self.angle + math.pi / 2) * 5),
-                          by + int(math.sin(self.angle + math.pi / 2) * 5)), 1)
-        pygame.draw.line(surface, ICE_WHITE, (bx, by),
-                         (bx + int(math.cos(self.angle - math.pi / 2) * 5),
-                          by + int(math.sin(self.angle - math.pi / 2) * 5)), 1)
+        pygame.draw.line(surface, WHITE, (bx, by),
+                         (bx + int(math.cos(self.angle + math.pi / 2) * 4),
+                          by + int(math.sin(self.angle + math.pi / 2) * 4)), 1)
+        pygame.draw.line(surface, WHITE, (bx, by),
+                         (bx + int(math.cos(self.angle - math.pi / 2) * 4),
+                          by + int(math.sin(self.angle - math.pi / 2) * 4)), 1)
 
 
 # ---------------------------------------------------------------------------
@@ -1009,200 +1084,11 @@ class MushroomEnemy:
 
 
 # ---------------------------------------------------------------------------
-# Sky Spectre  (floating ghost enemy — sky section only)
-# ---------------------------------------------------------------------------
-class SkySpectre:
-    WIDTH, HEIGHT = 32, 40
-
-    def __init__(self, x, y, amplitude=60, speed=0.7):
-        self.rect = pygame.Rect(x, y, self.WIDTH, self.HEIGHT)
-        self.base_x = float(x)
-        self.base_y = float(y)
-        self.amplitude = amplitude
-        self.speed = speed
-        self.tick = random.randint(0, 200)
-        self.alive = True
-        self.death_timer = 0
-        self.direction = 1
-        self.h_speed = random.uniform(0.6, 1.1)
-        self.patrol_left = x - 180
-        self.patrol_right = x + 180
-
-    def update(self):
-        if not self.alive:
-            self.death_timer -= 1
-            return
-        self.tick += 1
-        self.rect.x += int(self.h_speed * self.direction)
-        if self.rect.x >= self.patrol_right:
-            self.direction = -1
-        elif self.rect.x <= self.patrol_left:
-            self.direction = 1
-        # Sinusoidal vertical float
-        self.rect.y = int(self.base_y + math.sin(self.tick * 0.04) * self.amplitude)
-
-    def kill(self):
-        self.alive = False
-        self.death_timer = 1
-
-    def check_collision(self, player):
-        if not self.alive or not player.alive:
-            return None
-        if not self.rect.colliderect(player.rect):
-            return None
-        if player.vel_y > 0 and player.rect.bottom <= self.rect.centery + 10:
-            return "stomp"
-        return "kill_player"
-
-    def draw(self, surface, camera, tick):
-        if not self.alive:
-            return
-        sr = camera.apply(self.rect)
-        if sr.right < -10 or sr.left > SCREEN_WIDTH + 10:
-            return
-        bob = int(math.sin(self.tick * 0.05) * 3)
-        cx, cy = sr.centerx, sr.centery + bob
-
-        # Ghostly body glow
-        for gr, ga in [(22, 25), (16, 55), (10, 100)]:
-            gs = pygame.Surface((gr * 2, gr * 2), pygame.SRCALPHA)
-            pygame.draw.circle(gs, (*SPECTER_GLOW, ga), (gr, gr), gr)
-            surface.blit(gs, (cx - gr, cy - gr - 4))
-
-        # Main body — rounded top, wavy bottom
-        body_pts = [(cx - 14, cy + 12), (cx - 16, cy), (cx - 14, cy - 10),
-                    (cx, cy - 18), (cx + 14, cy - 10), (cx + 16, cy),
-                    (cx + 14, cy + 12)]
-        # Wavy tail
-        wave = int(math.sin(tick * 0.12) * 4)
-        tail_pts = [(cx + 14, cy + 12),
-                    (cx + 8, cy + 20 + wave),
-                    (cx, cy + 16 - wave),
-                    (cx - 8, cy + 20 + wave),
-                    (cx - 14, cy + 12)]
-        pygame.draw.polygon(surface, SPECTER_DARK, body_pts + tail_pts)
-        pygame.draw.polygon(surface, SPECTER_BLUE, body_pts + tail_pts, 2)
-
-        # Glowing eyes
-        for ex_off in [-5, 5]:
-            eye_s = pygame.Surface((10, 10), pygame.SRCALPHA)
-            pygame.draw.circle(eye_s, (*SPECTER_GLOW, 200), (5, 5), 5)
-            surface.blit(eye_s, (cx + ex_off - 5, cy - 10 + bob))
-            pygame.draw.circle(surface, WHITE, (cx + ex_off, cy - 8 + bob), 2)
-
-        # Eerie mouth jagged line
-        for i in range(-8, 8, 3):
-            my = cy + 4 + bob + (2 if (i // 3) % 2 == 0 else -2)
-            pygame.draw.circle(surface, SPECTER_GLOW, (cx + i, my), 1)
-
-
-# ---------------------------------------------------------------------------
-# Harpy  (swooping bat-wing enemy — fast diagonal dive)
-# ---------------------------------------------------------------------------
-class Harpy:
-    WIDTH, HEIGHT = 36, 28
-
-    def __init__(self, x, y, patrol_left, patrol_right, speed=1.4):
-        self.rect = pygame.Rect(x, y, self.WIDTH, self.HEIGHT)
-        self.patrol_left = patrol_left
-        self.patrol_right = patrol_right
-        self.speed = speed
-        self.direction = 1
-        self.alive = True
-        self.death_timer = 0
-        self.tick = random.randint(0, 100)
-        self.base_y = float(y)
-        self.dive_timer = 0      # counts up during dive
-        self.diving = False
-        self.dive_target_y = y
-
-    def update(self):
-        if not self.alive:
-            self.death_timer -= 1
-            return
-        self.tick += 1
-        self.rect.x += int(self.speed * self.direction)
-        if self.rect.x >= self.patrol_right:
-            self.direction = -1
-        elif self.rect.x <= self.patrol_left:
-            self.direction = 1
-
-        # Dive every ~200 ticks
-        if not self.diving and self.tick % 200 == 0:
-            self.diving = True
-            self.dive_timer = 0
-            self.dive_target_y = self.base_y + 80
-
-        if self.diving:
-            self.dive_timer += 1
-            t = min(1.0, self.dive_timer / 30)
-            self.rect.y = int(self.base_y + (self.dive_target_y - self.base_y) * t)
-            if self.dive_timer >= 60:
-                self.diving = False
-                self.rect.y = int(self.base_y)
-        else:
-            self.rect.y = int(self.base_y + math.sin(self.tick * 0.03) * 14)
-
-    def kill(self):
-        self.alive = False
-        self.death_timer = 1
-
-    def check_collision(self, player):
-        if not self.alive or not player.alive:
-            return None
-        if not self.rect.colliderect(player.rect):
-            return None
-        if player.vel_y > 0 and player.rect.bottom <= self.rect.centery + 10:
-            return "stomp"
-        return "kill_player"
-
-    def draw(self, surface, camera, tick):
-        if not self.alive:
-            return
-        sr = camera.apply(self.rect)
-        if sr.right < -10 or sr.left > SCREEN_WIDTH + 10:
-            return
-        cx, cy = sr.centerx, sr.centery
-        flap = int(math.sin(self.tick * 0.25) * 10)
-
-        # Wing glow
-        for gr, ga in [(24, 18), (16, 40)]:
-            gs = pygame.Surface((gr * 2, gr * 2), pygame.SRCALPHA)
-            pygame.draw.circle(gs, (*HARPY_PURPLE, ga), (gr, gr), gr)
-            surface.blit(gs, (cx - gr, cy - gr))
-
-        # Left wing
-        lw_pts = [(cx - 2, cy), (cx - 20, cy - flap - 8), (cx - 30, cy + 6),
-                  (cx - 18, cy + 10)]
-        pygame.draw.polygon(surface, HARPY_DARK, lw_pts)
-        pygame.draw.polygon(surface, HARPY_PURPLE, lw_pts, 1)
-
-        # Right wing
-        rw_pts = [(cx + 2, cy), (cx + 20, cy - flap - 8), (cx + 30, cy + 6),
-                  (cx + 18, cy + 10)]
-        pygame.draw.polygon(surface, HARPY_DARK, rw_pts)
-        pygame.draw.polygon(surface, HARPY_PURPLE, rw_pts, 1)
-
-        # Body
-        pygame.draw.ellipse(surface, HARPY_DARK, (cx - 9, cy - 8, 18, 20))
-        pygame.draw.ellipse(surface, HARPY_PURPLE, (cx - 9, cy - 8, 18, 20), 1)
-
-        # Head
-        pygame.draw.circle(surface, HARPY_DARK, (cx, cy - 10), 7)
-        pygame.draw.circle(surface, HARPY_PURPLE, (cx, cy - 10), 7, 1)
-
-        # Glowing red eyes
-        eye_x = cx + (3 if self.direction > 0 else -3)
-        for ex_off, blink in [(-3, 0), (3, 1)]:
-            if (tick // 30) % 8 != 0:  # blink effect
-                eye_s = pygame.Surface((8, 8), pygame.SRCALPHA)
-                pygame.draw.circle(eye_s, (255, 60, 60, 200), (4, 4), 3)
-                surface.blit(eye_s, (cx + ex_off - 4, cy - 13))
-                pygame.draw.circle(surface, (255, 120, 120), (cx + ex_off, cy - 11), 1)
+# Santa Boss
 # ---------------------------------------------------------------------------
 class SantaBoss:
-    WIDTH, HEIGHT = 88, 88
-    DAMAGE_STAGES = [12, 9, 6, 3, 1]
+    WIDTH, HEIGHT = 80, 80
+    DAMAGE_STAGES = [10, 7, 5, 3, 1]  # hp thresholds for visual stages
 
     def __init__(self, x, y):
         self.rect = pygame.Rect(x, y, self.WIDTH, self.HEIGHT)
@@ -1212,50 +1098,27 @@ class SantaBoss:
         self.dead = False
         self.death_timer = 0
         self.explosion_timer = 0
-        self.invincibility = 0
+        self.invincibility = 0  # frames after being hit
         self.balloon_cooldown = 0
         self.tick = 0
+        # Movement
         self.vx = 1.8
         self.base_y = float(y)
-        self.descent = 0.0
+        self.descent = 0.0  # total descent over fight
         self.appeared = False
+        self.appear_timer = 0
+        # Gift drop
         self.gift_dropped = False
         self.gift = None
-        # Phase system
-        self.phase = 1
-        self.phase_change_flash = 0
-        # Cinematic entrance
-        self.entrance_done = False
-        self.entrance_timer = 0
-        self.shadow_alpha = 0
-        # Hit feedback
-        self.hit_flash = 0
-
-    @property
-    def phase_speed(self):
-        return {3: 3.4, 2: 2.4}.get(self.phase, 1.8)
-
-    @property
-    def balloon_interval(self):
-        return {3: 45, 2: 75}.get(self.phase, 120)
 
     def hit(self):
         if self.invincibility > 0 or self.dead:
             return False
         self.hp -= 1
-        self.invincibility = 18
-        self.hit_flash = 6
-        if self.hp <= SANTA_PHASE3_HP and self.phase < 3:
-            self.phase = 3
-            self.phase_change_flash = 30
-            self.vx = self.phase_speed
-        elif self.hp <= SANTA_PHASE2_HP and self.phase < 2:
-            self.phase = 2
-            self.phase_change_flash = 24
-            self.vx = self.phase_speed
+        self.invincibility = 20
         if self.hp <= 0:
             self.dead = True
-            self.explosion_timer = 80
+            self.explosion_timer = 60
             return True
         return False
 
@@ -1263,208 +1126,160 @@ class SantaBoss:
         if not self.alive:
             return
         self.tick += 1
-        if self.invincibility > 0: self.invincibility -= 1
-        if self.hit_flash > 0:     self.hit_flash -= 1
-        if self.phase_change_flash > 0: self.phase_change_flash -= 1
+        if self.invincibility > 0:
+            self.invincibility -= 1
 
         if self.dead:
             self.explosion_timer -= 1
             if self.explosion_timer <= 0:
                 self.alive = False
+                # Drop gift
                 if not self.gift_dropped:
                     self.gift_dropped = True
                     self.gift = GiftPickup(self.rect.centerx, self.rect.centery)
             return
 
-        # ── Cinematic entrance (80 frames) ──
-        if not self.entrance_done:
-            self.entrance_timer += 1
-            self.shadow_alpha = min(160, self.entrance_timer * 6) if self.entrance_timer < 30 \
-                                else max(0, self.shadow_alpha - 8)
-            self.rect.x -= 4
-            if self.entrance_timer >= 80:
-                self.entrance_done = True
+        # Appear from right edge
+        if not self.appeared:
+            self.appear_timer += 1
+            self.rect.x -= 2
+            if self.rect.x < player_x + 300:
                 self.appeared = True
-                self.vx = self.phase_speed
             return
 
-        # ── Normal movement ──
+        # Side-to-side movement
         self.rect.x += int(self.vx)
-        if self.rect.x > player_x + 500:  self.vx = -abs(self.vx)
-        elif self.rect.x < player_x - 300: self.vx =  abs(self.vx)
+        # Bounce off world edges (wide range)
+        if self.rect.x > player_x + 500:
+            self.vx = -abs(self.vx)
+        elif self.rect.x < player_x - 300:
+            self.vx = abs(self.vx)
 
-        # Phase 3: occasional charge
-        if self.phase == 3 and self.tick % 180 < 30:
-            self.rect.x += int((player_x - self.rect.centerx) * 0.04)
-
+        # Gradual descent: total 200px over full fight
         progress = 1.0 - self.hp / self.max_hp
-        target_descent = progress * 220
-        if self.descent < target_descent: self.descent += 0.45
-        bob_amp = 16 if self.phase == 3 else 8
-        self.rect.y = int(self.base_y + self.descent + math.sin(self.tick * 0.03) * bob_amp)
+        target_descent = progress * 200
+        if self.descent < target_descent:
+            self.descent += 0.4
+        self.rect.y = int(self.base_y + self.descent + math.sin(self.tick * 0.03) * 12)
 
+        # Throw balloons
         self.balloon_cooldown -= 1
+        # Shoot faster as hp drops
+        interval = max(50, SANTA_BALLOON_INTERVAL - int((1.0 - progress) * 0) - int(progress * 60))
         if self.balloon_cooldown <= 0 and self.appeared:
-            self.balloon_cooldown = self.balloon_interval
-            shots = 2 if self.phase >= 2 else 1
-            for s in range(shots):
-                ox = random.randint(-30, 30) if s > 0 else 0
-                balloons.append(WaterBalloon(
-                    self.rect.centerx + ox, self.rect.bottom, player_x, player_y))
+            self.balloon_cooldown = interval
+            balloons.append(WaterBalloon(
+                self.rect.centerx, self.rect.bottom,
+                player_x, player_y))
 
     def draw(self, surface, camera, tick):
         if not self.alive:
             return
-
-        # Shadow sweep during entrance
-        if not self.entrance_done and self.shadow_alpha > 0:
-            prog = min(1.0, self.entrance_timer / 40)
-            sw = int(SCREEN_WIDTH * prog * 1.4)
-            shad = pygame.Surface((sw, SCREEN_HEIGHT), pygame.SRCALPHA)
-            shad.fill((0, 0, 0, int(self.shadow_alpha * 0.4)))
-            surface.blit(shad, (0, 0))
-
         sr = camera.apply(self.rect)
         if sr.right < -20 or sr.left > SCREEN_WIDTH + 20:
             return
 
-        # Phase change flash
-        if self.phase_change_flash > 0:
-            pf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-            fa = int(180 * (self.phase_change_flash / 30))
-            col = (255, 40, 40, fa) if self.phase == 3 else (255, 130, 30, fa)
-            pf.fill(col)
-            surface.blit(pf, (0, 0))
-
-        # Death explosion
+        # Explosion effect
         if self.dead:
-            prog = 1.0 - self.explosion_timer / 80
-            for i in range(4):
-                er = int((28 + i * 26) * prog)
-                ec = [FIRE_ORANGE, FIRE_RED, FIRE_YELLOW, WHITE][i]
+            prog = 1.0 - self.explosion_timer / 60
+            for i in range(3):
+                er = int((40 + i * 30) * prog)
+                ec = [FIRE_ORANGE, FIRE_RED, FIRE_YELLOW][i]
+                ea = max(0, int(255 * (1 - prog)))
                 if er > 0:
-                    ea = max(0, int(255 * (1 - prog * 0.7)))
-                    es = pygame.Surface((er * 2, er * 2), pygame.SRCALPHA)
-                    pygame.draw.circle(es, (*ec, ea), (er, er), er)
-                    surface.blit(es, (sr.centerx - er, sr.centery - er))
+                    pygame.draw.circle(surface, tuple(max(0, min(255, int(c * ea / 255))) for c in ec),
+                                       (sr.centerx, sr.centery), er)
+            if self.explosion_timer > 30:
+                pygame.draw.circle(surface, WHITE, (sr.centerx, sr.centery), int(20 * prog))
             return
 
-        damage_stage = sum(1 for t in self.DAMAGE_STAGES if self.hp <= t)
+        # Damage stage: visual degradation
+        damage_stage = 0
+        for i, threshold in enumerate(self.DAMAGE_STAGES):
+            if self.hp <= threshold:
+                damage_stage = i + 1
 
+        # Invincibility flicker
         if self.invincibility > 0 and (self.invincibility // 3) % 2 == 0:
             return
 
         cx, cy = sr.centerx, sr.centery
 
-        # ── Phase aura ──
-        if self.phase == 3:
-            for ar, aa in [(62, 14), (44, 28), (30, 50)]:
-                aura = pygame.Surface((ar * 2, ar * 2), pygame.SRCALPHA)
-                pulse = abs(math.sin(tick * 0.1)) * 0.5 + 0.5
-                pygame.draw.circle(aura, (*PHASE3_DARK, int(aa * pulse)), (ar, ar), ar)
-                surface.blit(aura, (cx - ar, cy - ar))
-        elif self.phase == 2:
-            for ar, aa in [(50, 12), (36, 22)]:
-                aura = pygame.Surface((ar * 2, ar * 2), pygame.SRCALPHA)
-                pygame.draw.circle(aura, (*PHASE2_RED, aa), (ar, ar), ar)
-                surface.blit(aura, (cx - ar, cy - ar))
+        # ── Balloon vessel ──
+        # Balloon string
+        string_sway = int(math.sin(self.tick * 0.04) * 6)
+        balloon_cx = cx + string_sway
+        balloon_cy = cy - 40
 
-        # ── Balloon ──
-        sway = int(math.sin(self.tick * 0.04) * 7)
-        bcx, bcy = cx + sway, cy - 46
-        br = 36
-        if self.phase == 3:   bc = lerp_color((160, 20, 20), (80, 0, 0), damage_stage / 5)
-        elif self.phase == 2: bc = lerp_color(SANTA_RED, (140, 30, 30), damage_stage / 5)
-        else:                 bc = lerp_color(BALLOON_BLUE, (160, 80, 80), damage_stage / 5)
+        # Balloon (gets more torn per stage)
+        balloon_r = 32
+        balloon_c = lerp_color(BALLOON_BLUE, (160, 80, 80), damage_stage / 5)
+        pygame.draw.circle(surface, balloon_c, (balloon_cx, balloon_cy), balloon_r)
+        pygame.draw.circle(surface, tuple(min(255, v + 40) for v in balloon_c),
+                           (balloon_cx - 8, balloon_cy - 10), 10)
 
-        bg = pygame.Surface((br * 3, br * 3), pygame.SRCALPHA)
-        pygame.draw.circle(bg, (*bc, 35), (br + br // 2, br + br // 2), br + 12)
-        surface.blit(bg, (bcx - br - br // 2, bcy - br - br // 2))
-        pygame.draw.circle(surface, bc, (bcx, bcy), br)
-        pygame.draw.circle(surface, tuple(min(255, v + 55) for v in bc), (bcx - 10, bcy - 12), 11)
-
+        # Damage cracks on balloon
         if damage_stage >= 1:
             for i in range(damage_stage * 2):
-                a = i * math.pi / max(1, damage_stage) + self.tick * 0.01
-                x1 = bcx + int(math.cos(a) * 20)
-                y1 = bcy + int(math.sin(a) * 20)
-                x2 = bcx + int(math.cos(a + 0.3) * (br - 2))
-                y2 = bcy + int(math.sin(a + 0.3) * (br - 2))
-                pygame.draw.line(surface, (100, 40, 40), (x1, y1), (x2, y2), 1)
+                a = i * math.pi / damage_stage + self.tick * 0.01
+                x1 = balloon_cx + int(math.cos(a) * 18)
+                y1 = balloon_cy + int(math.sin(a) * 18)
+                x2 = balloon_cx + int(math.cos(a + 0.3) * (balloon_r - 2))
+                y2 = balloon_cy + int(math.sin(a + 0.3) * (balloon_r - 2))
+                pygame.draw.line(surface, (100, 60, 60), (x1, y1), (x2, y2), 1)
 
-        # String
-        for i in range(10):
-            t = i / 9
-            sx2 = bcx + int((cx - bcx) * t) + int(math.sin(t * math.pi + self.tick * 0.05) * 3)
-            sy2 = bcy + int((cy - 30 - bcy) * t)
-            pygame.draw.circle(surface, (180, 180, 200), (sx2, sy2), 1)
+        # String from balloon to Santa
+        for i in range(8):
+            t = i / 7
+            sx = balloon_cx + int((cx - balloon_cx) * t) + int(math.sin(t * math.pi + self.tick * 0.05) * 3)
+            sy = balloon_cy + int((cy - 28 - balloon_cy) * t)
+            pygame.draw.circle(surface, (180, 180, 200), (sx, sy), 1)
 
-        # ── Body ──
-        if self.phase == 3:   sc = lerp_color((180, 10, 10), PHASE3_DARK, damage_stage / 5)
-        elif self.phase == 2: sc = lerp_color(SANTA_RED, (160, 20, 20), damage_stage / 5)
-        else:                 sc = lerp_color(SANTA_RED, (120, 40, 40), damage_stage / 5)
-        if self.hit_flash > 0:
-            sc = lerp_color(sc, WHITE, self.hit_flash / 6)
+        # ── Santa body ──
+        body_r = pygame.Rect(cx - 22, cy - 20, 44, 44)
+        santa_c = lerp_color(SANTA_RED, (120, 40, 40), damage_stage / 5)
+        pygame.draw.ellipse(surface, santa_c, body_r)
 
-        pygame.draw.ellipse(surface, sc, (cx - 24, cy - 22, 48, 48))
-        pygame.draw.rect(surface, BLACK, (cx - 24, cy + 2, 48, 6))
-        pygame.draw.rect(surface, XMAS_GOLD, (cx - 7, cy, 14, 9))
-        pygame.draw.rect(surface, (180, 140, 20), (cx - 5, cy + 1, 10, 7), 1)
-        pygame.draw.ellipse(surface, SANTA_WHITE, (cx - 25, cy - 25, 50, 14))
-        pygame.draw.ellipse(surface, SANTA_WHITE, (cx - 26, cy + 20, 52, 13))
+        # Belt
+        pygame.draw.rect(surface, BLACK, (cx - 22, cy + 2, 44, 5))
+        pygame.draw.rect(surface, XMAS_GOLD, (cx - 6, cy, 12, 8))
 
-        # ── Head ──
-        pygame.draw.circle(surface, (220, 180, 155), (cx, cy - 30), 16)
-        hc = PHASE3_DARK if self.phase == 3 else sc
-        pygame.draw.polygon(surface, hc, [(cx-16,cy-30),(cx+16,cy-30),(cx+7,cy-54),(cx-5,cy-54)])
-        pygame.draw.rect(surface, SANTA_WHITE, (cx - 17, cy - 34, 34, 8))
-        pygame.draw.circle(surface, SANTA_WHITE, (cx + 5, cy - 54), 5)
+        # White trim
+        pygame.draw.ellipse(surface, SANTA_WHITE, (cx - 23, cy - 23, 46, 14))
+        pygame.draw.ellipse(surface, SANTA_WHITE, (cx - 24, cy + 18, 48, 12))
 
-        # Phase 3 hat flames
-        if self.phase == 3:
-            for fi in range(5):
-                fa = tick * 0.15 + fi * 0.4
-                fx = cx - 10 + fi * 5 + int(math.sin(fa) * 3)
-                fy = cy - 56 - abs(int(math.sin(fa + fi) * 8))
-                pygame.draw.circle(surface, [FIRE_RED, FIRE_ORANGE, FIRE_YELLOW][fi % 3], (fx, fy), 3)
+        # Head
+        pygame.draw.circle(surface, (220, 180, 155), (cx, cy - 28), 14)
+        # Hat
+        pygame.draw.polygon(surface, santa_c,
+                            [(cx - 14, cy - 28), (cx + 14, cy - 28), (cx + 6, cy - 50), (cx - 4, cy - 50)])
+        pygame.draw.rect(surface, SANTA_WHITE, (cx - 15, cy - 32, 30, 7))
+        pygame.draw.circle(surface, SANTA_WHITE, (cx + 4, cy - 50), 4)
 
-        # Eyes
-        ec2 = (240, 60, 60) if self.phase >= 2 else BLACK
-        if damage_stage >= 2 or self.phase >= 2:
-            pygame.draw.line(surface, BLACK, (cx-10,cy-36),(cx-5,cy-33), 2)
-            pygame.draw.line(surface, BLACK, (cx+10,cy-36),(cx+5,cy-33), 2)
-        pygame.draw.circle(surface, ec2, (cx - 6, cy - 31), 3)
-        pygame.draw.circle(surface, ec2, (cx + 6, cy - 31), 3)
-        if self.phase >= 2:
-            pygame.draw.circle(surface, (255, 140, 140), (cx-6, cy-31), 1)
-            pygame.draw.circle(surface, (255, 140, 140), (cx+6, cy-31), 1)
+        # Eyes (angry on low hp)
+        if damage_stage >= 3:
+            pygame.draw.line(surface, BLACK, (cx - 8, cy - 32), (cx - 4, cy - 30), 2)
+            pygame.draw.line(surface, BLACK, (cx + 8, cy - 32), (cx + 4, cy - 30), 2)
+        pygame.draw.circle(surface, BLACK, (cx - 5, cy - 28), 2)
+        pygame.draw.circle(surface, BLACK, (cx + 5, cy - 28), 2)
 
-        # Arms
-        pygame.draw.line(surface, sc, (cx-24, cy-6), (cx-40, cy+12), 6)
-        pygame.draw.line(surface, sc, (cx+24, cy-6), (cx+40, cy+12), 6)
-        bhc = (200, 30, 30) if self.phase == 3 else BALLOON_BLUE
-        pygame.draw.circle(surface, bhc, (cx + 42, cy + 14), 9)
+        # Arms (holding a balloon sack)
+        pygame.draw.line(surface, santa_c, (cx - 22, cy - 4), (cx - 38, cy + 10), 5)
+        pygame.draw.line(surface, santa_c, (cx + 22, cy - 4), (cx + 38, cy + 10), 5)
+        pygame.draw.circle(surface, BALLOON_BLUE, (cx + 40, cy + 12), 8)
 
-        # Phase label
-        if self.phase >= 2:
-            pf2 = pygame.font.SysFont("consolas", 10, bold=True)
-            plbl_c = (255, 70, 70) if self.phase == 3 else (255, 140, 30)
-            plbl = pf2.render(f"PHASE {self.phase}", True, plbl_c)
-            surface.blit(plbl, (cx - plbl.get_width() // 2, sr.y - 40))
-
-        # ── HP bar ──
-        bar_w = 120
-        bx2, by2 = cx - bar_w // 2, sr.y - 24
-        pygame.draw.rect(surface, (20, 20, 20), (bx2-2, by2-2, bar_w+4, 14))
+        # HP bar above Santa
+        bar_w = 90
+        bar_x = cx - bar_w // 2
+        bar_y = sr.y - 26
+        pygame.draw.rect(surface, (40, 40, 40), (bar_x - 2, bar_y - 2, bar_w + 4, 14))
         ratio = self.hp / self.max_hp
-        if self.phase == 3:   brc = lerp_color((200,20,20), FIRE_RED, ratio)
-        elif self.phase == 2: brc = lerp_color(FIRE_RED, FIRE_ORANGE, ratio)
-        else:                 brc = lerp_color(FIRE_RED, GRASS_GREEN, ratio)
-        pygame.draw.rect(surface, brc, (bx2, by2, int(bar_w * ratio), 10))
-        pygame.draw.rect(surface, WHITE, (bx2, by2, bar_w, 10), 1)
-        hpf = pygame.font.SysFont("consolas", 9, bold=True)
-        hpt = hpf.render(f"CORRUPTED SANTA  {self.hp}/{self.max_hp}", True, WHITE)
-        surface.blit(hpt, (cx - hpt.get_width() // 2, by2 - 1))
+        bar_c = lerp_color(FIRE_RED, GRASS_GREEN, ratio)
+        pygame.draw.rect(surface, bar_c, (bar_x, bar_y, int(bar_w * ratio), 10))
+        pygame.draw.rect(surface, WHITE, (bar_x, bar_y, bar_w, 10), 1)
+        hp_f = pygame.font.SysFont("consolas", 9, bold=True)
+        hp_t = hp_f.render(f"SANTA {self.hp}/{self.max_hp}", True, WHITE)
+        surface.blit(hp_t, (cx - hp_t.get_width() // 2, bar_y - 1))
 
 
 # ---------------------------------------------------------------------------
@@ -1787,9 +1602,9 @@ def create_level():
     checkpoints = []
     mushrooms = []
     npcs = []
-    sky_enemies = []   # SkySpectre + Harpy
 
     # ── Section 1: Ground intro (0 – 2200) ──
+    # Wide starting ground
     platforms.append(IslandPlatform(0, 520, 500))
     npcs.append(NPC(120, 520, "intro", "Seraphiel"))
     platforms.append(IslandPlatform(650, 490, 160))
@@ -1815,9 +1630,6 @@ def create_level():
     mushrooms.append(MushroomEnemy(2490, 374, 2480, 2600, speed=1.4))
     mushrooms.append(MushroomEnemy(3350, 334, 3340, 3460, speed=1.5))
     mushrooms.append(MushroomEnemy(4230, 274, 4220, 4340, speed=1.5))
-    # First sky enemies appear in section 2
-    sky_enemies.append(Harpy(2700, 330, 2600, 2900, speed=1.3))
-    sky_enemies.append(SkySpectre(3500, 280, amplitude=50, speed=0.6))
     checkpoints.append(Checkpoint(4540, 340))
     npcs.append(NPC(4580, 340, "cp2", "Seraphiel"))
 
@@ -1830,16 +1642,10 @@ def create_level():
     platforms.append(IslandPlatform(6580, 240, 140))
     platforms.append(IslandPlatform(6900, 200, 140))
     platforms.append(IslandPlatform(7220, 240, 140))
-    platforms.append(IslandPlatform(7540, 220, 200))
+    platforms.append(IslandPlatform(7540, 220, 200))  # wide rest before boss
     mushrooms.append(MushroomEnemy(5310, 214, 5300, 5420, speed=1.6))
     mushrooms.append(MushroomEnemy(6270, 174, 6260, 6380, speed=1.6))
     mushrooms.append(MushroomEnemy(7230, 214, 7220, 7360, speed=1.7))
-    # Sky enemies get scarier in section 3
-    sky_enemies.append(SkySpectre(5100, 210, amplitude=70, speed=0.8))
-    sky_enemies.append(Harpy(5700, 150, 5600, 5900, speed=1.6))
-    sky_enemies.append(SkySpectre(6400, 150, amplitude=80, speed=0.9))
-    sky_enemies.append(Harpy(6800, 150, 6700, 7050, speed=1.7))
-    sky_enemies.append(SkySpectre(7300, 170, amplitude=65, speed=1.0))
     checkpoints.append(Checkpoint(7560, 220))
     npcs.append(NPC(7610, 220, "cp3", "Lumen"))
 
@@ -1850,20 +1656,14 @@ def create_level():
     platforms.append(IslandPlatform(9100, 200, 140))
     platforms.append(IslandPlatform(9400, 240, 180))
     platforms.append(IslandPlatform(9700, 200, 160))
-    platforms.append(IslandPlatform(10000, 240, 400))
+    platforms.append(IslandPlatform(10000, 240, 400))  # final wide platform
     mushrooms.append(MushroomEnemy(8510, 174, 8500, 8620, speed=1.7))
     mushrooms.append(MushroomEnemy(9410, 214, 9400, 9560, speed=1.8))
     mushrooms.append(MushroomEnemy(10020, 214, 10000, 10360, speed=1.8))
-    # Dense sky enemies in final section
-    sky_enemies.append(Harpy(8300, 170, 8200, 8500, speed=1.8))
-    sky_enemies.append(SkySpectre(8700, 160, amplitude=75, speed=1.1))
-    sky_enemies.append(Harpy(9200, 150, 9100, 9450, speed=2.0))
-    sky_enemies.append(SkySpectre(9600, 160, amplitude=60, speed=1.2))
-    sky_enemies.append(Harpy(9900, 150, 9800, 10100, speed=1.9))
 
     exit_portal = ExitPortal(10310, 240)
 
-    return platforms, checkpoints, mushrooms, npcs, exit_portal, sky_enemies
+    return platforms, checkpoints, mushrooms, npcs, exit_portal
 
 
 # ---------------------------------------------------------------------------
@@ -1931,7 +1731,7 @@ class Game:
 
     # ------------------------------------------------------------------
     def load_level(self):
-        self.platforms, self.checkpoints, self.mushrooms, self.npcs, self.exit_portal, self.sky_enemies = create_level()
+        self.platforms, self.checkpoints, self.mushrooms, self.npcs, self.exit_portal = create_level()
         self.player = Player(100, 460)
         self.camera = Camera(SCREEN_WIDTH, SCREEN_HEIGHT)
         self.particles.clear()
@@ -2029,12 +1829,12 @@ class Game:
         if arrow:
             self.arrows.append(arrow)
             self.sfx.play("shoot")
-            # Ice muzzle flash particles
-            for _ in range(6):
+            # Muzzle particles
+            for _ in range(4):
                 self.particles.append(Particle(
                     self.player.rect.centerx, self.player.rect.centery - 4,
-                    random.choice([ICE_BLUE, ICE_WHITE, ICE_CORE, WHITE]),
-                    random.uniform(-2, 2), random.uniform(-2.5, 0.5), 12, random.randint(2, 4), 0.1))
+                    random.choice([HOLY_GOLD, WHITE, SUN_YELLOW]),
+                    random.uniform(-1, 1), random.uniform(-2, 0.5), 10, 2, 0.1))
 
     # ------------------------------------------------------------------
     def _handle_key(self, key):
@@ -2183,38 +1983,14 @@ class Game:
                     and arrow.get_rect().colliderect(self.santa.rect)):
                 arrow.alive = False
                 killed = self.santa.hit()
-                self._ice_hit_fx(int(arrow.x), int(arrow.y), big=killed)
+                self._arrow_hit_fx(int(arrow.x), int(arrow.y))
                 if killed:
                     self.sfx.play("santa_die")
-                    self.camera.add_shake(18)
+                    self.camera.add_shake(16)
                     self.flashes.append(FlashOverlay(FIRE_ORANGE, 20, 160))
-                    self.freeze_frames = 4
                 else:
                     self.sfx.play("arrow_hit")
-                    self.camera.add_shake(5)
-                    # Phase change announcement
-                    if self.santa.phase_change_flash > 0:
-                        self.score_popups.append((
-                            self.santa.rect.centerx, self.santa.rect.y - 30,
-                            f"PHASE {self.santa.phase}!", 70,
-                            (255, 70, 70) if self.santa.phase == 3 else (255, 140, 30)))
-                        self.camera.add_shake(12)
-                        self.flashes.append(FlashOverlay(
-                            (255, 40, 40) if self.santa.phase == 3 else (255, 130, 30), 18, 120))
-
-            # Arrow vs sky enemies
-            if not arrow.alive:
-                continue
-            for se in self.sky_enemies:
-                if se.alive and arrow.alive and arrow.get_rect().colliderect(se.rect):
-                    arrow.alive = False
-                    se.kill()
-                    self._ice_hit_fx(int(arrow.x), int(arrow.y))
-                    self.sfx.play("arrow_hit")
-                    self.camera.add_shake(3)
-                    self.player.kill_count += 1
-                    self.score_popups.append((int(arrow.x), int(arrow.y) - 20, "+100", 40, ICE_BLUE))
-                    break
+                    self.camera.add_shake(4)
 
             # Arrow vs platforms
             if not arrow.alive:
@@ -2223,41 +1999,13 @@ class Game:
             for plat in self.platforms:
                 if plat.is_active() and ar.colliderect(plat.get_rect()):
                     arrow.alive = False
-                    # Ice dust puff on platform hit
-                    for _ in range(5):
+                    for _ in range(3):
                         self.particles.append(Particle(
-                            arrow.x, arrow.y,
-                            random.choice([ICE_BLUE, ICE_WHITE, ICE_CORE]),
-                            random.uniform(-2.5, 2.5), random.uniform(-2, 0.5),
-                            14, random.randint(2, 4), 0.08))
+                            arrow.x, arrow.y, ARROW_BROWN,
+                            random.uniform(-2, 2), random.uniform(-2, 0), 10, 2, 0.1))
                     break
 
         self.arrows = [a for a in self.arrows if a.update()]
-
-        # Sky enemy updates + collisions
-        for se in self.sky_enemies:
-            se.update()
-            coll = se.check_collision(self.player)
-            if coll == "stomp":
-                self._stomp_fx_sky(se)
-                se.kill()
-                self.player.vel_y = -10
-                self.player.kill_count += 1
-                self.sfx.play("stomp")
-                self.freeze_frames = 3
-            elif coll == "kill_player":
-                if self.player.take_damage():
-                    if self.player.alive:
-                        self.camera.add_shake(8)
-                        self.sfx.play("death")
-                        self.damage_flashes.append(DamageFlash())
-                        dx = self.player.rect.centerx - se.rect.centerx
-                        self.player.vel_x = 7 * (1 if dx >= 0 else -1)
-                        self.player.vel_y = -5
-                    else:
-                        self._player_death_fx()
-                        self.sfx.play("death")
-        self.sky_enemies = [se for se in self.sky_enemies if se.alive or se.death_timer > 0]
 
         # Balloon updates
         for bal in self.balloons:
@@ -2273,6 +2021,7 @@ class Game:
                             self.camera.add_shake(7)
                             self.sfx.play("balloon_hit")
                             self.damage_flashes.append(DamageFlash())
+                            # Knockback
                             dx = self.player.rect.centerx - (
                                 self.santa.rect.centerx if self.santa else self.player.rect.centerx)
                             self.player.vel_x = 6 * (1 if dx >= 0 else -1)
@@ -2418,36 +2167,14 @@ class Game:
                 math.cos(a) * s, math.sin(a) * s - 1, 20, 3, 0.12))
         self.score_popups.append((cx, cy - 25, "+50", 50, WHITE))
 
-    def _ice_hit_fx(self, x, y, big=False):
-        """Ice crystal explosion on arrow impact."""
-        count = 20 if big else 10
-        for _ in range(count):
+    def _arrow_hit_fx(self, x, y):
+        for _ in range(8):
             a = random.uniform(0, math.pi * 2)
-            s = random.uniform(2, 7 if big else 5)
+            s = random.uniform(2, 5)
             self.particles.append(Particle(
-                x, y, random.choice([ICE_BLUE, ICE_WHITE, ICE_CORE, WHITE]),
-                math.cos(a) * s, math.sin(a) * s,
-                random.randint(20, 40), random.randint(2, 5 if big else 3), 0.05))
-        # Ice ring
-        self.rings.append(RingEffect(x, y, ICE_BLUE, 60 if big else 35, 4, 2))
-        if big:
-            self.rings.append(RingEffect(x, y, ICE_WHITE, 90, 5, 3))
-            self.rings.append(RingEffect(x, y, ICE_CORE, 40, 6, 2))
-        lbl = "CRITICAL!" if big else "HIT!"
-        lbl_c = ICE_WHITE if big else ICE_BLUE
-        self.score_popups.append((x, y - 22, lbl, 45, lbl_c))
-
-    def _stomp_fx_sky(self, enemy):
-        cx, cy = enemy.rect.centerx, enemy.rect.top
-        self.camera.add_shake(5)
-        self.rings.append(RingEffect(cx, cy, SPECTER_GLOW, 50, 4, 2))
-        for _ in range(10):
-            a = random.uniform(-math.pi, 0)
-            s = random.uniform(1, 4)
-            self.particles.append(Particle(
-                cx, cy, random.choice([SPECTER_BLUE, SPECTER_GLOW, WHITE]),
-                math.cos(a) * s, math.sin(a) * s - 1, 20, 3, 0.10))
-        self.score_popups.append((cx, cy - 25, "+100", 50, SPECTER_GLOW))
+                x, y, random.choice([SANTA_RED, FIRE_ORANGE, WHITE]),
+                math.cos(a) * s, math.sin(a) * s, 18, 3, 0.1))
+        self.score_popups.append((x, y - 20, "HIT!", 40, SANTA_RED))
 
     def _gift_fx(self, x, y):
         self.camera.add_shake(10)
@@ -2703,10 +2430,6 @@ class Game:
         # Mushrooms
         for mush in self.mushrooms:
             mush.draw(self.screen, self.camera, self.tick)
-
-        # Sky enemies (Spectres + Harpies)
-        for se in self.sky_enemies:
-            se.draw(self.screen, self.camera, self.tick)
 
         # Santa
         if self.santa:
