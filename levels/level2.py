@@ -41,15 +41,19 @@ CP_ACTIVE    = (255, 220, 0)
 CP_GLOW      = (255, 255, 150)
 COUNTDOWN_COL = (60,  120, 200)
 
-# Zigzag ledge colours — left ledges are icy blue, right ledges are warm gold
-# No wall columns, so these are the only visual cues for side
-LEDGE_L_COL  = (80,  160, 220)   # left-side floating ledge (icy)
-LEDGE_R_COL  = (200, 160, 40)    # right-side floating ledge (gold)
+LEDGE_L_COL  = (80,  160, 220)
+LEDGE_R_COL  = (200, 160, 40)
 
 MOVING_COL   = (200, 140, 40)
 SANTA_RED    = (200, 30,  30)
 SLEIGH_BROWN = (180, 100, 40)
 SLEIGH_GOLD  = (220, 180, 30)
+
+# Snow Miser colour — icy blue-white, very on-brand
+SNOW_MISER_ROBE = (80, 160, 220)
+XMAS_GOLD       = (255, 200, 50)
+XMAS_RED        = (200, 30,  30)
+XMAS_GREEN      = (30,  160, 50)
 
 # Physics
 GRAVITY        = 0.6
@@ -60,103 +64,158 @@ MAX_FALL_SPEED = 15
 DEATH_Y        = 900
 BASE_Y         = 420
 
-# ---------------------------------------------------------------------------
-# Zigzag wall-climb geometry
-# ---------------------------------------------------------------------------
-# No wall columns — just floating ledges arranged in a zigzag.
-#
-# LEDGE_GAP   = horizontal distance between left ledges (x) and right ledges (x)
-# LEDGE_RISE  = vertical rise between consecutive steps
-# WALL_STEPS  = number of ledges per side (5 left + 5 right = 10 total)
-#
-# The ledges are staggered so NO ledge is directly above another — player
-# always has a clear diagonal window to jump through.
-#
-#   Right ledge 0  (lowest, player starts here)
-#        ↑ diagonal jump left+up
-#   Left  ledge 0
-#        ↑ diagonal jump right+up
-#   Right ledge 1
-#        ↑ ...
-#   Left  ledge 4  (highest)
-#        ↑ jump right+up to EXIT platform
-#
-LEDGE_GAP   = 180   # horizontal gap between left group x and right group x
-LEDGE_RISE  = 120   # vertical rise per step — generous clearance above each ledge
-WALL_STEPS  = 5     # ledges per side
-
-# Countdown grace window (frames player has to jump after GO before pad falls)
+LEDGE_GAP   = 180
+LEDGE_RISE  = 120
+WALL_STEPS  = 5
 COUNTDOWN_GRACE = 90
 
 # ---------------------------------------------------------------------------
-# Difficulty presets
+# Difficulty presets  (unchanged from original)
 # ---------------------------------------------------------------------------
 DIFFICULTY_PRESETS = {
     "easy": {
-        # Ice melts slowly, falls late, phantom is wide and stays long
-        "shrink_speed":    0.4,
-        "shrink_respawn":  400,
-        "fall_delay":      55,
-        "phantom_frames":  30,
-        "phantom_w":       110,
-        "balloon_vx":      10,
-        "balloon_vy":      -13,
-        "balloon_radius":  18,
-        "player_speed":    5,
-        "player_jump":     -14,
-        "countdown_sec":   3,
-        "countdown_grace": 100,
-        "tram_speed":      2,
-        "tram_vanish":     650,
-        "santa_timeout":   420,
-        "rope_len":        160,
-        "rope_grab_r":     22,
-        "zigzag_ledge_w":  80,
+        "shrink_speed":    0.4,  "shrink_respawn":  400,
+        "fall_delay":      55,   "phantom_frames":  30,
+        "phantom_w":       110,  "balloon_vx":      10,
+        "balloon_vy":      -13,  "balloon_radius":  18,
+        "player_speed":    5,    "player_jump":     -14,
+        "countdown_sec":   3,    "countdown_grace": 100,
+        "tram_speed":      2,    "tram_vanish":     650,
+        "santa_timeout":   420,  "rope_len":        160,
+        "rope_grab_r":     22,   "zigzag_ledge_w":  80,
         "kidnap_dist":     320,
     },
     "medium": {
-        "shrink_speed":    1.2,
-        "shrink_respawn":  300,
-        "fall_delay":      25,
-        "phantom_frames":  18,
-        "phantom_w":       80,
-        "balloon_vx":      9,
-        "balloon_vy":      -11,
-        "balloon_radius":  14,
-        "player_speed":    5,
-        "player_jump":     -13,
-        "countdown_sec":   3,
-        "countdown_grace": 90,
-        "tram_speed":      3,
-        "tram_vanish":     560,
-        "santa_timeout":   300,
-        "rope_len":        130,
-        "rope_grab_r":     14,
-        "zigzag_ledge_w":  60,
+        "shrink_speed":    1.2,  "shrink_respawn":  300,
+        "fall_delay":      25,   "phantom_frames":  18,
+        "phantom_w":       80,   "balloon_vx":      9,
+        "balloon_vy":      -11,  "balloon_radius":  14,
+        "player_speed":    5,    "player_jump":     -13,
+        "countdown_sec":   3,    "countdown_grace": 90,
+        "tram_speed":      3,    "tram_vanish":     560,
+        "santa_timeout":   300,  "rope_len":        130,
+        "rope_grab_r":     14,   "zigzag_ledge_w":  60,
         "kidnap_dist":     250,
     },
     "hard": {
-        # Ice melts fast, falls instantly, phantom is narrow and disappears quick
-        "shrink_speed":    2.8,
-        "shrink_respawn":  240,
-        "fall_delay":      8,
-        "phantom_frames":  8,
-        "phantom_w":       55,
-        "balloon_vx":      8,
-        "balloon_vy":      -10,
-        "balloon_radius":  9,
-        "player_speed":    5,
-        "player_jump":     -13,
-        "countdown_sec":   2,
-        "countdown_grace": 60,
-        "tram_speed":      4,
-        "tram_vanish":     555,
-        "santa_timeout":   300,
-        "rope_len":        130,
-        "rope_grab_r":     14,  # grab zone — hard difficulty via short rope+timeout
-        "zigzag_ledge_w":  42,
+        "shrink_speed":    2.8,  "shrink_respawn":  240,
+        "fall_delay":      8,    "phantom_frames":  8,
+        "phantom_w":       55,   "balloon_vx":      8,
+        "balloon_vy":      -10,  "balloon_radius":  9,
+        "player_speed":    5,    "player_jump":     -13,
+        "countdown_sec":   2,    "countdown_grace": 60,
+        "tram_speed":      4,    "tram_vanish":     555,
+        "santa_timeout":   300,  "rope_len":        130,
+        "rope_grab_r":     14,   "zigzag_ledge_w":  42,
         "kidnap_dist":     250,
     },
+}
+
+# ---------------------------------------------------------------------------
+# Story Dialogues  — Snow Miser guides the dreamer through the Second Realm
+# ---------------------------------------------------------------------------
+STORY_DIALOGUES = {
+    # ── Intro: Snow Miser greets the dreamer at the very start ──────────
+    "intro": [
+        ("Snow Miser", "Oh ho ho ho! Look who wandered into MY realm!"),
+        ("Snow Miser", "I'm Snow Miser. I'm too much. The second of the dream's four terrors."),
+        ("Snow Miser", "The First Realm is behind you. Fire. Anger. You burned right through it."),
+        ("Snow Miser", "But THIS realm? This is the realm of ICE. Of cold truth. Of slipping and falling."),
+        ("Snow Miser", "Everything here wants to shrink under you, fall away, or simply... vanish."),
+        ("Snow Miser", "I'm not your enemy, dreamer. I'm just the cold, honest voice in your head."),
+        ("Snow Miser", "Let me tell you what you're up against. ARROW KEYS or WASD to move. SPACE to jump."),
+        ("Snow Miser", "You can JUMP again in mid-air. Double jump. Use it wisely on the ice platforms."),
+        ("Snow Miser", "ICE PLATFORMS shrink the moment you land. Don't dawdle. Keep moving."),
+        ("Snow Miser", "WOOD PLATFORMS fall after a delay. You'll feel them shake. That's your warning."),
+        ("Snow Miser", "SPIKES are instant death. Don't fall into them. There's a balloon nearby... trust it."),
+        ("Snow Miser", "TEAL PLATFORMS are phantom. Step on them and they vanish. Fast."),
+        ("Snow Miser", "Press SPACE to jump off the ROPE when Santa carries you. Aim for the portal."),
+        ("Snow Miser", "Miss the portal and Santa takes you... somewhere you do NOT want to go."),
+        ("Snow Miser", "R to restart. ESC for settings. Flags are checkpoints -- reach them."),
+        ("Snow Miser", "Oh, and dreamer? The cold doesn't care how determined you are."),
+        ("Snow Miser", "It just waits. Patiently. For you to slip."),
+        ("Snow Miser", "Try not to slip."),
+    ],
+
+    # ── Checkpoint A: After shrinking ice platforms ──────────────────────
+    "cp_a": [
+        ("Snow Miser", "Ha! You made it past the ice. Barely."),
+        ("Snow Miser", "You felt it, didn't you? The platform shrinking under your feet."),
+        ("Snow Miser", "That feeling -- the ground disappearing while you're still standing on it."),
+        ("Snow Miser", "That's what this realm IS. Everything you rely on just... erodes."),
+        ("Snow Miser", "Ahead are the FALLING platforms. Wood. Old. Tired."),
+        ("Snow Miser", "They shake for a moment when you land. That shake is a countdown."),
+        ("Snow Miser", "Jump before the countdown ends. Every single time."),
+        ("Snow Miser", "You've done harder things, dreamer. Keep moving."),
+    ],
+
+    # ── Checkpoint B: After falling platforms, approaching spikes ────────
+    "cp_b": [
+        ("Snow Miser", "Two down. You're learning."),
+        ("Snow Miser", "The spikes ahead look like a dead end. They're not."),
+        ("Snow Miser", "There's a balloon floating just above them. Red. Festive. Deceptive."),
+        ("Snow Miser", "Grab it and you'll fly over the whole mess. It only works once though."),
+        ("Snow Miser", "Time your jump carefully. Land too early and the spikes get you."),
+        ("Snow Miser", "Land too late and you miss the safe platform entirely."),
+        ("Snow Miser", "I'd wish you luck but I don't believe in luck."),
+        ("Snow Miser", "I believe in timing. And you've got decent timing... so far."),
+    ],
+
+    # ── Checkpoint C: After spikes + balloon, approaching phantoms ───────
+    "cp_c": [
+        ("Snow Miser", "The balloon trick. Nice. Most dreamers just stare at the spikes until they die."),
+        ("Snow Miser", "Not you though. You see the path."),
+        ("Snow Miser", "Ahead of you are the PHANTOM platforms. Teal. Glowing. Beautiful, honestly."),
+        ("Snow Miser", "Touch them and a timer starts. When the timer runs out -- gone."),
+        ("Snow Miser", "No warning shake. No countdown. Just gone."),
+        ("Snow Miser", "Move fast. Don't look down. The gap below is not forgiving."),
+        ("Snow Miser", "You know what I find interesting about you, dreamer?"),
+        ("Snow Miser", "You keep going. Every realm. Every trap. You just... keep going."),
+        ("Snow Miser", "I wonder if you even know why."),
+    ],
+
+    # ── Checkpoint D: Safe platform after phantoms, before countdown ─────
+    "cp_d": [
+        ("Snow Miser", "Breathe. You've earned it."),
+        ("Snow Miser", "What comes next is my personal favourite. The COUNTDOWN platform."),
+        ("Snow Miser", "You step on it. A number appears. 3... 2... 1... GO!"),
+        ("Snow Miser", "When it says GO -- you jump. Immediately. To the platform ahead."),
+        ("Snow Miser", "If you hesitate, the pad falls away and takes you with it."),
+        ("Snow Miser", "The target platform only appears at GO. Not before. Not during the countdown."),
+        ("Snow Miser", "Don't try to jump early. There's nothing there yet."),
+        ("Snow Miser", "And if you die after reaching the target... it stays solid. You won't be trapped."),
+        ("Snow Miser", "I'm cold, dreamer. Not cruel."),
+    ],
+
+    # ── Checkpoint E: After countdown, approaching zigzag ───────────────
+    "cp_e": [
+        ("Snow Miser", "The countdown platform. Down in one try, were you? Or did it take a few?"),
+        ("Snow Miser", "Doesn't matter. You're here."),
+        ("Snow Miser", "The ZIGZAG climb is next. Floating ledges. No walls. Just the void."),
+        ("Snow Miser", "Blue ledges are on the left. Gold ledges are on the right."),
+        ("Snow Miser", "Jump right to gold. Then left to blue. Alternate. Rise."),
+        ("Snow Miser", "You need to reach the TENTH ledge. The very top one."),
+        ("Snow Miser", "Miss a ledge and you fall back down. Start the zigzag again."),
+        ("Snow Miser", "This one tests patience more than skill, dreamer."),
+        ("Snow Miser", "Which one do you have more of?"),
+    ],
+
+    # ── Checkpoint F: After zigzag, before tram + Santa ─────────────────
+    "cp_f": [
+        ("Snow Miser", "Ten ledges. You climbed all ten. I'm... actually impressed."),
+        ("Snow Miser", "Don't let it go to your head."),
+        ("Snow Miser", "Ahead is the final obstacle of this realm. The TRAM."),
+        ("Snow Miser", "Step on the golden cart. It starts moving. Ride it to the right."),
+        ("Snow Miser", "At some point... Santa Claus will appear. In his sleigh. With a rope."),
+        ("Snow Miser", "Yes. That Santa. In my realm. I know. Believe me, I know."),
+        ("Snow Miser", "Jump and GRAB the rope. Press SPACE to release when you're over the portal."),
+        ("Snow Miser", "Release too early and you fall short. Too late and Santa takes you for a ride."),
+        ("Snow Miser", "A very long, very unwanted ride."),
+        ("Snow Miser", "The portal is your way out of this realm. Through it -- the Third Realm."),
+        ("Snow Miser", "Storm. Grief. Someone else's problem to explain."),
+        ("Snow Miser", "But first... survive this. Go on, dreamer."),
+        ("Snow Miser", "I'll be watching."),
+    ],
 }
 
 # ---------------------------------------------------------------------------
@@ -237,7 +296,215 @@ class FlashOverlay:
     def draw(self, surf): self.surf.set_alpha(int(self.ma*(self.t/self.dur))); surf.blit(self.surf,(0,0))
 
 # ---------------------------------------------------------------------------
-# Section Checkpoint — floating flag
+# NPC — Snow Miser  (styled like Level 4 NPCs)
+# ---------------------------------------------------------------------------
+class NPC:
+    """
+    Snow Miser NPC.  Drawn as a robed figure with an icy blue robe and
+    snowflake-tipped staff, matching the Level 4 NPC visual style.
+    """
+    WIDTH, HEIGHT = 24, 40
+
+    def __init__(self, x, y, dialogue_key, name="Snow Miser"):
+        self.rect = pygame.Rect(x, y - self.HEIGHT, self.WIDTH, self.HEIGHT)
+        self.dialogue_key = dialogue_key
+        self.name = name
+        self.talked = False
+        self.bob = random.uniform(0, math.pi*2)
+        self.proximity_shown = False
+
+    def check_proximity(self, player):
+        dx = abs(player.rect.centerx - self.rect.centerx)
+        dy = abs(player.rect.centery - self.rect.centery)
+        return dx < 80 and dy < 80
+
+    def draw(self, surface, camera, tick):
+        sr = camera.apply(self.rect)
+        if sr.right < -20 or sr.left > SCREEN_WIDTH + 20:
+            return
+        bob = int(math.sin(tick * 0.04 + self.bob) * 2)
+        bx, by = sr.x, sr.y + bob
+
+        # Robe — icy blue for Snow Miser
+        robe_c    = SNOW_MISER_ROBE
+        robe_dark = tuple(max(0, c - 35) for c in robe_c)
+        pygame.draw.polygon(surface, robe_c,
+            [(bx+4, by+14), (bx+20, by+14), (bx+22, by+40), (bx, by+40)])
+        pygame.draw.polygon(surface, robe_dark,
+            [(bx+4, by+14), (bx+20, by+14), (bx+22, by+40), (bx, by+40)], 1)
+
+        # Head
+        pygame.draw.circle(surface, (220, 190, 160), (bx+12, by+10), 8)
+        # Icy hood arc
+        pygame.draw.arc(surface, robe_c, (bx+2, by, 20, 18), 0.3, 2.8, 3)
+
+        # Eyes — slightly mischievous
+        pygame.draw.circle(surface, WHITE, (bx+9,  by+9), 2)
+        pygame.draw.circle(surface, WHITE, (bx+15, by+9), 2)
+        pygame.draw.circle(surface, BLACK, (bx+9,  by+10), 1)
+        pygame.draw.circle(surface, BLACK, (bx+15, by+10), 1)
+
+        # Staff with snowflake tip
+        pygame.draw.line(surface, (160, 200, 230), (bx+22, by+5), (bx+22, by+40), 2)
+        # Snowflake star at tip
+        sf_cx, sf_cy = bx+22, by+3
+        for si in range(6):
+            sa = si * math.pi / 3
+            ex2 = sf_cx + int(math.cos(sa) * 5)
+            ey2 = sf_cy + int(math.sin(sa) * 5)
+            pygame.draw.line(surface, ICE_BLUE, (sf_cx, sf_cy), (ex2, ey2), 1)
+        snowflake_pulse = abs(math.sin(tick * 0.06)) * 0.5 + 0.5
+        pygame.draw.circle(surface,
+            lerp_color(ICE_BLUE, WHITE, snowflake_pulse), (sf_cx, sf_cy), 3)
+
+        # Name tag (only before talked)
+        if not self.talked:
+            font = pygame.font.SysFont("consolas", 10, bold=True)
+            tag    = font.render(self.name, True, ICE_BLUE)
+            tag_sh = font.render(self.name, True, (0, 0, 0))
+            surface.blit(tag_sh, (bx + 12 - tag.get_width()//2 + 1, by - 13))
+            surface.blit(tag,    (bx + 12 - tag.get_width()//2,     by - 14))
+            # Pulsing exclamation mark
+            exc_pulse = abs(math.sin(tick * 0.1)) * 0.5 + 0.5
+            exc_c     = lerp_color(CYAN, WHITE, exc_pulse)
+            exc_scale = int(exc_pulse * 2)
+            exc_font  = pygame.font.SysFont("consolas", 12 + exc_scale, bold=True)
+            exc    = exc_font.render("!", True, exc_c)
+            exc_sh = exc_font.render("!", True, (0, 0, 0))
+            surface.blit(exc_sh, (bx + 12 - exc.get_width()//2 + 1, by - 25))
+            surface.blit(exc,    (bx + 12 - exc.get_width()//2,     by - 26))
+
+        # Talk prompt pill
+        if self.proximity_shown and not self.talked:
+            font2  = pygame.font.SysFont("consolas", 11)
+            prompt = font2.render("[E] Talk", True, SNOW_WHITE)
+            pw, ph = prompt.get_width() + 8, prompt.get_height() + 4
+            px2 = bx + 12 - pw // 2
+            py2 = by - 38
+            pill = pygame.Surface((pw, ph), pygame.SRCALPHA)
+            pill.fill((0, 0, 0, 140))
+            surface.blit(pill,   (px2, py2))
+            surface.blit(prompt, (px2 + 4, py2 + 2))
+
+# ---------------------------------------------------------------------------
+# Dialogue Box  — exact match to Level 4 style
+# ---------------------------------------------------------------------------
+class DialogueBox:
+    def __init__(self, dialogues):
+        self.dialogues    = dialogues
+        self.index        = 0
+        self.active       = True
+        self.char_index   = 0
+        self.char_speed   = 1.5
+        self.char_timer   = 0
+        self.done_typing  = False
+
+    def advance(self):
+        if not self.done_typing:
+            self.char_index = len(self.dialogues[self.index][1])
+            self.done_typing = True
+        else:
+            self.index += 1
+            self.char_index = 0
+            self.char_timer = 0
+            self.done_typing = False
+            if self.index >= len(self.dialogues):
+                self.active = False
+
+    def update(self):
+        if not self.active or self.done_typing:
+            return
+        self.char_timer += self.char_speed
+        full_text = self.dialogues[self.index][1]
+        self.char_index = min(int(self.char_timer), len(full_text))
+        if self.char_index >= len(full_text):
+            self.done_typing = True
+
+    def draw(self, surface, tick):
+        if not self.active:
+            return
+
+        # Box background
+        box_h   = 130
+        box_y   = SCREEN_HEIGHT - box_h - 20
+        box_rect = pygame.Rect(40, box_y, SCREEN_WIDTH - 80, box_h)
+
+        bg = pygame.Surface((box_rect.width, box_rect.height), pygame.SRCALPHA)
+        r  = 6
+        bg.fill((0, 0, 0, 0))
+        pygame.draw.rect(bg, (8, 12, 30, 225), (r, 0, box_rect.width - 2*r, box_rect.height))
+        pygame.draw.rect(bg, (8, 12, 30, 225), (0, r, box_rect.width, box_rect.height - 2*r))
+        for cx2, cy2 in [(r, r), (box_rect.width-r, r),
+                         (r, box_rect.height-r), (box_rect.width-r, box_rect.height-r)]:
+            pygame.draw.circle(bg, (8, 12, 30, 225), (cx2, cy2), r)
+        surface.blit(bg, box_rect.topleft)
+
+        # Border — icy cyan instead of gold
+        pygame.draw.rect(surface, ICE_BLUE, box_rect, 2, border_radius=6)
+
+        # Corner snowflake ornaments
+        for cx3, cy3 in [(box_rect.left+3, box_rect.top+3),
+                         (box_rect.right-3, box_rect.top+3),
+                         (box_rect.left+3, box_rect.bottom-3),
+                         (box_rect.right-3, box_rect.bottom-3)]:
+            pygame.draw.circle(surface, ICE_DARK, (cx3, cy3), 5)
+            pygame.draw.circle(surface, ICE_BLUE, (cx3, cy3), 3)
+
+        # Speaker name
+        speaker, text = self.dialogues[self.index]
+        font_name = pygame.font.SysFont("consolas", 17, bold=True)
+        font_text = pygame.font.SysFont("consolas", 14)
+
+        if speaker:
+            # Snow Miser gets icy cyan; narrator lines have no speaker
+            name_c = ICE_BLUE
+            surface.blit(font_name.render(speaker, True, (0,0,0)),
+                         (box_rect.x + 17, box_rect.y + 11))
+            name_surf = font_name.render(speaker, True, name_c)
+            surface.blit(name_surf, (box_rect.x + 16, box_rect.y + 10))
+            pygame.draw.line(surface, name_c,
+                             (box_rect.x+16, box_rect.y+30),
+                             (box_rect.x+16+name_surf.get_width(), box_rect.y+30), 1)
+            text_y = box_rect.y + 36
+        else:
+            text_y = box_rect.y + 14
+
+        # Typewriter text
+        shown = text[:self.char_index]
+        words = shown.split(" ")
+        line  = ""
+        ly    = text_y
+        max_w = box_rect.width - 32
+        for word in words:
+            test = line + (" " if line else "") + word
+            if font_text.size(test)[0] > max_w:
+                ts = font_text.render(line, True, SNOW_WHITE)
+                surface.blit(ts, (box_rect.x + 16, ly))
+                ly += 20; line = word
+            else:
+                line = test
+        if line:
+            ts = font_text.render(line, True, SNOW_WHITE)
+            surface.blit(ts, (box_rect.x + 16, ly))
+
+        # Continue prompt
+        if self.done_typing:
+            blink = (tick // 20) % 2 == 0
+            if blink:
+                if self.index < len(self.dialogues) - 1:
+                    prompt = font_text.render("[ENTER] Continue...", True, GRAY)
+                else:
+                    prompt = font_text.render("[ENTER] Close", True, GRAY)
+                surface.blit(prompt,
+                             (box_rect.right - prompt.get_width() - 16, box_rect.bottom - 22))
+
+        # Page counter
+        pg_font = pygame.font.SysFont("consolas", 11)
+        pg = pg_font.render(f"{self.index+1}/{len(self.dialogues)}", True, (60, 60, 70))
+        surface.blit(pg, (box_rect.x + 16, box_rect.bottom - 18))
+
+# ---------------------------------------------------------------------------
+# Section Checkpoint — floating flag  (unchanged from original)
 # ---------------------------------------------------------------------------
 class SectionCheckpoint:
     FLAG_W = 22; FLAG_H = 14
@@ -277,14 +544,13 @@ class SectionCheckpoint:
         if self.activated:       self.glow_tick   += 1
 
     def draw_flag(self, surface, camera, font):
-        # Landing-based checkpoints — draw toast only, no flag at dummy x
         if self.trigger_x > 100000:
             if self.toast_timer > 0:
                 pos = camera.apply(pygame.Rect(int(self.spawn_x), int(self.float_y), 1, 1))
                 sx, sy = pos.x, pos.y
                 alpha  = min(255, self.toast_timer * 4)
                 rise   = (150 - self.toast_timer) // 4
-                ts     = font.render(f"CHECKPOINT  {self.label}", True, CP_ACTIVE)
+                ts = font.render(f"CHECKPOINT  {self.label}", True, CP_ACTIVE)
                 ts.set_alpha(alpha)
                 surface.blit(ts, (sx - ts.get_width()//2, sy - rise))
             return
@@ -477,13 +743,6 @@ class PhantomPlatform(Platform):
 # ---------------------------------------------------------------------------
 # OBSTACLE 1 — Countdown Platform
 # ---------------------------------------------------------------------------
-# States: idle → counting → go → falling → (auto-reset back to idle)
-#
-# KEY RULE: Once the player lands on the TARGET platform, that platform
-# gets a permanent "landed" flag and stays solid forever — even if the
-# countdown pad resets due to player death elsewhere.  This means dying
-# on the wall-climb after beating the countdown won't trap the player.
-#
 class CountdownPlatform(Platform):
     IDLE     = "idle"
     COUNTING = "counting"
@@ -500,10 +759,9 @@ class CountdownPlatform(Platform):
         self.grace     = 0
         self.fall_vy   = 0.0
         self.tick      = 0
-        self.target    = None   # linked CountdownTargetPlatform
+        self.target    = None
 
     def reset(self):
-        """Reset countdown pad back to idle. Target only hides if player never landed on it."""
         self.rect.x  = self.ox
         self.rect.y  = self.oy
         self.state   = self.IDLE
@@ -511,7 +769,7 @@ class CountdownPlatform(Platform):
         self.grace   = 0
         self.fall_vy = 0.0
         if self.target:
-            self.target.on_countdown_reset()   # target decides whether to hide
+            self.target.on_countdown_reset()
 
     def on_player_land(self, player):
         if self.state == self.IDLE:
@@ -531,13 +789,11 @@ class CountdownPlatform(Platform):
             if self.countdown <= 0:
                 self.state = self.GO
                 self.grace = self.grace_frames
-
         elif self.state == self.GO:
             self.grace -= 1
             if self.grace <= 0:
                 self.state   = self.FALLING
                 self.fall_vy = 0.0
-
         elif self.state == self.FALLING:
             self.fall_vy = min(self.fall_vy + 0.4, 12)
             self.rect.y += int(self.fall_vy)
@@ -579,7 +835,6 @@ class CountdownPlatform(Platform):
             t  = f.render(txt, True, tc)
             surface.blit(t, (sr.centerx - t.get_width()//2, sr.y - 70))
 
-        # Grace timer bar
         if self.state == self.GO and self.grace > 0:
             bar_w = int(sr.width * self.grace / self.grace_frames)
             bar_y = sr.y - 12
@@ -590,32 +845,21 @@ class CountdownPlatform(Platform):
 
 
 class CountdownTargetPlatform(Platform):
-    """
-    Appears when countdown reaches GO.
-    Once the player successfully LANDS here, the platform is permanently solid
-    (landed=True) — it won't hide even if the countdown pad resets later.
-    This prevents the player from being trapped after dying on a later obstacle.
-    """
     def __init__(self, x, y, w, h, owner):
         super().__init__(x, y, w, h, PINE_GREEN)
         self.owner      = owner
         self.section_cp = None
-        self.landed     = False   # True once player has successfully stood here
+        self.landed     = False
 
     def is_active(self):
-        # Always active once player has landed here (permanent platform)
         if self.landed: return True
         return self.owner.target_visible()
 
     def on_countdown_reset(self):
-        """Called by CountdownPlatform.reset(). Only hide if player hasn't landed yet."""
-        if not self.landed:
-            pass  # is_active() checks owner state, so it will hide automatically
+        pass  # landing flag keeps it solid
 
     def on_player_land(self, player):
-        # Mark as permanently landed
         self.landed = True
-        # Fire checkpoint
         if self.section_cp is not None:
             self.section_cp.activate_direct(player)
 
@@ -627,7 +871,6 @@ class CountdownTargetPlatform(Platform):
             s.fill((COUNTDOWN_COL[0], COUNTDOWN_COL[1], COUNTDOWN_COL[2], 40))
             surface.blit(s, (sr.x, sr.y))
             return
-        # Draw with a subtle gold tint if permanently unlocked
         if self.landed:
             sr = camera.apply(self.rect)
             if sr.right < -10 or sr.left > SCREEN_WIDTH + 10: return
@@ -637,29 +880,11 @@ class CountdownTargetPlatform(Platform):
             super().draw(surface, camera)
 
 # ---------------------------------------------------------------------------
-# OBSTACLE 2 — Zigzag Floating Ledges  (NO wall columns)
+# OBSTACLE 2 — Zigzag Floating Ledges
 # ---------------------------------------------------------------------------
-# Pure floating ledges in a zigzag layout.
-# No columns, no walls, no distracting colours — just icy-blue (left side)
-# and gold (right side) ledges floating in space.
-#
-# The player starts from the approach platform on the LEFT and must:
-#   Jump RIGHT to the first right ledge  (step 0)
-#   Jump LEFT  to the first left  ledge  (step 1)
-#   Jump RIGHT to the second right ledge (step 2)
-#   ... and so on up to step 9, then the exit appears.
-#
-# LEDGE_RISE=120 means each ledge is 120px higher than the previous — enough
-# vertical space to jump diagonally without the ledge above blocking you.
-# LEDGE_GAP=180 is the horizontal distance between the two groups of ledges.
-# Both values are tuned so a standard jump (JUMP_VELOCITY=-13) can reach.
+PH = 28   # platform height constant used throughout
 
 class ZigzagLedge(Platform):
-    """
-    A floating ledge in the zigzag obstacle.
-    side: "LEFT" (blue) or "RIGHT" (gold)
-    step_index: 0..9 in ascending order bottom→top
-    """
     LEDGE_W = 70
     LEDGE_H = 14
 
@@ -697,21 +922,15 @@ class ZigzagLedge(Platform):
         pygame.draw.rect(surface, col, sr)
         pygame.draw.rect(surface, SNOW_WHITE, (sr.x, sr.y, sr.width, 4))
 
-        # Step number + side hint
         f = pygame.font.SysFont("consolas", 10, bold=True)
         n = f.render(str(self.step_index+1), True, WHITE)
         surface.blit(n, (sr.centerx - n.get_width()//2, sr.y - 14))
 
 
 class ZigzagClimbSection:
-    """
-    Exit platform unlocks as soon as the player lands on the TOP ledge
-    (step_index == total_steps-1, the 10th floating floor).
-    No strict sequence — just reach the top.
-    """
     def __init__(self):
         self.total_steps  = WALL_STEPS * 2
-        self.top_index    = self.total_steps - 1   # 10th ledge = index 9
+        self.top_index    = self.total_steps - 1
         self.highest_hit  = -1
         self.unlocked     = False
         self.started      = False
@@ -733,7 +952,6 @@ class ZigzagClimbSection:
 
 
 class ZigzagExitPlatform(Platform):
-    """Exit platform — only solid once all zigzag steps completed."""
     def __init__(self, x, y, w, h, owner):
         super().__init__(x, y, w, h, PINE_GREEN)
         self.owner = owner
@@ -752,25 +970,6 @@ class ZigzagExitPlatform(Platform):
 
 
 def build_zigzag_section(base_x, base_y, ledge_w=70):
-    """
-    Build the zigzag floating-ledge obstacle.
-
-    Left ledges  sit at x = base_x
-    Right ledges sit at x = base_x + LEDGE_GAP
-
-    Step layout (bottom to top):
-      step 0: RIGHT ledge  at y = base_y
-      step 1: LEFT  ledge  at y = base_y - LEDGE_RISE//2        (half rise)
-      step 2: RIGHT ledge  at y = base_y - LEDGE_RISE
-      step 3: LEFT  ledge  at y = base_y - LEDGE_RISE*3//2
-      ...
-
-    The half-rise offset means left/right ledges alternate in height
-    with LEDGE_RISE//2 vertical gap between consecutive steps — plenty
-    of room to jump diagonally without any ledge above blocking you.
-
-    Exit platform sits at x = base_x + LEDGE_GAP, just above the highest ledge.
-    """
     climb = ZigzagClimbSection()
     plats = []
 
@@ -779,26 +978,19 @@ def build_zigzag_section(base_x, base_y, ledge_w=70):
 
     step = 0
     for i in range(WALL_STEPS):
-        # RIGHT ledge — player jumps here from the left
         r_y = base_y - i * LEDGE_RISE
         r_ledge = ZigzagLedge(right_x, r_y, "RIGHT", climb, step, ledge_w)
         plats.append(r_ledge)
         step += 1
 
-        # LEFT ledge — half a LEDGE_RISE above the right ledge at this level
         l_y = base_y - i * LEDGE_RISE - LEDGE_RISE // 2
         l_ledge = ZigzagLedge(left_x, l_y, "LEFT", climb, step, ledge_w)
         plats.append(l_ledge)
         step += 1
 
-    # Exit platform: just above and to the right of the highest right ledge.
-    # The highest right ledge (step WALL_STEPS-1 *2 = step 8) is at:
-    #   y = base_y - (WALL_STEPS-1) * LEDGE_RISE
-    # The highest left ledge (step 9) is LEDGE_RISE//2 above that.
-    # We place the exit 70px above the highest left ledge — one normal jump up.
     highest_left_y = base_y - (WALL_STEPS - 1) * LEDGE_RISE - LEDGE_RISE // 2
     exit_y   = highest_left_y - 70 - PH
-    exit_x   = right_x - 20   # horizontally over the right ledge column
+    exit_x   = right_x - 20
     exit_plat = ZigzagExitPlatform(exit_x, exit_y, 220, PH, owner=climb)
     plats.append(exit_plat)
 
@@ -808,12 +1000,6 @@ def build_zigzag_section(base_x, base_y, ledge_w=70):
 # OBSTACLE 3 — Tram + Santa Sleigh
 # ---------------------------------------------------------------------------
 class TramPlatform(Platform):
-    """
-    Moving platform (tram/cart).
-    - Starts moving when player lands on it
-    - At vanish_x it starts falling away (becomes inactive) — player MUST jump before this
-    - dx is exposed so Player.update can move the player with the tram each frame
-    """
     FALL_SPEED = 0.5
     MAX_FALL   = 14
 
@@ -823,12 +1009,11 @@ class TramPlatform(Platform):
         self.moving     = False
         self.origin_x   = x
         self.origin_y   = y
-        self.vanish_x   = vanish_x   # world X where tram starts falling
+        self.vanish_x   = vanish_x
         self.dx         = 0
         self.falling    = False
         self.fall_vy    = 0.0
         self.gone       = False
-        # Warning flash counter — flashes red near vanish point
         self.warn_flash = 0
 
     def on_player_land(self, player):
@@ -850,8 +1035,7 @@ class TramPlatform(Platform):
 
     def update(self):
         if self.gone:
-            self.dx = 0
-            return
+            self.dx = 0; return
         if self.falling:
             self.dx       = 0
             self.fall_vy  = min(self.fall_vy + self.FALL_SPEED, self.MAX_FALL)
@@ -861,14 +1045,12 @@ class TramPlatform(Platform):
             return
         if self.moving:
             if self.vanish_x is not None and self.rect.x >= self.vanish_x:
-                # Start falling
                 self.falling  = True
                 self.fall_vy  = 0.0
                 self.dx       = 0
             else:
                 self.rect.x  += self.speed
                 self.dx       = self.speed
-                # Warning when within 120px of vanish point
                 if self.vanish_x is not None:
                     dist = self.vanish_x - self.rect.x
                     if dist < 120:
@@ -880,7 +1062,6 @@ class TramPlatform(Platform):
         if self.gone: return
         sr = camera.apply(self.rect)
         if sr.right < -10 or sr.left > SCREEN_WIDTH + 10: return
-        # Near-vanish warning colour
         if self.vanish_x is not None and self.moving and not self.falling:
             dist = self.vanish_x - self.rect.x
             if dist < 120:
@@ -906,19 +1087,8 @@ class TramPlatform(Platform):
 
 
 class SantaSleigh:
-    """
-    Rope-grab mechanic:
-      - Santa hovers above the tram and drops a rope
-      - Rope bottom hangs 80px above the tram top — within jump reach
-      - Player jumps and overlaps the ROPE RECT → grabbed instantly (no vel check)
-      - While grabbed: player hangs on rope, sleigh flies right toward portal
-      - Player presses jump → releases rope, flies forward freely
-      - If sleigh passes portal_x + KIDNAP_DIST without player releasing → kidnap → die
-      - If hover timeout expires without grab → kidnap (fly away empty)
-    """
     WIDTH  = 160
     HEIGHT = 30
-    # rope/timing constants set per-instance from difficulty preset
 
     def __init__(self, portal_x, portal_y, tram,
                  rope_len=130, rope_grab_r=14,
@@ -939,17 +1109,15 @@ class SantaSleigh:
         self.player_grabbed= False
         self.carry_tick    = 0
 
-    # Rope bottom world position
     def rope_tip_world(self):
         cx = int(self.wx + self.WIDTH // 2)
         cy = int(self.wy + self.HEIGHT + self.ROPE_LEN)
         return cx, cy
 
     def rope_grab_rect(self):
-        """Full rope length grab zone — player can grab anywhere along the rope."""
         rope_top_x = int(self.wx + self.WIDTH // 2)
         rope_top_y = int(self.wy + self.HEIGHT)
-        w = max(30, self.ROPE_W * 2)  # at least player width
+        w = max(30, self.ROPE_W * 2)
         return pygame.Rect(rope_top_x - w // 2, rope_top_y, w, self.ROPE_LEN)
 
     def reset(self):
@@ -964,83 +1132,69 @@ class SantaSleigh:
         self.carry_tick     = 0
 
     def start(self, tram_rect):
-        """Called when tram has travelled far enough."""
         self.wx    = float(tram_rect.centerx + 500)
         self.wy    = float(tram_rect.top - 380)
         self.state = "flying_in"
 
     def update(self, player):
-        """Returns 'kill_player' if player should die, else None."""
         self.tick += 1
         tr = self.tram.rect
 
-        # ── flying_in ────────────────────────────────────────────────────
         if self.state == "flying_in":
             tx = float(tr.centerx - self.WIDTH // 2)
-            ty = float(tr.top - 260)   # hover higher up — rope tip hangs at jump height
+            ty = float(tr.top - 260)
             self.wx += (tx - self.wx) * 0.06
             self.wy += (ty - self.wy) * 0.06
             if abs(self.wx - tx) < 10 and abs(self.wy - ty) < 10:
                 self.state      = "hovering"
                 self.hover_tick = 0
 
-        # ── hovering ─────────────────────────────────────────────────────
         elif self.state == "hovering":
-            # Track tram while alive, freeze when tram falls
             if not self.tram.falling and not self.tram.gone:
                 tx = float(tr.centerx - self.WIDTH // 2)
                 ty = float(tr.top - 260) + math.sin(self.tick * 0.07) * 8
                 self.wx += (tx - self.wx) * 0.12
                 self.wy += (ty - self.wy) * 0.10
             else:
-                # Tram gone — hold position, gentle bob
                 self.wy += math.sin(self.tick * 0.09) * 0.6
 
             self.hover_tick += 1
 
-            # Check grab — player touches the ROPE TIP (not the sleigh body)
             if player.alive and not self.player_grabbed:
                 grip = self.rope_grab_rect()
                 if player.rect.colliderect(grip):
                     self.player_grabbed = True
                     self.state          = "carrying"
                     self.carry_tick     = 0
-                    player.riding_platform = None  # detach from tram
+                    player.riding_platform = None
 
-            # Timeout
             if self.hover_tick >= self.HOVER_TIMEOUT:
                 self.state = "kidnapping"
 
-        # ── carrying ─────────────────────────────────────────────────────
         elif self.state == "carrying":
             self.carry_tick += 1
             self.wx += 5
             self.wy += math.sin(self.tick * 0.05) * 0.4
 
             if player.alive:
-                # Hang player at rope tip
                 cx, cy = self.rope_tip_world()
                 player.rect.centerx = cx
                 player.rect.bottom  = cy + player.HEIGHT // 2
                 player.vel_x        = 0
                 player.vel_y        = 0
-                player.on_ground    = False  # hanging, not on ground
+                player.on_ground    = False
 
-                # Release: player presses jump after grace period
                 keys = pygame.key.get_pressed()
                 if self.carry_tick > 10 and (
                         keys[pygame.K_SPACE] or keys[pygame.K_UP] or keys[pygame.K_w]):
                     self.player_grabbed = False
                     self.state          = "done"
-                    # Give player a forward boost so they can reach the portal
                     player.vel_x = 7
                     player.vel_y = -10
 
-            # Kidnap: passed portal without releasing
             if self.state == "carrying" and self.wx > self.portal_x + self.KIDNAP_DIST:
                 self.state = "kidnapping"
 
-        # ── kidnapping ───────────────────────────────────────────────────
         elif self.state == "kidnapping":
             self.wx += 16
             self.wy -= 6
@@ -1062,7 +1216,6 @@ class SantaSleigh:
     def draw(self, surface, camera):
         if self.state in ("waiting", "done"): return
 
-        # Sleigh body
         sr = camera.apply(self.rect)
         if -200 < sr.x < SCREEN_WIDTH + 200:
             pygame.draw.rect(surface, SLEIGH_BROWN, sr)
@@ -1070,7 +1223,6 @@ class SantaSleigh:
             for side in (sr.x + 8, sr.right - 18):
                 pygame.draw.arc(surface, SLEIGH_GOLD,
                                 (side, sr.bottom-4, 10, 8), 0, math.pi, 2)
-            # Santa pixel art
             hx = sr.centerx - 12; hy = sr.y - 28
             pygame.draw.rect(surface, SANTA_RED,       (hx,    hy+10, 24, 18))
             pygame.draw.rect(surface, (50, 30, 10),    (hx,    hy+18, 24,  4))
@@ -1081,27 +1233,22 @@ class SantaSleigh:
             pygame.draw.circle(surface, WHITE, (hx+20, hy-8), 3)
             pygame.draw.rect(surface, WHITE,   (hx+2,  hy+6,  20,  8))
 
-        # Rope
         cx_w, cy_w = self.rope_tip_world()
         rp_top = camera.apply(pygame.Rect(int(self.wx + self.WIDTH//2), int(self.wy + self.HEIGHT), 1, 1))
         rp_bot = camera.apply(pygame.Rect(cx_w, cy_w, 1, 1))
 
-        # Draw rope as a zigzag for visual interest
         pygame.draw.line(surface, (180, 120, 60),
                          (rp_top.x, rp_top.y), (rp_bot.x, rp_bot.y), 3)
-        # Grab ring at tip — pulses to show it's interactive
         pulse = int(4 + abs(math.sin(self.tick * 0.15)) * 4)
         ring_col = (GOLD if self.state == "hovering" else
                     (100, 220, 100) if self.state == "carrying" else RED)
         pygame.draw.circle(surface, ring_col, (rp_bot.x, rp_bot.y), pulse + 4)
         pygame.draw.circle(surface, WHITE,    (rp_bot.x, rp_bot.y), pulse + 4, 2)
 
-        # HUD hints
         if self.state == "hovering" and not self.player_grabbed:
             f = pygame.font.SysFont("consolas", 13, bold=True)
             t = f.render("JUMP TO GRAB ROPE!", True, GOLD)
             surface.blit(t, (rp_bot.x - t.get_width()//2, rp_bot.y - 28))
-            # Hover timeout bar
             if self.hover_tick > self.HOVER_TIMEOUT // 2:
                 ratio = 1 - self.hover_tick / self.HOVER_TIMEOUT
                 bx, by = sr.x, sr.y - 12
@@ -1115,7 +1262,6 @@ class SantaSleigh:
             f = pygame.font.SysFont("consolas", 14, bold=True)
             t = f.render("HO HO HO! BYE BYE!", True, RED)
             surface.blit(t, (sr.centerx - t.get_width()//2, sr.y - 50))
-
 
 # ---------------------------------------------------------------------------
 # Spike Trap
@@ -1243,7 +1389,6 @@ class Player:
             if self.respawn_timer<=0: self.respawn()
             return None
 
-        # Move with riding platform (e.g. tram) before normal movement
         if self.riding_platform is not None and hasattr(self.riding_platform, 'dx'):
             self.rect.x += self.riding_platform.dx
 
@@ -1260,7 +1405,6 @@ class Player:
             self.vel_y=self.jump_velocity; self.on_ground=False
             self.riding_platform=None; jumped=True
 
-        # Horizontal
         self.rect.x+=int(self.vel_x)
         for plat in platforms:
             if not plat.is_active(): continue
@@ -1271,7 +1415,6 @@ class Player:
                 elif self.vel_x<0: self.rect.left=pr.right
                 self.vel_x=0
 
-        # Vertical
         self.was_on_ground=self.on_ground
         self.on_ground=False; self.riding_platform=None
         vy=int(self.vel_y)
@@ -1300,36 +1443,21 @@ class Player:
 SOUND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "audio")
 SOUND_FILES= {"jump":"jump.wav","death":"death.wav","respawn":"respawn.wav",
               "balloon":"powerup.wav","balloon_pop":"balloon_pop.wav",
-              "checkpoint":"checkpoint.wav","win":"win.wav"}
+              "checkpoint":"checkpoint.wav","win":"win.wav",
+              "npc_talk":"npc_talk.wav"}
 
-# ── Background music for this level ─────────────────────────────────────
-# Replace the filename below with your own track.
-# The file should be placed in the assets/audio folder.
 MUSIC_FILE = r"C:\Users\ilham\Documents\APU WORKS\YEAR 2 SEM 2\IMAGING & SE\GameAssignment\imaging-assignment\assets\audio\backgroundlevel2.mp3"
 
 class SoundManager:
     def __init__(self):
         self.sounds={}; self.music_loaded=False
-        # for name,fn in SOUND_FILES.items():
-        #     p=os.path.join(SOUND_DIR,fn)
-        #     try: self.sounds[name]=pygame.mixer.Sound(p) if os.path.isfile(p) else None
-        #     except: self.sounds[name]=None
-
         for name,fn in SOUND_FILES.items():
             p=os.path.join(SOUND_DIR,fn)
-            print("Loading:", p)
-
             if os.path.isfile(p):
-                try:
-                    self.sounds[name] = pygame.mixer.Sound(p)
-                    print("Loaded:", name)
-                except Exception as e:
-                    print("FAILED:", name, e)
-                    self.sounds[name] = None
+                try: self.sounds[name]=pygame.mixer.Sound(p)
+                except: self.sounds[name]=None
             else:
-                print("Missing:", p)
-                self.sounds[name] = None
-
+                self.sounds[name]=None
         if os.path.isfile(MUSIC_FILE):
             try: pygame.mixer.music.load(MUSIC_FILE); self.music_loaded=True
             except: pass
@@ -1342,9 +1470,9 @@ class SoundManager:
     def stop_music(self): pygame.mixer.music.stop()
 
 # ---------------------------------------------------------------------------
-# Level layout
+# Level layout  (unchanged, but NPCs injected at checkpoint positions)
 # ---------------------------------------------------------------------------
-PW_SAFE=250; PW_SHRINK=160; PW_FALL=140; PW_PHANTOM=110; PH=28
+PW_SAFE=250; PW_SHRINK=160; PW_FALL=140; PW_PHANTOM=110
 
 def create_christmas_level(preset):
     platforms=[]; section_checkpoints=[]
@@ -1352,22 +1480,25 @@ def create_christmas_level(preset):
     countdown_platforms=[]; spikes=[]
     tram_platform=None; santa_sleigh=None; balloon=None
     zigzag_section=None; countdown_platform_ref=None
+    npcs = []   # ← NEW: NPC list
 
     def add(p): platforms.append(p); return p
 
-    # ── START ────────────────────────────────────────────────────────────
+    # ── START — Snow Miser intro NPC ─────────────────────────────────────
     add(Platform(0, BASE_Y, PW_SAFE, PH, PINE_GREEN))
+    npcs.append(NPC(80, BASE_Y, "intro", "Snow Miser"))   # intro dialogue
 
     # ── ICE shrink ───────────────────────────────────────────────────────
-    sp=preset["shrink_speed"]; sr=preset["shrink_respawn"]
-    for p in [ShrinkingPlatform(420,BASE_Y-30,PW_SHRINK,PH,sp,sr),
-              ShrinkingPlatform(660,BASE_Y-60,PW_SHRINK,PH,sp,sr)]:
+    sp=preset["shrink_speed"]; sr_t=preset["shrink_respawn"]
+    for p in [ShrinkingPlatform(420,BASE_Y-30,PW_SHRINK,PH,sp,sr_t),
+              ShrinkingPlatform(660,BASE_Y-60,PW_SHRINK,PH,sp,sr_t)]:
         add(p); shrink_platforms.append(p)
 
     add(Platform(910,BASE_Y-40,PW_SAFE,PH,PINE_GREEN))
     section_checkpoints.append(SectionCheckpoint(
         trigger_x=960, spawn_x=920, spawn_y=BASE_Y-80,
         float_y=BASE_Y-120, label="A"))
+    npcs.append(NPC(950, BASE_Y-40, "cp_a", "Snow Miser"))   # CP-A dialogue
 
     # ── FALL platforms ───────────────────────────────────────────────────
     fd=preset["fall_delay"]
@@ -1379,6 +1510,7 @@ def create_christmas_level(preset):
     section_checkpoints.append(SectionCheckpoint(
         trigger_x=1740, spawn_x=1700, spawn_y=BASE_Y-40,
         float_y=BASE_Y-130, label="B"))
+    npcs.append(NPC(1730, BASE_Y, "cp_b", "Snow Miser"))     # CP-B dialogue
 
     # ── SPIKES + BALLOON ─────────────────────────────────────────────────
     sbx=1880; sby=BASE_Y+10
@@ -1390,6 +1522,7 @@ def create_christmas_level(preset):
     section_checkpoints.append(SectionCheckpoint(
         trigger_x=2170, spawn_x=2130, spawn_y=BASE_Y-60,
         float_y=BASE_Y-140, label="C"))
+    npcs.append(NPC(2160, BASE_Y-20, "cp_c", "Snow Miser")) # CP-C dialogue
 
     # ── PHANTOM ──────────────────────────────────────────────────────────
     pf=preset["phantom_frames"]; pw=preset["phantom_w"]
@@ -1401,9 +1534,10 @@ def create_christmas_level(preset):
     section_checkpoints.append(SectionCheckpoint(
         trigger_x=2900, spawn_x=2850, spawn_y=BASE_Y-100,
         float_y=BASE_Y-150, label="D"))
+    npcs.append(NPC(2890, BASE_Y-60, "cp_d", "Snow Miser")) # CP-D dialogue
 
     # ── OBSTACLE 1: COUNTDOWN ────────────────────────────────────────────
-    add(Platform(3060,BASE_Y-60,120,PH,PINE_GREEN))   # approach
+    add(Platform(3060,BASE_Y-60,120,PH,PINE_GREEN))
 
     cnt_frames=preset["countdown_sec"]*FPS
     cd_pad=CountdownPlatform(3240,BASE_Y-60,180,PH,
@@ -1420,13 +1554,13 @@ def create_christmas_level(preset):
         float_y=BASE_Y-150, label="E")
     cd_target.section_cp=cp_e
     section_checkpoints.append(cp_e)
+    npcs.append(NPC(3510, BASE_Y-60, "cp_e", "Snow Miser")) # CP-E dialogue
 
     # ── OBSTACLE 2: ZIGZAG FLOATING LEDGES ───────────────────────────────
-    # Approach pad at same height as first right ledge
-    zz_base_x = 3820   # x of LEFT ledge group
+    zz_base_x = 3820
     zz_base_y = BASE_Y - 60
 
-    add(Platform(3720, zz_base_y, 90, PH, PINE_GREEN))   # approach
+    add(Platform(3720, zz_base_y, 90, PH, PINE_GREEN))
 
     zz_plats, zz_climb, zz_exit = build_zigzag_section(zz_base_x, zz_base_y,
                                                          preset["zigzag_ledge_w"])
@@ -1439,38 +1573,20 @@ def create_christmas_level(preset):
         spawn_y   = zz_exit.rect.y - 50,
         float_y   = zz_exit.rect.y - 90,
         label     = "F"))
+    # CP-F NPC placed just after the zigzag exit
+    npcs.append(NPC(zz_exit.rect.right + 30, zz_exit.rect.y, "cp_f", "Snow Miser"))
 
     # ── OBSTACLE 3: TRAM + SANTA SLEIGH ──────────────────────────────────
-    #
-    # Full narrative timeline:
-    #
-    #   [bridge]  safe platform after zigzag — player walks right onto tram
-    #   [tram]    starts moving when player lands — rides it to the right
-    #             at SANTA_TRIGGER_DIST px travelled, santa flies in
-    #             at TRAM_VANISH_DIST px travelled, tram falls away
-    #             player must jump from tram to sleigh before it vanishes
-    #   [sleigh]  santa carries player rightward toward portal
-    #             player sees portal approaching — must jump off to portal platform
-    #             if player doesn't jump → kidnap → flies over portal → player dies
-    #   [portal]  player lands here, walks into portal → WIN
-    #
-    # Distances (px from tram start):
-    #   SANTA_TRIGGER_DIST = 380  santa starts flying in
-    #   TRAM_VANISH_DIST   = 560  tram falls away (player must be on sleigh)
-    #   portal distance    = 1000 lots of room for the sleigh ride
-    #
-    # NO checkpoint after F — dying here respawns at zigzag exit (checkpoint F)
-
-    bridge_x = zz_exit.rect.right + 60   # extra space after zigzag
+    bridge_x = zz_exit.rect.right + 60
     bridge_y = zz_exit.rect.y
     add(Platform(bridge_x, bridge_y, 160, PH, PINE_GREEN))
 
-    tram_x = bridge_x + 200   # tram starts 200px after bridge
+    tram_x = bridge_x + 200
     tram_y = bridge_y
 
-    SANTA_TRIGGER_DIST = 400  # tram travels this far before santa arrives
-    TRAM_VANISH_DIST   = preset["tram_vanish"]  # from difficulty preset
-    PORTAL_DIST        = 1300 # portal far enough for full rope-ride experience
+    SANTA_TRIGGER_DIST = 400
+    TRAM_VANISH_DIST   = preset["tram_vanish"]
+    PORTAL_DIST        = 1300
 
     portal_x = tram_x + PORTAL_DIST
     portal_y = tram_y - 80
@@ -1491,17 +1607,11 @@ def create_christmas_level(preset):
         kidnap_dist   = preset["kidnap_dist"],
     )
     santa_sleigh=santa
-
-    # Store santa trigger distance so Game._update can start santa at right time
     tram.santa_trigger_dist = SANTA_TRIGGER_DIST
 
-    # Portal landing platform — extra wide, placed further from portal
-    # so player released from rope has room to land before walking into portal
     portal_plat_x = portal_x - 220
     add(Platform(portal_plat_x, tram_y, PW_SAFE + 200, PH, PINE_GREEN))
     portal=Portal(portal_x, portal_y)
-
-    # NO checkpoint G — last checkpoint is F
 
     return dict(
         platforms=platforms,
@@ -1516,6 +1626,7 @@ def create_christmas_level(preset):
         spikes=spikes, balloon=balloon,
         portal=portal,
         section_checkpoints=section_checkpoints,
+        npcs=npcs,          # ← returned
     )
 
 # ---------------------------------------------------------------------------
@@ -1527,7 +1638,7 @@ class Game:
 
     def __init__(self):
         self.screen=pygame.display.set_mode((SCREEN_WIDTH,SCREEN_HEIGHT))
-        pygame.display.set_caption("Glitch Claus - Christmas Level")
+        pygame.display.set_caption("Glitch Claus - The Second Realm")
         self.clock=pygame.time.Clock()
         self.font      =pygame.font.SysFont("consolas",24)
         self.small_font=pygame.font.SysFont("consolas",16)
@@ -1542,6 +1653,9 @@ class Game:
         self.camera=Camera(SCREEN_WIDTH,SCREEN_HEIGHT)
         self.particles=[]; self.rings=[]; self.flashes=[]
         self.snowflakes=[Snowflake() for _ in range(80)]
+        # Story
+        self.dialogue_box  = None
+        self.pending_state = None
         self._load_level()
         self.sfx.start_music(volume=self.music_volume)
 
@@ -1561,20 +1675,30 @@ class Game:
         self.balloon                =d["balloon"]
         self.portal                 =d["portal"]
         self.section_checkpoints    =d["section_checkpoints"]
+        self.npcs                   =d["npcs"]          # ← NEW
         self.player=Player(80,BASE_Y-60,
                            move_speed=preset["player_speed"],
-                           jump_velocity=preset["player_jump"])        
-        
+                           jump_velocity=preset["player_jump"])
         self.camera=Camera(SCREEN_WIDTH,SCREEN_HEIGHT)
         self.particles.clear(); self.rings.clear(); self.flashes.clear()
         self.level_time=0; self.tick=0; self.win_timer=0
         self._tram_started=False
+        self.dialogue_box  = None
+        self.pending_state = None
 
     def _apply_volume(self):
         pygame.mixer.music.set_volume(0.0 if self.music_muted else self.music_volume)
 
     def _exit_to_menu(self):
         self.sfx.stop_music(); self.running=False
+
+    def start_dialogue(self, key, return_state="playing"):
+        """Start a story dialogue by key, pausing the game."""
+        if key in STORY_DIALOGUES:
+            self.dialogue_box  = DialogueBox(STORY_DIALOGUES[key])
+            self.pending_state = return_state
+            self.state         = "dialogue"
+            self.sfx.play("npc_talk")
 
     def run(self):
         self.running=True
@@ -1583,12 +1707,27 @@ class Game:
                 if ev.type==pygame.QUIT: self._exit_to_menu(); return
                 if ev.type==pygame.KEYDOWN: self._handle_key(ev.key)
             if not self.running: return
-            if self.state=="playing": self._update()
-            elif self.state=="win":   self.win_timer+=1
+            if self.state=="playing":   self._update()
+            elif self.state=="dialogue":
+                if self.dialogue_box: self.dialogue_box.update()
+                for sf in self.snowflakes: sf.update()
+                self.tick += 1
+            elif self.state=="win":     self.win_timer+=1
             self._draw()
             self.clock.tick(FPS)
 
     def _handle_key(self, key):
+        # ── Dialogue state ────────────────────────────────────────────────
+        if self.state == "dialogue":
+            if key in (pygame.K_RETURN, pygame.K_SPACE, pygame.K_e):
+                if self.dialogue_box:
+                    self.dialogue_box.advance()
+                    if not self.dialogue_box.active:
+                        self.dialogue_box = None
+                        self.state = self.pending_state or "playing"
+            return
+
+        # ── Settings state ────────────────────────────────────────────────
         if self.state=="settings":
             if key==pygame.K_ESCAPE: self.state="playing"; return
             nr=5
@@ -1598,14 +1737,11 @@ class Game:
                 changed = False
                 if key in (pygame.K_LEFT,pygame.K_a):
                     self.diff_index=(self.diff_index-1)%3
-                    self.difficulty=self.DIFF_OPTIONS[self.diff_index]
-                    changed=True
+                    self.difficulty=self.DIFF_OPTIONS[self.diff_index]; changed=True
                 elif key in (pygame.K_RIGHT,pygame.K_d,pygame.K_RETURN,pygame.K_SPACE):
                     self.diff_index=(self.diff_index+1)%3
-                    self.difficulty=self.DIFF_OPTIONS[self.diff_index]
-                    changed=True
-                if changed:
-                    self._load_level()   # rebuild level immediately with new preset
+                    self.difficulty=self.DIFF_OPTIONS[self.diff_index]; changed=True
+                if changed: self._load_level()
             elif self.settings_cursor==1:
                 if key in (pygame.K_LEFT,pygame.K_a):    self.music_volume=max(0.0,round(self.music_volume-0.1,1)); self._apply_volume()
                 elif key in (pygame.K_RIGHT,pygame.K_d): self.music_volume=min(1.0,round(self.music_volume+0.1,1)); self._apply_volume()
@@ -1616,11 +1752,24 @@ class Game:
             elif self.settings_cursor==4:
                 if key in (pygame.K_RETURN,pygame.K_SPACE): self._exit_to_menu()
             return
+
+        # ── Win state ─────────────────────────────────────────────────────
         if self.state=="win":
             if key in (pygame.K_RETURN,pygame.K_SPACE,pygame.K_ESCAPE): self._exit_to_menu()
             return
-        if key==pygame.K_ESCAPE: self.state="settings"; self.settings_cursor=3
-        elif key==pygame.K_r:    self._load_level()
+
+        # ── Playing state ─────────────────────────────────────────────────
+        if key==pygame.K_ESCAPE:
+            self.state="settings"; self.settings_cursor=3
+        elif key==pygame.K_r:
+            self._load_level()
+        elif key==pygame.K_e:
+            # Talk to nearest untouched NPC
+            for npc in self.npcs:
+                if npc.check_proximity(self.player) and not npc.talked:
+                    npc.talked = True
+                    self.start_dialogue(npc.dialogue_key)
+                    break
 
     def _update(self):
         self.tick+=1; self.level_time+=1
@@ -1628,17 +1777,18 @@ class Game:
 
         for p in self.platforms: p.update()
 
-        # Track alive state before player update (to detect death this frame)
+        # NPC proximity display
+        for npc in self.npcs:
+            npc.proximity_shown = npc.check_proximity(self.player)
+
         was_alive=self.player.alive
         result=self.player.update(keys,self.platforms)
-        if result=="jump": self.sfx.play("jump") 
+        if result=="jump": self.sfx.play("jump")
 
-        # On player death: reset countdown, tram and sleigh
+        # On death: reset countdown/tram/sleigh
         if was_alive and not self.player.alive:
             if self.countdown_platform_ref:
                 self.countdown_platform_ref.reset()
-            # Reset tram back to origin and sleigh back to waiting
-            # so Santa comes back every time the player respawns
             if self.tram_platform:
                 self.tram_platform.reset()
             if self.santa_sleigh:
@@ -1646,7 +1796,6 @@ class Game:
             self._tram_started = False
 
         # Tram + sleigh
-        # Santa starts flying in only after tram has travelled SANTA_TRIGGER_DIST px
         if self.tram_platform and self.tram_platform.moving and not self._tram_started:
             tram_travelled = self.tram_platform.rect.x - self.tram_platform.origin_x
             trigger = getattr(self.tram_platform, "santa_trigger_dist", 200)
@@ -1657,19 +1806,13 @@ class Game:
         if self.santa_sleigh and self.santa_sleigh.state != "waiting":
             sleigh_result = self.santa_sleigh.update(self.player)
             if sleigh_result == "kill_player" and self.player.alive:
-                self._death_fx()
-                self.player.die()
-                self.sfx.play("death")
-        # Kill player if still on tram when it fully disappears
-        # (but NOT if they've grabbed the rope — santa_sleigh handles that)
+                self._death_fx(); self.player.die(); self.sfx.play("death")
         if (self.tram_platform and self.tram_platform.gone
                 and self.player.alive
                 and self.santa_sleigh
                 and not self.santa_sleigh.player_grabbed
                 and self.player.riding_platform is self.tram_platform):
-            self._death_fx()
-            self.player.die()
-            self.sfx.play("death")
+            self._death_fx(); self.player.die(); self.sfx.play("death")
 
         # Section checkpoints
         for sc in self.section_checkpoints:
@@ -1690,8 +1833,7 @@ class Game:
         self.balloon.update()
         if self.balloon.check_grab(self.player):
             self._balloon_fx()
-            self.sfx.play("balloon")
-            self.sfx.play("balloon_pop")
+            self.sfx.play("balloon"); self.sfx.play("balloon_pop")
 
         self.portal.update()
         if self.player.alive and self.portal.check(self.player):
@@ -1744,15 +1886,25 @@ class Game:
                     p.rect.y+random.randint(0,p.rect.height),
                     ICE_BLUE,random.uniform(-1,1),random.uniform(-1.5,0),15,2,0.0))
 
+    # ── Drawing ───────────────────────────────────────────────────────────
     def _draw(self):
         self.screen.fill(DARK_BG)
-        if self.state in ("playing","settings"): self._draw_game()
-        if self.state=="settings":               self._draw_settings()
-        elif self.state=="win":                  self._draw_win()
+        if self.state in ("playing","settings","dialogue"):
+            self._draw_game()
+        if self.state=="settings":
+            self._draw_settings()
+        elif self.state=="dialogue":
+            # Dim the game world during dialogue
+            dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            dim.fill((0, 0, 0, 80))
+            self.screen.blit(dim, (0, 0))
+            if self.dialogue_box:
+                self.dialogue_box.draw(self.screen, self.tick)
+        elif self.state=="win":
+            self._draw_win()
         pygame.display.flip()
 
     def _draw_background(self):
-        # ── Sky gradient (deep midnight blue → dark grey-blue at horizon) ──
         sky_top    = (8,  20,  55)
         sky_mid    = (20, 45,  90)
         sky_horz   = (50, 70, 110)
@@ -1764,7 +1916,6 @@ class Game:
                 c = lerp_color(sky_mid, sky_horz, (t - 0.6) / 0.4)
             pygame.draw.line(self.screen, c, (0, y), (SCREEN_WIDTH, y))
 
-        # ── Stars (parallax — slow scroll) ──────────────────────────────
         ox_slow = int(self.camera.offset_x * 0.05) % SCREEN_WIDTH
         for i in range(80):
             sx = (i * 173 + ox_slow) % SCREEN_WIDTH
@@ -1773,7 +1924,6 @@ class Game:
             r = 1 if i % 3 else 2
             pygame.draw.circle(self.screen, (brightness, brightness, brightness), (sx, sy), r)
 
-        # ── Far mountain silhouette (distant, barely visible) ────────────
         ox_far = int(self.camera.offset_x * 0.08) % SCREEN_WIDTH
         far_col = (30, 50, 80)
         far_pts = [(0, SCREEN_HEIGHT)]
@@ -1784,14 +1934,12 @@ class Game:
             far_pts.append(((px - ox_far) % SCREEN_WIDTH, py))
         far_pts.append((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.draw.polygon(self.screen, far_col, far_pts)
-        # Snow caps on far mountains
         for i in range(1, len(far_pts) - 1):
             px, py = far_pts[i]
             if py < 310:
                 cap = [(px-18, py+20), (px, py-5), (px+18, py+20)]
                 pygame.draw.polygon(self.screen, (200, 215, 235), cap)
 
-        # ── Near mountain silhouette (closer, darker) ────────────────────
         ox_near = int(self.camera.offset_x * 0.18) % SCREEN_WIDTH
         near_col = (15, 28, 52)
         near_pts = [(0, SCREEN_HEIGHT)]
@@ -1802,14 +1950,12 @@ class Game:
             near_pts.append(((px - ox_near) % SCREEN_WIDTH, py))
         near_pts.append((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.draw.polygon(self.screen, near_col, near_pts)
-        # Snow on near mountain peaks
         for i in range(1, len(near_pts) - 1):
             px, py = near_pts[i]
             if py < 300:
                 cap = [(px-25, py+30), (px, py-10), (px+25, py+30)]
                 pygame.draw.polygon(self.screen, (225, 235, 255), cap)
 
-        # ── Ground snow line at horizon ──────────────────────────────────
         pygame.draw.rect(self.screen, (200, 215, 235),
                          (0, SCREEN_HEIGHT - 30, SCREEN_WIDTH, 30))
 
@@ -1824,6 +1970,9 @@ class Game:
         if self.santa_sleigh:      self.santa_sleigh.draw(self.screen,self.camera)
         for p in self.particles:   p.draw(self.screen,self.camera)
         for r in self.rings:       r.draw(self.screen,self.camera)
+        # Draw NPCs
+        for npc in self.npcs:
+            npc.draw(self.screen, self.camera, self.tick)
         self.player.draw(self.screen,self.camera,self.tick)
         for f in self.flashes:     f.draw(self.screen)
 
@@ -1860,7 +2009,7 @@ class Game:
             pygame.draw.rect(self.screen,col,(12,12+li*17,10,10))
             self.screen.blit(self.tiny_font.render(txt,True,(160,180,200)),(26,10+li*17))
         self.screen.blit(self.tiny_font.render(
-            "SPACE/W-Jump  A/D-Move  R-Restart  ESC-Settings",True,(80,100,120)),
+            "SPACE/W-Jump  A/D-Move  E-Talk  R-Restart  ESC-Settings",True,(80,100,120)),
             (10,SCREEN_HEIGHT-20))
         if not self.player.alive:
             t=self.font.render("Respawning...",True,RED)
@@ -1902,18 +2051,53 @@ class Game:
     def _draw_win(self):
         self._draw_background()
         for sf in self.snowflakes: sf.draw(self.screen)
-        t=self.big_font.render("MERRY CHRISTMAS!",True,GOLD)
+        t=self.big_font.render("SECOND REALM CLEARED!",True,GOLD)
         self.screen.blit(t,t.get_rect(center=(SCREEN_WIDTH//2,140)))
+        sm=self.font.render("Snow Miser tips his hat... reluctantly.",True,ICE_BLUE)
+        self.screen.blit(sm,sm.get_rect(center=(SCREEN_WIDTH//2,205)))
         for lbl,col,y in [
-            ("You escaped the Glitch Winter!",ICE_BLUE,215),
-            (f"Time: {self.level_time/FPS:.1f} seconds",YELLOW,265),
-            (f"Checkpoints: {sum(1 for sc in self.section_checkpoints if sc.activated)}/{len(self.section_checkpoints)}",CP_ACTIVE,315),
-            (f"Difficulty: {self.difficulty.upper()}",self.DIFF_COLORS[self.difficulty],365),
+            ("You escaped the Second Realm!",ICE_BLUE,265),
+            (f"Time: {self.level_time/FPS:.1f} seconds",YELLOW,315),
+            (f"Checkpoints: {sum(1 for sc in self.section_checkpoints if sc.activated)}/{len(self.section_checkpoints)}",CP_ACTIVE,365),
+            (f"Difficulty: {self.difficulty.upper()}",self.DIFF_COLORS[self.difficulty],415),
         ]:
-            t=self.font.render(lbl,True,col)
-            self.screen.blit(t,t.get_rect(center=(SCREEN_WIDTH//2,y)))
+            t2=self.font.render(lbl,True,col)
+            self.screen.blit(t2,t2.get_rect(center=(SCREEN_WIDTH//2,y)))
         h=self.small_font.render("Press ENTER or ESC to exit",True,WHITE)
-        self.screen.blit(h,h.get_rect(center=(SCREEN_WIDTH//2,430)))
+        self.screen.blit(h,h.get_rect(center=(SCREEN_WIDTH//2,480)))
+
+    # expose zigzag_section for HUD
+    @property
+    def zigzag_section(self):
+        return self._zigzag_section if hasattr(self, '_zigzag_section') else None
+
+    def _load_level(self):
+        preset=DIFFICULTY_PRESETS[self.difficulty]
+        d=create_christmas_level(preset)
+        self.platforms              =d["platforms"]
+        self.shrink_platforms       =d["shrink_platforms"]
+        self.fall_platforms         =d["fall_platforms"]
+        self.phantom_platforms      =d["phantom_platforms"]
+        self.countdown_platforms    =d["countdown_platforms"]
+        self.countdown_platform_ref =d["countdown_platform_ref"]
+        self._zigzag_section        =d["zigzag_section"]
+        self.tram_platform          =d["tram_platform"]
+        self.santa_sleigh           =d["santa_sleigh"]
+        self.spikes                 =d["spikes"]
+        self.balloon                =d["balloon"]
+        self.portal                 =d["portal"]
+        self.section_checkpoints    =d["section_checkpoints"]
+        self.npcs                   =d["npcs"]
+        self.player=Player(80,BASE_Y-60,
+                           move_speed=preset["player_speed"],
+                           jump_velocity=preset["player_jump"])
+        self.camera=Camera(SCREEN_WIDTH,SCREEN_HEIGHT)
+        self.particles.clear(); self.rings.clear(); self.flashes.clear()
+        self.level_time=0; self.tick=0; self.win_timer=0
+        self._tram_started=False
+        self.dialogue_box  = None
+        self.pending_state = None
+
 
 # ---------------------------------------------------------------------------
 # Entry points
