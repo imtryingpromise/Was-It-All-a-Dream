@@ -8,6 +8,7 @@ pygame.init()
 
 from levels.level1 import launch_game as launch_level1
 from levels.level2 import launch_game as launch_level2
+from levels.level3 import launch_game as launch_level3
 from levels.level4 import launch_game as launch_level4
 from levels.level4 import draw_credits_screen, get_credits_max_scroll
 
@@ -232,8 +233,8 @@ def handle_level_select(index):
         launch_level2()
         restore_menu_music()
     elif index == 2:
-        current_level = "Level 3"
-        state = "LEVEL_PREVIEW"
+        launch_level3()
+        restore_menu_music()
     elif index == 3:
         launch_level4()
         restore_menu_music()
