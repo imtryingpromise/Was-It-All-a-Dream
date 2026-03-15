@@ -1376,7 +1376,9 @@ class Player:
         self.squash_timer=0; self.was_on_ground=False
         init_player_sprite(self)
 
-    def die(self): self.alive=False; self.respawn_timer=60
+    def die(self):
+        self.alive=False; self.respawn_timer=9999
+        self._spr_state='death'; self._spr_frame=0; self._spr_tick=0; self._spr_death_done=False
 
     def respawn(self):
         self.rect.topleft=(self.spawn_x,self.spawn_y)
@@ -1385,8 +1387,7 @@ class Player:
 
     def update(self, keys, platforms):
         if not self.alive:
-            self.respawn_timer-=1
-            if self.respawn_timer<=0: self.respawn()
+            # Soul system handles respawn — just wait
             return None
 
         if self.riding_platform is not None and hasattr(self.riding_platform, 'dx'):
@@ -1431,7 +1432,7 @@ class Player:
                 elif self.vel_y<0:
                     self.rect.top=pr.bottom; self.vel_y=0
 
-        if self.rect.top>DEATH_Y: self.alive=False; self.respawn_timer=60
+        if self.rect.top > SCREEN_HEIGHT - SCREEN_HEIGHT // 10 and self.alive: self.die()
         return "jump" if jumped else None
 
     def draw(self,surface,camera,tick):
@@ -1444,7 +1445,8 @@ SOUND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file_
 SOUND_FILES= {"jump":"jump.wav","death":"death.wav","respawn":"respawn.wav",
               "balloon":"powerup.wav","balloon_pop":"balloon_pop.wav",
               "checkpoint":"checkpoint.wav","win":"win.wav",
-              "npc_talk":"npc_talk.wav"}
+              "npc_talk":"npc_talk.wav",
+              "soul_rise":"soul_rise.wav","soul_land":"soul_land.wav"}
 
 MUSIC_FILE = r"C:\Users\ilham\Documents\APU WORKS\YEAR 2 SEM 2\IMAGING & SE\GameAssignment\imaging-assignment\assets\audio\backgroundlevel2.mp3"
 
@@ -1656,6 +1658,11 @@ class Game:
         # Story
         self.dialogue_box  = None
         self.pending_state = None
+        # Soul death/respawn animation
+        self.soul_state=None; self.soul_x=0; self.soul_y=0
+        self.soul_target_y=0; self.soul_timer=0; self.soul_trail=[]
+        self.soul_pan_target_x=0; self.soul_pan_target_y=0
+        self.respawn_fade=0
         self._load_level()
         self.sfx.start_music(volume=self.music_volume)
 
@@ -1685,6 +1692,8 @@ class Game:
         self._tram_started=False
         self.dialogue_box  = None
         self.pending_state = None
+        self.soul_state=None; self.soul_trail=[]
+        self.respawn_fade=0
 
     def _apply_volume(self):
         pygame.mixer.music.set_volume(0.0 if self.music_muted else self.music_volume)
@@ -1707,7 +1716,9 @@ class Game:
                 if ev.type==pygame.QUIT: self._exit_to_menu(); return
                 if ev.type==pygame.KEYDOWN: self._handle_key(ev.key)
             if not self.running: return
-            if self.state=="playing":   self._update()
+            if self.state=="playing" and self.soul_state is not None:
+                self._update_soul(); self.tick += 1
+            elif self.state=="playing":   self._update()
             elif self.state=="dialogue":
                 if self.dialogue_box: self.dialogue_box.update()
                 for sf in self.snowflakes: sf.update()
@@ -1840,8 +1851,17 @@ class Game:
             self.state="win"; self.win_timer=0
             self.sfx.play("win"); self.sfx.stop_music()
 
-        if not self.player.alive and self.player.respawn_timer==1:
-            self.sfx.play("respawn")
+        # Trigger soul rise when death animation finishes (or immediately if fell off screen)
+        if not self.player.alive and self.soul_state is None:
+            death_ready = getattr(self.player, '_spr_death_done', False)
+            fell_off = self.player.rect.top > SCREEN_HEIGHT
+            if death_ready or fell_off:
+                self.player.respawn_timer = 9999
+                self.soul_x = float(self.player.rect.centerx)
+                self.soul_y = float(min(self.player.rect.centery, SCREEN_HEIGHT - 50))
+                self.soul_target_y = self.soul_y - 140
+                self.soul_timer = 0; self.soul_trail = []
+                self.soul_state = "rising"; self.sfx.play("soul_rise")
 
         self.particles=[p for p in self.particles if p.update()]
         self.rings    =[r for r in self.rings     if r.update()]
@@ -1887,6 +1907,92 @@ class Game:
                     ICE_BLUE,random.uniform(-1,1),random.uniform(-1.5,0),15,2,0.0))
 
     # ── Drawing ───────────────────────────────────────────────────────────
+    def _update_soul(self):
+        self.soul_timer += 1
+        # Sparkle particles around the soul (skip during panning)
+        if self.soul_state != "panning":
+            for _ in range(random.randint(2, 3)):
+                a = random.uniform(0, math.pi*2); d = random.uniform(8, 20)
+                sx = self.soul_x + math.cos(a)*d; sy = self.soul_y + math.sin(a)*d
+                self.particles.append(Particle(sx, sy, (255, 210, 80),
+                    random.uniform(-0.5, 0.5), random.uniform(-1, 0),
+                    random.randint(12, 20), random.randint(1, 3), 0.02, fade=True))
+        if self.soul_state == "rising":
+            t = min(1.0, self.soul_timer / 40)
+            ease = t * t * (3 - 2 * t)
+            self.soul_y = self.player.rect.centery - ease * 140
+            self.soul_x = self.player.rect.centerx + math.sin(self.soul_timer * 0.15) * 12
+            self.soul_trail.append((self.soul_x, self.soul_y, 255))
+            if len(self.soul_trail) > 20: self.soul_trail.pop(0)
+            self.soul_trail = [(x, y, a-10) for x, y, a in self.soul_trail if a > 10]
+            if self.soul_timer >= 40:
+                self.soul_state = "panning"; self.soul_timer = 0; self.soul_trail = []
+                self.soul_pan_target_x = self.player.spawn_x + Player.WIDTH // 2 - self.camera.width // 3
+                self.soul_pan_target_y = self.player.spawn_y + Player.HEIGHT // 2 - self.camera.height // 2
+        elif self.soul_state == "panning":
+            dx = self.soul_pan_target_x - self.camera.offset_x
+            dy = self.soul_pan_target_y - self.camera.offset_y
+            self.camera.offset_x += dx * 0.12
+            self.camera.offset_y += dy * 0.08
+            if self.soul_timer >= 20 and abs(dx) < 8 and abs(dy) < 8:
+                self.soul_state = "falling"; self.soul_timer = 0
+                self.soul_x = float(self.player.spawn_x + Player.WIDTH // 2)
+                self.soul_y = self.camera.offset_y - 60
+                self.soul_target_y = float(self.player.spawn_y + Player.HEIGHT // 2)
+                self.soul_trail = []; self.sfx.play("soul_land")
+        elif self.soul_state == "falling":
+            t = min(1.0, self.soul_timer / 35)
+            ease = t * t * (3 - 2 * t)
+            self.soul_y = -50 + (self.soul_target_y + 50) * ease
+            self.soul_x = (self.player.spawn_x + Player.WIDTH // 2) + math.sin(t * math.pi) * 30
+            self.soul_trail.append((self.soul_x, self.soul_y, 255))
+            if len(self.soul_trail) > 20: self.soul_trail.pop(0)
+            self.soul_trail = [(x, y, a-10) for x, y, a in self.soul_trail if a > 10]
+            if self.soul_timer >= 35:
+                self.player.respawn_timer = 0; self.player.respawn()
+                self.sfx.play("soul_land"); self.sfx.play("respawn")
+                self.respawn_fade = 20
+                self.flashes.append(FlashOverlay(WHITE, 12, 160))
+                for _ in range(25):
+                    a = random.uniform(0, math.pi*2); s = random.uniform(2, 7)
+                    self.particles.append(Particle(self.soul_x, self.soul_target_y,
+                        random.choice([WHITE, SNOW_WHITE, ICE_BLUE, XMAS_GOLD]),
+                        math.cos(a)*s, math.sin(a)*s, 30, random.randint(3, 7), 0.1))
+                self.rings.append(RingEffect(int(self.soul_x), int(self.soul_target_y), WHITE, 100, 6, 3))
+                self.soul_state = None; self.soul_trail = []
+                self.camera.update(self.player.rect)
+        self.particles = [p for p in self.particles if p.update()]
+        self.rings = [r for r in self.rings if r.update()]
+        self.flashes = [f for f in self.flashes if f.update()]
+
+    def _draw_soul(self):
+        if self.soul_state is None: return
+        # Pulsing dark overlay (same as level4)
+        dim_alpha = int(80 + 20 * math.sin(self.soul_timer * 0.12))
+        dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        dim.fill((0, 0, 0, dim_alpha))
+        self.screen.blit(dim, (0, 0))
+        # During panning, only show the dark overlay — no soul orb
+        if self.soul_state == "panning": return
+        sp = self.camera.apply(pygame.Rect(int(self.soul_x), int(self.soul_y), 1, 1))
+        # Soul trail — fading circles
+        for i, (sx, sy, sa) in enumerate(self.soul_trail):
+            tp = self.camera.apply(pygame.Rect(int(sx), int(sy), 1, 1))
+            frac = (i + 1) / max(1, len(self.soul_trail))
+            r = max(2, int(10 * frac))
+            al = max(0, min(255, int(sa * 0.4 * frac)))
+            ts = pygame.Surface((r*2, r*2), pygame.SRCALPHA)
+            pygame.draw.circle(ts, (255, 255, 255, al), (r, r), r)
+            self.screen.blit(ts, (tp.x - r, tp.y - r))
+        # Outer glow
+        for gr, ga in [(40, 40), (28, 80), (18, 160)]:
+            gs = pygame.Surface((gr*2, gr*2), pygame.SRCALPHA)
+            pygame.draw.circle(gs, (255, 255, 255, ga), (gr, gr), gr)
+            self.screen.blit(gs, (sp.x - gr, sp.y - gr))
+        # Core white orb
+        pygame.draw.circle(self.screen, WHITE, (sp.x, sp.y), 8)
+        pygame.draw.circle(self.screen, (240, 250, 255), (sp.x - 1, sp.y - 1), 4)
+
     def _draw(self):
         self.screen.fill(DARK_BG)
         if self.state in ("playing","settings","dialogue"):
@@ -1902,6 +2008,12 @@ class Game:
                 self.dialogue_box.draw(self.screen, self.tick)
         elif self.state=="win":
             self._draw_win()
+        if self.respawn_fade > 0:
+            a = int(255*(1.0-abs(self.respawn_fade-10)/10.0))
+            if a > 0:
+                ov=pygame.Surface((SCREEN_WIDTH,SCREEN_HEIGHT)); ov.fill(BLACK)
+                ov.set_alpha(min(255,a)); self.screen.blit(ov,(0,0))
+            self.respawn_fade -= 1
         pygame.display.flip()
 
     def _draw_background(self):
@@ -2011,7 +2123,9 @@ class Game:
         self.screen.blit(self.tiny_font.render(
             "SPACE/W-Jump  A/D-Move  E-Talk  R-Restart  ESC-Settings",True,(80,100,120)),
             (10,SCREEN_HEIGHT-20))
-        if not self.player.alive:
+        if self.soul_state is not None:
+            self._draw_soul()
+        elif not self.player.alive:
             t=self.font.render("Respawning...",True,RED)
             self.screen.blit(t,t.get_rect(center=(SCREEN_WIDTH//2,SCREEN_HEIGHT//2)))
 
