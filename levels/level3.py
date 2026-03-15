@@ -60,6 +60,12 @@ CYAN = (0, 220, 255)
 PURPLE = (160, 50, 200)
 BROWN = (139, 90, 43)
 
+# ── Ice arrow colours ──────────────────────────────────────────────────────
+ICE_BLUE   = (140, 210, 255)
+ICE_WHITE  = (220, 245, 255)
+ICE_DARK   = ( 80, 160, 220)
+ICE_CORE   = (200, 240, 255)
+
 # ── Physics ───────────────────────────────────────────────────────────────────
 GRAVITY = 0.55
 JUMP_VELOCITY = -13
@@ -892,12 +898,18 @@ class Arrow:
         self.lifetime = ARROW_LIFETIME
         self.alive = True
         self.angle = math.atan2(vy, vx)
+        self.trail = []  # frost trail: list of (x, y, alpha)
 
     def update(self):
+        # Save trail point before moving
+        self.trail.append((self.x, self.y, 200))
+        if len(self.trail) > 10:
+            self.trail.pop(0)
+        self.trail = [(x, y, a - 22) for x, y, a in self.trail if a > 22]
+
         self.x += self.vx
         self.y += self.vy
-        # Very slight gravity on arrow
-        self.vy += 0.08
+        self.vy += 0.08  # slight gravity
         self.angle = math.atan2(self.vy, self.vx)
         self.lifetime -= 1
         if self.lifetime <= 0:
@@ -911,23 +923,44 @@ class Arrow:
     def draw(self, surface, camera, tick):
         if not self.alive:
             return
+
+        # ── Frost trail ──
+        for i, (tx, ty, ta) in enumerate(self.trail):
+            tp = camera.apply(pygame.Rect(int(tx), int(ty), 1, 1))
+            frac = (i + 1) / max(1, len(self.trail))
+            r = max(1, int(4 * frac))
+            a = max(0, min(255, int(ta * frac)))
+            ts = pygame.Surface((r * 2 + 2, r * 2 + 2), pygame.SRCALPHA)
+            c = lerp_color(ICE_DARK, ICE_WHITE, frac)
+            pygame.draw.circle(ts, (*c, a), (r + 1, r + 1), r)
+            surface.blit(ts, (tp.x - r - 1, tp.y - r - 1))
+
         p = camera.apply(pygame.Rect(int(self.x), int(self.y), 1, 1))
-        # Arrow shaft
+
+        # ── Shaft ──
         length = 18
         ex = p.x + int(math.cos(self.angle) * length)
         ey = p.y + int(math.sin(self.angle) * length)
-        pygame.draw.line(surface, ARROW_BROWN, (p.x, p.y), (ex, ey), 2)
-        # Arrowhead
-        pygame.draw.circle(surface, (180, 180, 200), (ex, ey), 3)
-        # Tail feathers
+        pygame.draw.line(surface, (60, 60, 80), (p.x + 1, p.y + 1), (ex + 1, ey + 1), 2)  # shadow
+        pygame.draw.line(surface, ICE_DARK,  (p.x, p.y), (ex, ey), 3)
+        pygame.draw.line(surface, ICE_WHITE, (p.x, p.y), (ex, ey), 1)
+
+        # ── Ice crystal tip ──
+        pygame.draw.circle(surface, ICE_BLUE,  (ex, ey), 4)
+        pygame.draw.circle(surface, ICE_WHITE, (ex, ey), 2)
+        if tick % 4 < 2:  # sparkle blink
+            pygame.draw.line(surface, WHITE, (ex - 3, ey), (ex + 3, ey), 1)
+            pygame.draw.line(surface, WHITE, (ex, ey - 3), (ex, ey + 3), 1)
+
+        # ── Tail feathers ──
         bx = p.x + int(math.cos(self.angle + math.pi) * 8)
         by = p.y + int(math.sin(self.angle + math.pi) * 8)
-        pygame.draw.line(surface, WHITE, (bx, by),
-                         (bx + int(math.cos(self.angle + math.pi / 2) * 4),
-                          by + int(math.sin(self.angle + math.pi / 2) * 4)), 1)
-        pygame.draw.line(surface, WHITE, (bx, by),
-                         (bx + int(math.cos(self.angle - math.pi / 2) * 4),
-                          by + int(math.sin(self.angle - math.pi / 2) * 4)), 1)
+        pygame.draw.line(surface, ICE_WHITE, (bx, by),
+                         (bx + int(math.cos(self.angle + math.pi / 2) * 5),
+                          by + int(math.sin(self.angle + math.pi / 2) * 5)), 1)
+        pygame.draw.line(surface, ICE_WHITE, (bx, by),
+                         (bx + int(math.cos(self.angle - math.pi / 2) * 5),
+                          by + int(math.sin(self.angle - math.pi / 2) * 5)), 1)
 
 
 # ---------------------------------------------------------------------------
@@ -1829,12 +1862,12 @@ class Game:
         if arrow:
             self.arrows.append(arrow)
             self.sfx.play("shoot")
-            # Muzzle particles
-            for _ in range(4):
+            # Ice muzzle flash particles
+            for _ in range(6):
                 self.particles.append(Particle(
                     self.player.rect.centerx, self.player.rect.centery - 4,
-                    random.choice([HOLY_GOLD, WHITE, SUN_YELLOW]),
-                    random.uniform(-1, 1), random.uniform(-2, 0.5), 10, 2, 0.1))
+                    random.choice([ICE_BLUE, ICE_WHITE, ICE_CORE, WHITE]),
+                    random.uniform(-2, 2), random.uniform(-2.5, 0.5), 12, random.randint(2, 4), 0.1))
 
     # ------------------------------------------------------------------
     def _handle_key(self, key):
@@ -1983,7 +2016,7 @@ class Game:
                     and arrow.get_rect().colliderect(self.santa.rect)):
                 arrow.alive = False
                 killed = self.santa.hit()
-                self._arrow_hit_fx(int(arrow.x), int(arrow.y))
+                self._arrow_hit_fx(int(arrow.x), int(arrow.y), big=killed)
                 if killed:
                     self.sfx.play("santa_die")
                     self.camera.add_shake(16)
@@ -1999,10 +2032,12 @@ class Game:
             for plat in self.platforms:
                 if plat.is_active() and ar.colliderect(plat.get_rect()):
                     arrow.alive = False
-                    for _ in range(3):
+                    for _ in range(6):
                         self.particles.append(Particle(
-                            arrow.x, arrow.y, ARROW_BROWN,
-                            random.uniform(-2, 2), random.uniform(-2, 0), 10, 2, 0.1))
+                            arrow.x, arrow.y,
+                            random.choice([ICE_BLUE, ICE_WHITE, ICE_CORE]),
+                            random.uniform(-2.5, 2.5), random.uniform(-2, 0.5),
+                            14, random.randint(2, 4), 0.08))
                     break
 
         self.arrows = [a for a in self.arrows if a.update()]
@@ -2167,14 +2202,21 @@ class Game:
                 math.cos(a) * s, math.sin(a) * s - 1, 20, 3, 0.12))
         self.score_popups.append((cx, cy - 25, "+50", 50, WHITE))
 
-    def _arrow_hit_fx(self, x, y):
-        for _ in range(8):
+    def _arrow_hit_fx(self, x, y, big=False):
+        count = 20 if big else 10
+        for _ in range(count):
             a = random.uniform(0, math.pi * 2)
-            s = random.uniform(2, 5)
+            s = random.uniform(2, 7 if big else 5)
             self.particles.append(Particle(
-                x, y, random.choice([SANTA_RED, FIRE_ORANGE, WHITE]),
-                math.cos(a) * s, math.sin(a) * s, 18, 3, 0.1))
-        self.score_popups.append((x, y - 20, "HIT!", 40, SANTA_RED))
+                x, y, random.choice([ICE_BLUE, ICE_WHITE, ICE_CORE, WHITE]),
+                math.cos(a) * s, math.sin(a) * s,
+                random.randint(20, 40), random.randint(2, 5 if big else 3), 0.05))
+        self.rings.append(RingEffect(x, y, ICE_BLUE, 60 if big else 35, 4, 2))
+        if big:
+            self.rings.append(RingEffect(x, y, ICE_WHITE, 90, 5, 3))
+            self.freeze_frames = 4
+        lbl = "CRITICAL!" if big else "HIT!"
+        self.score_popups.append((x, y - 22, lbl, 45, ICE_WHITE if big else ICE_BLUE))
 
     def _gift_fx(self, x, y):
         self.camera.add_shake(10)
