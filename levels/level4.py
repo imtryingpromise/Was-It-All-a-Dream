@@ -20,8 +20,8 @@ ICE_BLUE    = (140, 200, 240)
 SNOW_WHITE  = (240, 245, 255)
 CANDY_PINK  = (255, 130, 160)
 CANDY_WHITE = (255, 240, 240)
-DARK_SKY    = (10, 12, 30)
-NIGHT_BLUE  = (15, 20, 50)
+DARK_SKY    = (12, 15, 40)
+NIGHT_BLUE  = (18, 25, 60)
 GRAY        = (140, 140, 140)
 DARK_GRAY   = (80, 80, 80)
 PURPLE      = (160, 50, 200)
@@ -805,15 +805,32 @@ class Platform:
     def draw(self, surface, camera):
         sr=camera.apply(self.rect)
         if sr.right<-10 or sr.left>SCREEN_WIDTH+10: return
-        pygame.draw.rect(surface, self.color, sr)
-        pygame.draw.rect(surface, SNOW_WHITE, (sr.x-2,sr.y-3,sr.width+4,6))
-        rng=random.Random(sr.x*31+sr.y*17)
-        for bx in range(sr.x, sr.right, 18):
-            bw=random.Random(bx+sr.y).randint(8,14)
-            pygame.draw.ellipse(surface, WHITE, (bx, sr.y-5, bw, 6))
-        for ix in range(sr.x+4, sr.right-4, rng.randint(12,20)):
+        # Rich wooden body with moonlit highlight
+        body = lerp_color(self.color, (60, 55, 80), 0.2)
+        pygame.draw.rect(surface, body, sr, border_radius=6)
+        # Plank grain
+        rng=random.Random(self.rect.x*31+self.rect.y*17)
+        grain = lerp_color(body, (40, 35, 55), 0.25)
+        for gi in range(sr.x+8, sr.right-8, max(12, sr.width//5)):
+            pygame.draw.line(surface, grain, (gi, sr.y+3), (gi, sr.bottom-1), 1)
+        # Moonlit top edge
+        pygame.draw.rect(surface, (70, 80, 110), (sr.x+2, sr.y, sr.width-4, 2), border_radius=2)
+        # Snowy bumpy cap
+        snow_pts = [(sr.x-2, sr.y+3)]
+        for bx in range(sr.x, sr.right+6, 8):
+            bump = rng.randint(3, 6)
+            snow_pts.append((bx, sr.y - bump))
+        snow_pts.append((sr.right+2, sr.y+3))
+        if len(snow_pts) >= 3:
+            pygame.draw.polygon(surface, (200, 210, 230), snow_pts)
+            pygame.draw.polygon(surface, (160, 175, 200), snow_pts, 1)
+        # Icicles
+        for ix in range(sr.x+4, sr.right-4, rng.randint(14,22)):
             il=rng.randint(5,12); iw=rng.randint(2,4)
-            pygame.draw.polygon(surface,(180,210,240),[(ix,sr.bottom),(ix+iw,sr.bottom),(ix+iw//2,sr.bottom+il)])
+            pygame.draw.polygon(surface,(150,180,220),[(ix,sr.bottom),(ix+iw,sr.bottom),(ix+iw//2,sr.bottom+il)])
+            pygame.draw.polygon(surface,(180,200,235),[(ix,sr.bottom),(ix+iw,sr.bottom),(ix+iw//2,sr.bottom+il)], 1)
+        # Shadow underneath
+        pygame.draw.line(surface, (10, 12, 25), (sr.x+4, sr.bottom), (sr.right-4, sr.bottom))
 
 class MovingPlatform(Platform):
     def __init__(self, x1,y1,x2,y2,w,h,speed=1.5,color=None):
@@ -832,22 +849,31 @@ class MovingPlatform(Platform):
     def draw(self, surface, camera):
         sr=camera.apply(self.rect)
         if sr.right<-10 or sr.left>SCREEN_WIDTH+10: return
-        pygame.draw.rect(surface, CANDY_WHITE, sr)
-        for sx_i in range(0, sr.width, 16):
-            x0=sr.x+sx_i
-            stripe=pygame.Rect(x0, sr.y, 8, sr.height)
-            stripe=stripe.clip(sr)
-            if stripe.width>0: pygame.draw.rect(surface, XMAS_RED, stripe)
+        # Gift box style — deep red with gold ribbon
+        pygame.draw.rect(surface, (140, 30, 30), sr, border_radius=6)
+        # Gold ribbon
+        mid_x = sr.x + sr.width // 2
+        mid_y = sr.y + sr.height // 2
+        pygame.draw.rect(surface, (200, 170, 50), (mid_x-2, sr.y, 4, sr.height))
+        pygame.draw.rect(surface, (200, 170, 50), (sr.x, mid_y-2, sr.width, 3))
+        # Bow
+        pygame.draw.ellipse(surface, (220, 190, 60), (mid_x-7, sr.y-4, 7, 5))
+        pygame.draw.ellipse(surface, (220, 190, 60), (mid_x+1, sr.y-4, 7, 5))
+        pygame.draw.circle(surface, (240, 210, 80), (mid_x, sr.y-1), 2)
+        # Border
+        pygame.draw.rect(surface, (170, 40, 35), sr, 2, border_radius=6)
         # Snow cap
-        pygame.draw.rect(surface, SNOW_WHITE, (sr.x-2,sr.y-3,sr.width+4,5))
-        rng=random.Random(sr.x*31+sr.y*17)
-        for bx in range(sr.x, sr.right, 16):
-            bw=random.Random(bx+sr.y).randint(8,12)
-            pygame.draw.ellipse(surface, WHITE, (bx, sr.y-5, bw, 6))
+        rng=random.Random(self.sx*17+self.sy*31)
+        snow_pts = [(sr.x-1, sr.y+3)]
+        for bx in range(sr.x, sr.right+4, 7):
+            snow_pts.append((bx, sr.y - rng.randint(2, 5)))
+        snow_pts.append((sr.right+1, sr.y+3))
+        if len(snow_pts) >= 3:
+            pygame.draw.polygon(surface, (195, 205, 225), snow_pts)
         # Icicles
         for ix in range(sr.x+8, sr.right-8, rng.randint(18,28)):
             il=rng.randint(5,10); iw=rng.randint(2,4)
-            pygame.draw.polygon(surface,(180,210,240),[(ix,sr.bottom),(ix+iw,sr.bottom),(ix+iw//2,sr.bottom+il)])
+            pygame.draw.polygon(surface,(150,180,220),[(ix,sr.bottom),(ix+iw,sr.bottom),(ix+iw//2,sr.bottom+il)])
 
 class GlitchPlatform(Platform):
     def __init__(self, x,y,w,h,on_time=90,off_time=60,offset=0,color=None):
@@ -1499,9 +1525,16 @@ class Ornament:
         pos = camera.apply(pygame.Rect(self.x - 1, int(self.y + bob) - 1, 2, 2))
         sx, sy = pos.x, pos.y
         if sx < -20 or sx > SCREEN_WIDTH + 20: return
-        pygame.draw.line(surface, GRAY, (sx, sy - self.RADIUS), (sx, sy - self.RADIUS - 4), 1)
+        # Hook
+        pygame.draw.line(surface, (120, 120, 140), (sx, sy - self.RADIUS), (sx, sy - self.RADIUS - 5), 1)
+        pygame.draw.circle(surface, (140, 140, 160), (sx, sy - self.RADIUS - 5), 2)
+        # Ornament ball with shine
         pygame.draw.circle(surface, self.color, (sx, sy), self.RADIUS)
-        pygame.draw.circle(surface, WHITE, (sx - 2, sy - 2), 2)
+        # Decorative band
+        hi = tuple(min(c+60, 255) for c in self.color)
+        pygame.draw.ellipse(surface, hi, (sx - self.RADIUS+2, sy-2, self.RADIUS*2-4, 4))
+        # Highlight
+        pygame.draw.circle(surface, (255, 255, 240), (sx - 2, sy - 2), 2)
 
 # --- Heart Pickup ---
 class HeartPickup:
@@ -3672,97 +3705,187 @@ class Game:
                 self.screen.blit(overlay, (0, 0))
         pygame.display.flip()
 
-    def _draw_background(self):
-        # Sky gradient - smoother (dark blue at top -> slightly lighter at horizon)
-        sky_top = (8, 10, 35)
-        sky_mid = (12, 16, 45)
-        sky_bot = (18, 22, 40)
-        # Lerp toward dark red when red atmosphere is active
-        ra = getattr(self, '_red_atmosphere', 0.0)
-        if ra > 0 and self.state != "ending":
-            red_top = (60, 10, 10)
-            red_bot = (80, 15, 15)
-            red_mid = (70, 12, 12)
-            sky_top = lerp_color(sky_top, red_top, ra)
-            sky_mid = lerp_color(sky_mid, red_mid, ra)
-            sky_bot = lerp_color(sky_bot, red_bot, ra)
-        for y in range(0, SCREEN_HEIGHT, 2):
-            t = y / SCREEN_HEIGHT
-            if t < 0.5:
-                c = lerp_color(sky_top, sky_mid, t * 2)
-            else:
-                c = lerp_color(sky_mid, sky_bot, (t - 0.5) * 2)
-            self.screen.fill(c, (0, y, SCREEN_WIDTH, 2))
-        for star in self.bg_stars: star.draw(self.screen, self.tick)
-        # Moon
-        mx, my = SCREEN_WIDTH - 120, 80
-        pygame.draw.circle(self.screen, (60, 60, 50), (mx, my), 50)
-        pygame.draw.circle(self.screen, (240, 230, 200), (mx, my), 45)
-        pygame.draw.circle(self.screen, (60, 60, 50), (mx + 12, my - 8), 35)
-        for r in range(80, 40, -5):
-            a = int(12 * (80 - r) / 40)
-            gs = pygame.Surface((r*2, r*2), pygame.SRCALPHA)
-            pygame.draw.circle(gs, (240, 230, 200, a), (r, r), r)
-            self.screen.blit(gs, (mx - r, my - r))
-        # Aurora - subtle, not overpowering
-        for i in range(3):
-            pts = []
-            for x in range(0, SCREEN_WIDTH + 40, 40):
-                y = 50 + int(math.sin(x*0.004+self.tick*0.006+i*2)*25+math.sin(x*0.002+self.tick*0.004)*15)
-                pts.append((x, y))
-            pts.append((SCREEN_WIDTH, 0)); pts.append((0, 0))
-            if len(pts) >= 3:
-                acs = [(15,60,30),(20,45,60),(30,20,50)]
-                ac = acs[i%3]; p = abs(math.sin(self.tick*0.005+i))*0.35+0.15
-                ac = tuple(int(c*p) for c in ac)
-                s = pygame.Surface((SCREEN_WIDTH, 200), pygame.SRCALPHA)
-                pygame.draw.polygon(s, (*ac, 22), pts)
-                self.screen.blit(s, (0, 0))
-        # === PARALLAX LAYER 1: Far mountains (0.1x scroll) ===
-        ox_far = int(self.camera.offset_x * 0.1)
+    def _build_sky_cache(self):
+        """Pre-render normal night sky and red atmosphere sky."""
+        caches = {}
+        for key, tops in [("normal", ((8, 5, 35), (20, 12, 55), (35, 18, 65), (25, 15, 50))),
+                          ("red",    ((55, 10, 15), (65, 12, 18), (75, 18, 20), (70, 15, 18)))]:
+            surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+            c1, c2, c3, c4 = tops
+            stops = [c1, c2, c3, c4]
+            for y in range(0, SCREEN_HEIGHT, 2):
+                t = y / SCREEN_HEIGHT
+                # 4-stop gradient
+                seg = t * 3
+                i = min(2, int(seg))
+                frac = seg - i
+                c = lerp_color(stops[i], stops[i+1], frac)
+                pygame.draw.line(surf, c, (0, y), (SCREEN_WIDTH, y))
+                pygame.draw.line(surf, c, (0, y+1), (SCREEN_WIDTH, y+1))
+            caches[key] = surf
+        return caches
+
+    def _build_bg_layers(self):
+        """Pre-render parallax mountain/tree/village strips."""
+        strip_w = SCREEN_WIDTH + 800
         base_y = SCREEN_HEIGHT - 30
-        for mx2 in range(-100 - ox_far % 300, SCREEN_WIDTH + 350, 300):
+        layers = []
+        # Layer 0: Far mountains
+        s = pygame.Surface((strip_w, SCREEN_HEIGHT), pygame.SRCALPHA)
+        for mx2 in range(0, strip_w, 300):
             rng = random.Random(mx2 + 55555)
             mh = rng.randint(120, 220); mw = rng.randint(140, 250)
-            mc = (18, 22 + rng.randint(0, 5), 35)
-            pts = [(mx2 - mw // 2, base_y), (mx2, base_y - mh), (mx2 + mw // 2, base_y)]
-            pygame.draw.polygon(self.screen, mc, pts)
-            # Snow cap
+            mc = (20, 25 + rng.randint(0, 8), 45)
+            pts = [(mx2-mw//2, base_y), (mx2, base_y-mh), (mx2+mw//2, base_y)]
+            pygame.draw.polygon(s, mc, pts)
             cap_h = mh // 4
-            pygame.draw.polygon(self.screen, (35, 40, 55),
-                [(mx2 - mw // 6, base_y - mh + cap_h), (mx2, base_y - mh), (mx2 + mw // 6, base_y - mh + cap_h)])
-        # === PARALLAX LAYER 2: Mid pine trees (0.3x scroll) ===
-        ox_mid = int(self.camera.offset_x * 0.3)
-        for tx in range(-60 - ox_mid % 80, SCREEN_WIDTH + 120, 80):
+            pygame.draw.polygon(s, (40, 50, 70),
+                [(mx2-mw//6, base_y-mh+cap_h), (mx2, base_y-mh), (mx2+mw//6, base_y-mh+cap_h)])
+        layers.append(s)
+        # Layer 1: Mid pine trees
+        s = pygame.Surface((strip_w, SCREEN_HEIGHT), pygame.SRCALPHA)
+        for tx in range(0, strip_w, 80):
             rng = random.Random(tx + 88888)
             th = rng.randint(50, 100); tw2 = rng.randint(20, 35)
-            tc = (10, 16 + rng.randint(0, 6), 10)
-            pygame.draw.polygon(self.screen, tc, [(tx, base_y - th), (tx - tw2, base_y), (tx + tw2, base_y)])
-            pygame.draw.polygon(self.screen, tc, [(tx, base_y - th + 15), (tx - tw2 + 6, base_y - 8), (tx + tw2 - 6, base_y - 8)])
-        # === PARALLAX LAYER 3: Close pine trees (0.6x scroll) ===
-        ox_close = int(self.camera.offset_x * 0.6)
-        for tx in range(-80 - ox_close % 150, SCREEN_WIDTH + 200, 150):
+            tc = (12, 22 + rng.randint(0, 8), 15)
+            pygame.draw.polygon(s, tc, [(tx, base_y-th), (tx-tw2, base_y), (tx+tw2, base_y)])
+            pygame.draw.polygon(s, tc, [(tx, base_y-th+15), (tx-tw2+6, base_y-8), (tx+tw2-6, base_y-8)])
+            # Snow on tips
+            pygame.draw.line(s, (50, 60, 80), (tx-tw2+3, base_y-1), (tx-tw2+12, base_y-5), 2)
+        layers.append(s)
+        # Layer 2: Close pine trees
+        s = pygame.Surface((strip_w, SCREEN_HEIGHT), pygame.SRCALPHA)
+        for tx in range(0, strip_w, 150):
             rng = random.Random(tx + 33333)
             th = rng.randint(80, 160); tw2 = rng.randint(35, 55)
-            tc = (14, 20 + rng.randint(0, 10), 14)
-            pygame.draw.polygon(self.screen, tc, [(tx, base_y - th), (tx - tw2, base_y), (tx + tw2, base_y)])
-            pygame.draw.polygon(self.screen, tc, [(tx, base_y - th + 25), (tx - tw2 + 10, base_y - 12), (tx + tw2 - 10, base_y - 12)])
-            pygame.draw.circle(self.screen, (25, 32, 40), (tx, base_y - th), 4)
-        # Distant village silhouettes
-        ox2 = int(self.camera.offset_x * 0.04)
-        for hx in range(-80 - ox2 % 250, SCREEN_WIDTH + 250, 250):
+            tc = (16, 28 + rng.randint(0, 12), 18)
+            pygame.draw.polygon(s, tc, [(tx, base_y-th), (tx-tw2, base_y), (tx+tw2, base_y)])
+            pygame.draw.polygon(s, tc, [(tx, base_y-th+25), (tx-tw2+10, base_y-12), (tx+tw2-10, base_y-12)])
+            # Snow on tree top
+            pygame.draw.circle(s, (45, 55, 70), (tx, base_y-th), 5)
+            # Tiny star ornament on some
+            if rng.random() > 0.5:
+                pygame.draw.circle(s, (255, 200, 50), (tx, base_y-th-2), 2)
+        layers.append(s)
+        # Layer 3: Village silhouettes
+        s = pygame.Surface((strip_w, SCREEN_HEIGHT), pygame.SRCALPHA)
+        for hx in range(0, strip_w, 250):
             rng2 = random.Random(hx + 77777)
             hw = rng2.randint(40, 60); hh = rng2.randint(30, 55)
-            pygame.draw.rect(self.screen, (15, 18, 25), (hx, base_y - hh, hw, hh))
-            pygame.draw.polygon(self.screen, (20, 22, 30), [(hx - 5, base_y - hh), (hx + hw + 5, base_y - hh), (hx + hw // 2, base_y - hh - 20)])
-            pygame.draw.polygon(self.screen, (35, 38, 48), [(hx - 3, base_y - hh), (hx + hw + 3, base_y - hh), (hx + hw // 2, base_y - hh - 18)])
+            pygame.draw.rect(s, (18, 22, 32), (hx, base_y-hh, hw, hh))
+            pygame.draw.polygon(s, (25, 28, 38), [(hx-5, base_y-hh), (hx+hw+5, base_y-hh), (hx+hw//2, base_y-hh-20)])
+            pygame.draw.polygon(s, (35, 40, 52), [(hx-3, base_y-hh), (hx+hw+3, base_y-hh), (hx+hw//2, base_y-hh-18)])
+            # Warm window glow
             if rng2.random() > 0.3:
-                wy = base_y - hh + 12; wx = hx + hw // 2 - 4
-                wc = (60, 50, 20) if (self.tick // 60 + hx) % 3 != 0 else (40, 35, 15)
-                pygame.draw.rect(self.screen, wc, (wx, wy, 8, 8))
-        # Ground
-        pygame.draw.rect(self.screen, (18, 22, 35), (0, base_y, SCREEN_WIDTH, 50))
-        pygame.draw.rect(self.screen, (40, 45, 55), (0, base_y, SCREEN_WIDTH, 3))
+                wy = base_y-hh+12; wx = hx+hw//2-4
+                pygame.draw.rect(s, (70, 55, 25), (wx, wy, 8, 8))
+                pygame.draw.rect(s, (90, 70, 30), (wx+1, wy+1, 6, 6))
+        layers.append(s)
+        return layers
+
+    def _draw_background(self):
+        # Build caches on first call
+        if not hasattr(self, '_sky_caches'):
+            self._sky_caches = self._build_sky_cache()
+            self._bg_layers = self._build_bg_layers()
+
+        # Sky — blend between normal and red based on atmosphere
+        ra = getattr(self, '_red_atmosphere', 0.0)
+        if ra <= 0 or self.state == "ending":
+            self.screen.blit(self._sky_caches["normal"], (0, 0))
+        elif ra >= 1.0:
+            self.screen.blit(self._sky_caches["red"], (0, 0))
+        else:
+            self.screen.blit(self._sky_caches["normal"], (0, 0))
+            red_s = self._sky_caches["red"].copy()
+            red_s.set_alpha(int(ra * 255))
+            self.screen.blit(red_s, (0, 0))
+
+        # Stars
+        for star in self.bg_stars: star.draw(self.screen, self.tick)
+
+        # Moon — rich crescent with no SRCALPHA glow
+        mx, my = SCREEN_WIDTH - 120, 80
+        # Outer glow rings (opaque, just lighter sky color)
+        for r, c in [(55, (30, 35, 60)), (50, (40, 45, 70))]:
+            pygame.draw.circle(self.screen, c, (mx, my), r)
+        pygame.draw.circle(self.screen, (235, 225, 195), (mx, my), 44)
+        pygame.draw.circle(self.screen, (245, 238, 210), (mx, my), 38)
+        # Craters
+        for cx2, cy2, cr in [(mx-10, my-8, 6), (mx+8, my+5, 5), (mx-3, my+10, 4), (mx+14, my-3, 3)]:
+            pygame.draw.circle(self.screen, (220, 210, 180), (cx2, cy2), cr)
+        # Dark side crescent
+        pygame.draw.circle(self.screen, lerp_color((10,12,45), (55,10,15), ra if self.state != "ending" else 0),
+                           (mx + 14, my - 8), 38)
+
+        # Northern lights — flowing curtains that breathe and sway
+        if ra < 0.8:
+            aurora_a = 1.0 - ra * 1.25
+            af = self.tick // 8
+            if not hasattr(self, '_aurora_surf') or getattr(self, '_aurora_frame', -1) != af:
+                self._aurora_frame = af
+                self._aurora_surf = pygame.Surface((SCREEN_WIDTH, 250), pygame.SRCALPHA)
+                t = self.tick
+                # Draw vertical curtain columns across the sky
+                # Each column is a thin vertical strip whose color and brightness vary
+                for x in range(0, SCREEN_WIDTH, 4):
+                    # Mix of green and purple that shifts across the sky
+                    color_t = (math.sin(x * 0.005 + t * 0.001) + 1) * 0.5
+                    # Green ↔ teal ↔ purple gradient across the width
+                    if color_t < 0.5:
+                        col = lerp_color((25, 180, 80), (40, 160, 180), color_t * 2)
+                    else:
+                        col = lerp_color((40, 160, 180), (100, 50, 160), (color_t - 0.5) * 2)
+                    # Curtain wave — the top edge undulates
+                    y_top = 15 + int(
+                        math.sin(x * 0.008 + t * 0.006) * 20 +
+                        math.sin(x * 0.003 + t * 0.003) * 12 +
+                        math.sin(x * 0.015 + t * 0.01) * 6
+                    )
+                    # Height of the curtain drape at this x — varies to create hanging folds
+                    fold = (
+                        math.sin(x * 0.012 + t * 0.004) * 0.4 +
+                        math.sin(x * 0.005 + t * 0.007) * 0.3 + 0.5
+                    )
+                    h = int(40 + fold * 80)
+                    # Brightness — some columns bright, others dim (creates streaky look)
+                    brightness = (
+                        abs(math.sin(x * 0.02 + t * 0.005)) *
+                        abs(math.sin(x * 0.007 + t * 0.003)) *
+                        (0.5 + 0.5 * math.sin(x * 0.003 + t * 0.002))
+                    )
+                    # Occasional bright flares
+                    flare = max(0, math.sin(x * 0.01 + t * 0.008) - 0.7) * 3.0
+                    brightness = min(1.0, brightness + flare)
+                    if brightness < 0.05:
+                        continue
+                    a = int(brightness * 28 * aurora_a)
+                    if a < 2:
+                        continue
+                    # Draw a vertical gradient strip: bright at top, fading to nothing at bottom
+                    for dy in range(0, h, 4):
+                        fade = 1.0 - (dy / h) ** 0.7
+                        strip_a = int(a * fade)
+                        if strip_a < 1:
+                            break
+                        pygame.draw.line(self._aurora_surf, (*col, strip_a),
+                                         (x, y_top + dy), (x + 3, y_top + dy + 3))
+            self.screen.blit(self._aurora_surf, (0, 0))
+
+        # Parallax layers (pre-rendered strips, just offset)
+        parallax_rates = [0.1, 0.3, 0.6, 0.04]
+        for i, layer_surf in enumerate(self._bg_layers):
+            ox = int(self.camera.offset_x * parallax_rates[i]) % layer_surf.get_width()
+            self.screen.blit(layer_surf, (-ox, 0))
+            if ox > layer_surf.get_width() - SCREEN_WIDTH:
+                self.screen.blit(layer_surf, (layer_surf.get_width()-ox, 0))
+
+        # Ground with subtle gradient
+        base_y = SCREEN_HEIGHT - 30
+        pygame.draw.rect(self.screen, (18, 24, 40), (0, base_y, SCREEN_WIDTH, 50))
+        pygame.draw.rect(self.screen, (35, 45, 65), (0, base_y, SCREEN_WIDTH, 2))
+        pygame.draw.rect(self.screen, (25, 32, 50), (0, base_y+2, SCREEN_WIDTH, 1))
+
         # Snowflakes
         for sf in self.snowflakes: sf.draw(self.screen)
 
