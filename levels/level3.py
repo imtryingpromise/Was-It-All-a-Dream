@@ -476,7 +476,7 @@ class IslandPlatform:
             pygame.draw.line(surface, STONE_DARK, (body.left, my), (body.right, my), 1)
 
         # Vertical brick joints — stagger every row
-        rng = random.Random(sr.x * 13 + sr.y * 7)
+        rng = random.Random(self.rect.x * 13 + self.rect.y * 7)
         brick_w = rng.randint(18, 26)
         for row_i, my in enumerate(range(body.top, body.bottom, 10)):
             offset = (brick_w // 2) if row_i % 2 == 1 else 0
@@ -502,7 +502,7 @@ class IslandPlatform:
         pygame.draw.rect(surface, GRASS_SHADE, (sr.x,     sr.y + 5, sr.width,      4))
 
         # Pixel-art grass tufts — blocky 2px wide spikes
-        rng2 = random.Random(sr.x * 31 + sr.y * 17)
+        rng2 = random.Random(self.rect.x * 31 + self.rect.y * 17)
         tx = sr.x + 3
         while tx < sr.right - 3:
             th = rng2.randint(3, 7)
@@ -511,7 +511,7 @@ class IslandPlatform:
 
         # ── Pixel-art trees on top (like the screenshot) ──
         # Only add trees based on platform width and a deterministic seed
-        tree_rng = random.Random(sr.x * 99 + sr.y * 43)
+        tree_rng = random.Random(self.rect.x * 99 + self.rect.y * 43)
         # Decide how many trees (0 to 2 depending on width)
         n_trees = 0
         if sr.width > 60:  n_trees = 1
@@ -533,44 +533,63 @@ class IslandPlatform:
             self._draw_pixel_tree(surface, tx2, sr.y - 2, tree_rng)
 
     def _draw_pixel_tree(self, surface, cx, base_y, rng):
-        """Draw a chunky pixel-art tree like the reference screenshot."""
-        TRUNK_DARK  = (100,  60,  30)
-        TRUNK_LIGHT = (140,  90,  45)
-        POT_RED     = (160,  60,  60)
-        POT_DARK    = (110,  35,  35)
-        LEAF_MID    = ( 55, 130,  55)
-        LEAF_DARK   = ( 35,  90,  40)
-        LEAF_LIGHT  = ( 80, 170,  65)
-
-        # Randomise tree height a little
-        trunk_h = rng.randint(14, 22)
-        canopy_r = rng.randint(12, 18)
-
-        # Pot (small brick-style pot at base)
-        pot_w, pot_h = 14, 10
-        pot_x = cx - pot_w // 2
-        pot_y = base_y - pot_h
-        pygame.draw.rect(surface, POT_RED,  (pot_x,     pot_y,     pot_w,     pot_h), border_radius=2)
-        pygame.draw.rect(surface, POT_DARK, (pot_x,     pot_y,     pot_w,     2))       # top rim
-        pygame.draw.rect(surface, POT_DARK, (pot_x,     pot_y + pot_h - 2, pot_w, 2))  # bottom
-        pygame.draw.rect(surface, POT_DARK, (pot_x + pot_w - 2, pot_y, 2, pot_h))      # right shadow
-
-        # Trunk (2 wide for pixel art feel)
-        trunk_top = pot_y - trunk_h
-        pygame.draw.rect(surface, TRUNK_DARK,  (cx - 2, trunk_top, 4, trunk_h))
-        pygame.draw.rect(surface, TRUNK_LIGHT, (cx - 2, trunk_top, 2, trunk_h))  # highlight left
-
-        # Canopy — layered circles for chunky pixel feel
-        canopy_cy = trunk_top
-        # Shadow layer (dark, slightly offset down)
-        pygame.draw.circle(surface, LEAF_DARK,  (cx + 2, canopy_cy + 3), canopy_r)
-        # Main canopy
-        pygame.draw.circle(surface, LEAF_MID,   (cx,     canopy_cy),     canopy_r)
-        # Highlight (top-left dome)
-        pygame.draw.circle(surface, LEAF_LIGHT, (cx - canopy_r // 3, canopy_cy - canopy_r // 3),
-                           max(3, canopy_r // 2))
-        # Hard outline (1px dark ring — pixel art style)
-        pygame.draw.circle(surface, LEAF_DARK,  (cx,     canopy_cy),     canopy_r, 1)
+        """Lush layered conifer tree — scenic and cartoony with contrast."""
+        trunk_h = rng.randint(16, 28)
+        n_tiers = rng.randint(3, 5)
+        base_r  = rng.randint(14, 22)
+        lean    = rng.randint(-2, 2)
+        TRUNK_D  = ( 80,  45,  18)
+        TRUNK_L  = (120,  72,  30)
+        BARK_H   = (145,  90,  38)
+        LEAF_DEEP   = ( 28,  80,  38)
+        LEAF_MID    = ( 48, 115,  55)
+        LEAF_BRIGHT = ( 72, 158,  68)
+        LEAF_HILIT  = (105, 190,  85)
+        LEAF_EDGE   = ( 38,  95,  45)
+        # Trunk
+        trunk_top = base_y - trunk_h
+        pygame.draw.polygon(surface, TRUNK_D,
+            [(cx - 5, base_y),(cx - 3 + lean, trunk_top + trunk_h//2),(cx + 3 + lean, trunk_top + trunk_h//2),(cx + 5, base_y)])
+        pygame.draw.rect(surface, TRUNK_D, (cx - 3 + lean, trunk_top, 6, trunk_h))
+        pygame.draw.rect(surface, TRUNK_L, (cx - 3 + lean, trunk_top, 3, trunk_h))
+        pygame.draw.rect(surface, BARK_H,  (cx - 2 + lean, trunk_top + 2, 1, trunk_h - 4))
+        # Tiers
+        for tier in range(n_tiers):
+            t_frac = tier / max(1, n_tiers - 1)
+            t_r  = int(base_r * (1.0 - t_frac * 0.45))
+            t_y  = trunk_top - tier * (base_r * 4 // 5) + (n_tiers - 1) * (base_r // 3)
+            t_cx = cx + lean * (n_tiers - tier) // n_tiers
+            # Shadow
+            ss = pygame.Surface((t_r * 2 + 8, t_r * 2 + 8), pygame.SRCALPHA)
+            pygame.draw.circle(ss, (*LEAF_DEEP, 120), (t_r + 6, t_r + 6), t_r)
+            surface.blit(ss, (t_cx - t_r - 2, t_y - t_r + 2))
+            # Main blob
+            pygame.draw.circle(surface, LEAF_MID, (t_cx, t_y), t_r)
+            # Dark bottom half
+            for dy in range(t_r // 2, t_r):
+                rw = int(math.sqrt(max(0, t_r * t_r - dy * dy)))
+                if rw > 0:
+                    pygame.draw.line(surface, LEAF_DEEP, (t_cx - rw, t_y + dy), (t_cx + rw, t_y + dy), 1)
+            # Sunlit face
+            pygame.draw.circle(surface, LEAF_BRIGHT, (t_cx - t_r//4, t_y - t_r//5), max(3, t_r*2//3))
+            pygame.draw.circle(surface, LEAF_HILIT,  (t_cx - t_r//3, t_y - t_r//2), max(2, t_r//3))
+            # Texture bumps
+            bump_rng = random.Random(rng.randint(0, 9999) + tier * 17)
+            for _ in range(5):
+                ba  = bump_rng.uniform(0, math.pi * 2)
+                bd  = bump_rng.uniform(t_r * 0.55, t_r * 0.9)
+                br2 = bump_rng.randint(3, 6)
+                bx2 = int(t_cx + math.cos(ba) * bd)
+                by2 = int(t_y  + math.sin(ba) * bd * 0.7)
+                bc  = LEAF_BRIGHT if math.cos(ba) < 0 else LEAF_EDGE
+                pygame.draw.circle(surface, bc, (bx2, by2), br2)
+            pygame.draw.circle(surface, LEAF_EDGE, (t_cx, t_y), t_r, 1)
+        # Tip spike
+        tip_y = trunk_top - (n_tiers - 1) * (base_r * 4 // 5) + (n_tiers - 1) * (base_r // 3) - base_r
+        pygame.draw.polygon(surface, LEAF_BRIGHT,
+            [(cx + lean - 3, tip_y + 10),(cx + lean, tip_y),(cx + lean + 3, tip_y + 10)])
+        pygame.draw.polygon(surface, LEAF_HILIT,
+            [(cx + lean - 1, tip_y + 8),(cx + lean, tip_y),(cx + lean + 1, tip_y + 6)])
 
 
 # ---------------------------------------------------------------------------
@@ -898,18 +917,16 @@ class Arrow:
         self.lifetime = ARROW_LIFETIME
         self.alive = True
         self.angle = math.atan2(vy, vx)
-        self.trail = []  # frost trail: list of (x, y, alpha)
+        self.trail = []
 
     def update(self):
-        # Save trail point before moving
         self.trail.append((self.x, self.y, 200))
         if len(self.trail) > 10:
             self.trail.pop(0)
         self.trail = [(x, y, a - 22) for x, y, a in self.trail if a > 22]
-
         self.x += self.vx
         self.y += self.vy
-        self.vy += 0.08  # slight gravity
+        self.vy += 0.08
         self.angle = math.atan2(self.vy, self.vx)
         self.lifetime -= 1
         if self.lifetime <= 0:
@@ -923,8 +940,6 @@ class Arrow:
     def draw(self, surface, camera, tick):
         if not self.alive:
             return
-
-        # ── Frost trail ──
         for i, (tx, ty, ta) in enumerate(self.trail):
             tp = camera.apply(pygame.Rect(int(tx), int(ty), 1, 1))
             frac = (i + 1) / max(1, len(self.trail))
@@ -934,25 +949,18 @@ class Arrow:
             c = lerp_color(ICE_DARK, ICE_WHITE, frac)
             pygame.draw.circle(ts, (*c, a), (r + 1, r + 1), r)
             surface.blit(ts, (tp.x - r - 1, tp.y - r - 1))
-
         p = camera.apply(pygame.Rect(int(self.x), int(self.y), 1, 1))
-
-        # ── Shaft ──
         length = 18
         ex = p.x + int(math.cos(self.angle) * length)
         ey = p.y + int(math.sin(self.angle) * length)
-        pygame.draw.line(surface, (60, 60, 80), (p.x + 1, p.y + 1), (ex + 1, ey + 1), 2)  # shadow
+        pygame.draw.line(surface, (60, 60, 80), (p.x + 1, p.y + 1), (ex + 1, ey + 1), 2)
         pygame.draw.line(surface, ICE_DARK,  (p.x, p.y), (ex, ey), 3)
         pygame.draw.line(surface, ICE_WHITE, (p.x, p.y), (ex, ey), 1)
-
-        # ── Ice crystal tip ──
         pygame.draw.circle(surface, ICE_BLUE,  (ex, ey), 4)
         pygame.draw.circle(surface, ICE_WHITE, (ex, ey), 2)
-        if tick % 4 < 2:  # sparkle blink
+        if tick % 4 < 2:
             pygame.draw.line(surface, WHITE, (ex - 3, ey), (ex + 3, ey), 1)
             pygame.draw.line(surface, WHITE, (ex, ey - 3), (ex, ey + 3), 1)
-
-        # ── Tail feathers ──
         bx = p.x + int(math.cos(self.angle + math.pi) * 8)
         by = p.y + int(math.sin(self.angle + math.pi) * 8)
         pygame.draw.line(surface, ICE_WHITE, (bx, by),
@@ -1862,7 +1870,7 @@ class Game:
         if arrow:
             self.arrows.append(arrow)
             self.sfx.play("shoot")
-            # Ice muzzle flash particles
+            # Ice muzzle flash
             for _ in range(6):
                 self.particles.append(Particle(
                     self.player.rect.centerx, self.player.rect.centery - 4,
@@ -2428,21 +2436,69 @@ class Game:
         for cloud in self.clouds:
             cloud.draw(self.screen)
 
-        # Distant mountain silhouettes (parallax 0.1x)
-        ox = int(self.camera.offset_x * 0.1)
-        base_y = SCREEN_HEIGHT - 40
-        for mx2 in range(-100 - ox % 350, SCREEN_WIDTH + 400, 350):
-            rng = random.Random(mx2 + 9999)
-            mh = rng.randint(100, 200)
-            mw = rng.randint(120, 220)
-            mc = (130, 180, 210)
-            pts = [(mx2 - mw // 2, base_y), (mx2, base_y - mh), (mx2 + mw // 2, base_y)]
-            pygame.draw.polygon(self.screen, mc, pts)
-            # Snow cap
-            pygame.draw.polygon(self.screen, (220, 235, 250),
-                                [(mx2 - mw // 8, base_y - mh + mh // 4),
-                                 (mx2, base_y - mh),
-                                 (mx2 + mw // 8, base_y - mh + mh // 4)])
+        # ── Distant mountain scenery — 3 parallax layers, no twitching ──
+        world_ox = self.camera.offset_x * 0.15
+        base_y = SCREEN_HEIGHT - 30
+
+        # Layer 1: Far hazy peaks
+        for wi in range(12):
+            world_mx = int((world_ox - 300) / 400) * 400 + wi * 400
+            screen_mx = int(world_mx - world_ox)
+            if screen_mx > SCREEN_WIDTH + 350: break
+            if screen_mx < -350: continue
+            rng = random.Random(int(world_mx) + 1111)
+            mh, mw = rng.randint(160, 260), rng.randint(180, 320)
+            pts = [(screen_mx - mw//2, base_y),(screen_mx - mw//6, base_y - mh*6//10),
+                   (screen_mx, base_y - mh),(screen_mx + mw//5, base_y - mh*7//10),(screen_mx + mw//2, base_y)]
+            pygame.draw.polygon(self.screen, (175, 200, 225), pts)
+            pygame.draw.polygon(self.screen, (190, 212, 232),
+                [(screen_mx - mw//6, base_y - mh*6//10),(screen_mx, base_y - mh),
+                 (screen_mx + mw//5, base_y - mh*7//10),(screen_mx, base_y - mh*3//10)])
+
+        # Layer 2: Mid rocky mountains
+        for wi in range(10):
+            world_mx = int((world_ox*1.05 - 300) / 500) * 500 + wi * 500
+            screen_mx = int(world_mx - world_ox * 1.05)
+            if screen_mx > SCREEN_WIDTH + 350: break
+            if screen_mx < -350: continue
+            rng = random.Random(int(world_mx) + 2222)
+            mh, mw = rng.randint(110, 190), rng.randint(150, 280)
+            pts = [(screen_mx - mw//2, base_y),(screen_mx - mw//8, base_y - mh*5//8),
+                   (screen_mx, base_y - mh),(screen_mx + mw//6, base_y - mh*7//10),(screen_mx + mw//2, base_y)]
+            pygame.draw.polygon(self.screen, (95, 120, 145), pts)
+            pygame.draw.polygon(self.screen, (125, 155, 175),
+                [(screen_mx - mw//8, base_y - mh*5//8),(screen_mx, base_y - mh),
+                 (screen_mx, base_y - mh*2//8),(screen_mx - mw//4, base_y)])
+            pygame.draw.polygon(self.screen, (150, 165, 178),
+                [(screen_mx - mw//12, base_y - mh + 4),(screen_mx, base_y - mh),(screen_mx + mw//14, base_y - mh + 6)])
+            if mh > 145:
+                pygame.draw.polygon(self.screen, (235, 242, 250),
+                    [(screen_mx - mw//9, base_y - mh + mh//5),(screen_mx, base_y - mh),(screen_mx + mw//10, base_y - mh + mh//5 - 4)])
+                pygame.draw.polygon(self.screen, (200, 215, 230),
+                    [(screen_mx, base_y - mh),(screen_mx + mw//10, base_y - mh + mh//5 - 4),(screen_mx + mw//8, base_y - mh + mh//5 + 2)])
+
+        # Layer 3: Foreground pine treeline ridge
+        for wi in range(14):
+            world_mx = int((world_ox*1.12 - 200) / 320) * 320 + wi * 320
+            screen_mx = int(world_mx - world_ox * 1.12)
+            if screen_mx > SCREEN_WIDTH + 250: break
+            if screen_mx < -250: continue
+            rng = random.Random(int(world_mx) + 3333)
+            cluster_w = rng.randint(80, 160)
+            ridge_h   = rng.randint(50, 95)
+            n_trees = rng.randint(4, 8)
+            for ti in range(n_trees):
+                tx = screen_mx - cluster_w//2 + int(ti * cluster_w / max(1, n_trees - 1))
+                th = rng.randint(ridge_h - 20, ridge_h + 20)
+                tw = rng.randint(14, 28)
+                ty = base_y - th
+                for tier in range(3):
+                    tier_y = ty + tier * (th // 4)
+                    tier_w = tw // 2 + tier * (tw // 3)
+                    c = (90, 140, 105) if tier == 0 else ((70, 110, 85) if tier == 1 else (55, 90, 70))
+                    pygame.draw.polygon(self.screen, c,
+                        [(tx - tier_w, tier_y + th//3),(tx, tier_y),(tx + tier_w, tier_y + th//3)])
+                pygame.draw.rect(self.screen, (50, 35, 20), (tx - 2, base_y - 12, 4, 12))
 
         # Horizon haze
         hz = pygame.Surface((SCREEN_WIDTH, 60), pygame.SRCALPHA)
