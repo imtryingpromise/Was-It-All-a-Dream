@@ -1,322 +1,600 @@
 import pygame
+import sys
 import math
 import random
 import os
-import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from player_sprites import init_player_sprite, draw_player_sprite
+
+_FONT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "fonts")
+TITLE_FONT_PATH = os.path.join(_FONT_DIR, "title_font.ttf")
+BTN_FONT_PATH = os.path.join(_FONT_DIR, "button_font.ttf")
+try:
+    from player_sprites import init_player_sprite, draw_player_sprite
+    _SPRITES_AVAILABLE = True
+except ImportError:
+    _SPRITES_AVAILABLE = False
+from wood_ui import draw_wooden_bar, draw_wooden_panel, draw_wooden_slider
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-SCREEN_WIDTH  = 1280
+SCREEN_WIDTH = 1280
 SCREEN_HEIGHT = 720
 FPS = 60
 
-BLACK        = (0,   0,   0)
-WHITE        = (255, 255, 255)
-GRAY         = (140, 140, 140)
-DARK_GRAY    = (80,  80,  80)
-RED          = (220, 50,  50)
-YELLOW       = (255, 220, 50)
-DARK_BG      = (8,   18,  35)
-CYAN         = (0,   220, 255)
-GRID_COLOR   = (15,  25,  45)
-ORANGE       = (255, 160, 30)
-GOLD         = (255, 200, 50)
-ICE_BLUE     = (120, 200, 255)
-ICE_DARK     = (60,  140, 210)
-SNOW_WHITE   = (230, 245, 255)
-PINE_GREEN   = (30,  100, 60)
-CANDY_RED    = (220, 40,  60)
-BALLOON_RED  = (255, 60,  80)
-BALLOON_PINK = (255, 160, 180)
-SPIKE_GRAY   = (160, 160, 175)
-PORTAL_CYAN  = (0,   240, 220)
-PORTAL_BLUE  = (0,   120, 255)
-FALLING_BROWN= (160, 100, 50)
-PHANTOM_TEAL = (40,  220, 180)
-CP_INACTIVE  = (180, 140, 50)
-CP_ACTIVE    = (255, 220, 0)
-CP_GLOW      = (255, 255, 150)
-COUNTDOWN_COL = (60,  120, 200)
+# ── Palette ──────────────────────────────────────────────────────────────────
+BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
+SKY_TOP = (100, 160, 230)
+SKY_BOT = (180, 220, 255)
+CLOUD_WHITE = (245, 248, 255)
+SUN_YELLOW = (255, 230, 80)
+SUN_GOLD = (255, 190, 30)
+GRASS_GREEN = (80, 180, 80)
+GRASS_DARK = (55, 130, 55)
+DIRT_BROWN = (160, 110, 60)
+HOLY_GOLD = (255, 215, 50)
+HOLY_WHITE = (240, 250, 255)
+ANGEL_BLUE = (160, 200, 255)
+ANGEL_GOLD = (255, 220, 100)
+HERO_BROWN = (180, 120, 60)
+HERO_GREEN = (60, 130, 60)
+ARROW_BROWN = (140, 90, 30)
+SANTA_RED = (200, 40, 40)
+SANTA_WHITE = (240, 240, 240)
+BALLOON_BLUE = (60, 130, 220)
+BALLOON_DARK = (40, 90, 180)
+GIFT_RED = (210, 50, 50)
+GIFT_GREEN = (50, 170, 70)
+GIFT_GOLD = (255, 200, 50)
+MUSHROOM_RED = (200, 50, 50)
+MUSHROOM_CAP = (210, 60, 60)
+FIRE_ORANGE = (255, 140, 30)
+FIRE_RED = (255, 60, 20)
+FIRE_YELLOW = (255, 220, 50)
+SPIRIT_WHITE = (220, 240, 255)
+SPIRIT_GOLD = (255, 230, 120)
+GRAY = (140, 140, 140)
+DARK_GRAY = (80, 80, 80)
+XMAS_GREEN = (30, 160, 50)
+XMAS_GOLD = (255, 200, 50)
+XMAS_RED = (200, 30, 30)
+RED = (220, 50, 50)
+ORANGE = (255, 160, 30)
+CYAN = (0, 220, 255)
+PURPLE = (160, 50, 200)
+BROWN = (139, 90, 43)
 
-LEDGE_L_COL  = (80,  160, 220)
-LEDGE_R_COL  = (200, 160, 40)
+# ── Ice arrow colours ──────────────────────────────────────────────────────
+ICE_BLUE   = (140, 210, 255)
+ICE_WHITE  = (220, 245, 255)
+ICE_DARK   = ( 80, 160, 220)
+ICE_CORE   = (200, 240, 255)
 
-MOVING_COL   = (200, 140, 40)
-SANTA_RED    = (200, 30,  30)
-SLEIGH_BROWN = (180, 100, 40)
-SLEIGH_GOLD  = (220, 180, 30)
-
-# Snow Miser colour — icy blue-white, very on-brand
-SNOW_MISER_ROBE = (80, 160, 220)
-XMAS_GOLD       = (255, 200, 50)
-XMAS_RED        = (200, 30,  30)
-XMAS_GREEN      = (30,  160, 50)
-
-# Physics
-GRAVITY        = 0.6
-JUMP_VELOCITY  = -13
-MOVE_SPEED     = 5
-SPRINT_SPEED   = 8
+# ── Physics ───────────────────────────────────────────────────────────────────
+GRAVITY = 0.55
+JUMP_VELOCITY = -13
+MOVE_SPEED = 5
+SPRINT_SPEED = 8
 MAX_FALL_SPEED = 15
-DEATH_Y        = 900
-BASE_Y         = 420
+DEATH_Y = 900
+PLAYER_MAX_HEARTS = 3
+INVINCIBILITY_FRAMES = 90
+ARROW_SPEED = 14
+ARROW_LIFETIME = 80
+ARROW_COOLDOWN = 22
 
-LEDGE_GAP   = 180
-LEDGE_RISE  = 120
-WALL_STEPS  = 5
-COUNTDOWN_GRACE = 90
+# ── Santa boss ────────────────────────────────────────────────────────────────
+SANTA_MAX_HP = 12  # hits to kill
+SANTA_BALLOON_INTERVAL = 120  # frames between balloon throws
+SANTA_BALLOON_SPEED = 5
+BALLOON_LIFETIME = 90
 
-# ---------------------------------------------------------------------------
-# Difficulty presets  (unchanged from original)
-# ---------------------------------------------------------------------------
-DIFFICULTY_PRESETS = {
-    "easy": {
-        "shrink_speed":    0.4,  "shrink_respawn":  400,
-        "fall_delay":      55,   "phantom_frames":  30,
-        "phantom_w":       110,  "balloon_vx":      10,
-        "balloon_vy":      -13,  "balloon_radius":  18,
-        "player_speed":    5,    "player_jump":     -14,
-        "countdown_sec":   3,    "countdown_grace": 100,
-        "tram_speed":      2,    "tram_vanish":     650,
-        "santa_timeout":   420,  "rope_len":        160,
-        "rope_grab_r":     22,   "zigzag_ledge_w":  80,
-        "kidnap_dist":     320,
-    },
-    "medium": {
-        "shrink_speed":    1.2,  "shrink_respawn":  300,
-        "fall_delay":      25,   "phantom_frames":  18,
-        "phantom_w":       80,   "balloon_vx":      9,
-        "balloon_vy":      -11,  "balloon_radius":  14,
-        "player_speed":    5,    "player_jump":     -13,
-        "countdown_sec":   3,    "countdown_grace": 90,
-        "tram_speed":      3,    "tram_vanish":     560,
-        "santa_timeout":   300,  "rope_len":        130,
-        "rope_grab_r":     14,   "zigzag_ledge_w":  60,
-        "kidnap_dist":     250,
-    },
-    "hard": {
-        "shrink_speed":    2.8,  "shrink_respawn":  240,
-        "fall_delay":      8,    "phantom_frames":  8,
-        "phantom_w":       55,   "balloon_vx":      8,
-        "balloon_vy":      -10,  "balloon_radius":  9,
-        "player_speed":    5,    "player_jump":     -13,
-        "countdown_sec":   2,    "countdown_grace": 60,
-        "tram_speed":      4,    "tram_vanish":     555,
-        "santa_timeout":   300,  "rope_len":        130,
-        "rope_grab_r":     14,   "zigzag_ledge_w":  42,
-        "kidnap_dist":     250,
-    },
-}
-
-# ---------------------------------------------------------------------------
-# Story Dialogues  — Snow Miser guides the dreamer through the Second Realm
-# ---------------------------------------------------------------------------
+# ── Story dialogues ──────────────────────────────────────────────────────────
 STORY_DIALOGUES = {
-    # ── Intro: Snow Miser greets the dreamer at the very start ──────────
     "intro": [
-        ("Snow Miser", "Oh ho ho ho! Look who wandered into MY realm!"),
-        ("Snow Miser", "I'm Snow Miser. I'm too much. The second of the dream's four terrors."),
-        ("Snow Miser", "The First Realm is behind you. Fire. Anger. You burned right through it."),
-        ("Snow Miser", "But THIS realm? This is the realm of ICE. Of cold truth. Of slipping and falling."),
-        ("Snow Miser", "Everything here wants to shrink under you, fall away, or simply... vanish."),
-        ("Snow Miser", "I'm not your enemy, dreamer. I'm just the cold, honest voice in your head."),
-        ("Snow Miser", "Let me tell you what you're up against. ARROW KEYS or WASD to move. SPACE to jump."),
-        ("Snow Miser", "You can JUMP again in mid-air. Double jump. Use it wisely on the ice platforms."),
-        ("Snow Miser", "ICE PLATFORMS shrink the moment you land. Don't dawdle. Keep moving."),
-        ("Snow Miser", "WOOD PLATFORMS fall after a delay. You'll feel them shake. That's your warning."),
-        ("Snow Miser", "SPIKES are instant death. Don't fall into them. There's a balloon nearby... trust it."),
-        ("Snow Miser", "TEAL PLATFORMS are phantom. Step on them and they vanish. Fast."),
-        ("Snow Miser", "Press SPACE to jump off the ROPE when Santa carries you. Aim for the portal."),
-        ("Snow Miser", "Miss the portal and Santa takes you... somewhere you do NOT want to go."),
-        ("Snow Miser", "R to restart. ESC for settings. Flags are checkpoints -- reach them."),
-        ("Snow Miser", "Oh, and dreamer? The cold doesn't care how determined you are."),
-        ("Snow Miser", "It just waits. Patiently. For you to slip."),
-        ("Snow Miser", "Try not to slip."),
+        ("Seraphiel", "...Can you hear me, Dreamer?"),
+        ("Seraphiel", "I am Seraphiel -- guardian of the Second Realm. The Sky Trial."),
+        ("Seraphiel", "You conquered the First Realm. Ice and cold. Snow Miser's domain. Well done."),
+        ("Seraphiel", "But the dream is not finished with you. Two more realms remain after this one."),
+        ("Seraphiel", "This realm floats above the clouds. It is beautiful... but it is not safe."),
+        ("Seraphiel", "The Nightmare has corrupted the creatures here. Mushrooms, balloons, things with teeth."),
+        ("Seraphiel", "WASD to move. SPACE to jump. SHIFT to sprint. You can DOUBLE JUMP in mid-air."),
+        ("Seraphiel", "LEFT-CLICK to fire an arrow. STOMP mushrooms by landing on them."),
+        ("Seraphiel", "Something large is circling above this realm. Watch the skies."),
+        ("Seraphiel", "Press E to talk. ESC for settings. R to respawn. Now climb, Dreamer."),
     ],
-
-    # ── Checkpoint A: After shrinking ice platforms ──────────────────────
-    "cp_a": [
-        ("Snow Miser", "Ha! You made it past the ice. Barely."),
-        ("Snow Miser", "You felt it, didn't you? The platform shrinking under your feet."),
-        ("Snow Miser", "That feeling -- the ground disappearing while you're still standing on it."),
-        ("Snow Miser", "That's what this realm IS. Everything you rely on just... erodes."),
-        ("Snow Miser", "Ahead are the FALLING platforms. Wood. Old. Tired."),
-        ("Snow Miser", "They shake for a moment when you land. That shake is a countdown."),
-        ("Snow Miser", "Jump before the countdown ends. Every single time."),
-        ("Snow Miser", "You've done harder things, dreamer. Keep moving."),
+    "cp1": [
+        ("Lumen", "Hey! Over here! I am Lumen -- a light spirit trapped in this realm."),
+        ("Lumen", "The islands ahead are trickier. Wider gaps. Angrier mushrooms."),
+        ("Lumen", "That thing in the sky is getting closer. Red coat. Flying contraption."),
+        ("Lumen", "Keep your bow ready. Seraphiel chose you for a reason."),
     ],
-
-    # ── Checkpoint B: After falling platforms, approaching spikes ────────
-    "cp_b": [
-        ("Snow Miser", "Two down. You're learning."),
-        ("Snow Miser", "The spikes ahead look like a dead end. They're not."),
-        ("Snow Miser", "There's a balloon floating just above them. Red. Festive. Deceptive."),
-        ("Snow Miser", "Grab it and you'll fly over the whole mess. It only works once though."),
-        ("Snow Miser", "Time your jump carefully. Land too early and the spikes get you."),
-        ("Snow Miser", "Land too late and you miss the safe platform entirely."),
-        ("Snow Miser", "I'd wish you luck but I don't believe in luck."),
-        ("Snow Miser", "I believe in timing. And you've got decent timing... so far."),
+    "cp2": [
+        ("Seraphiel", "Dreamer. You are climbing well. But I must warn you."),
+        ("Seraphiel", "Santa has entered this realm. He drops corrupted water balloons. They hurt."),
+        ("Seraphiel", "Shoot him down with your arrows. Many hits. Stay mobile."),
+        ("Seraphiel", "When he falls, a gift drops. Collect it. The portal home is beyond."),
     ],
-
-    # ── Checkpoint C: After spikes + balloon, approaching phantoms ───────
-    "cp_c": [
-        ("Snow Miser", "The balloon trick. Nice. Most dreamers just stare at the spikes until they die."),
-        ("Snow Miser", "Not you though. You see the path."),
-        ("Snow Miser", "Ahead of you are the PHANTOM platforms. Teal. Glowing. Beautiful, honestly."),
-        ("Snow Miser", "Touch them and a timer starts. When the timer runs out -- gone."),
-        ("Snow Miser", "No warning shake. No countdown. Just gone."),
-        ("Snow Miser", "Move fast. Don't look down. The gap below is not forgiving."),
-        ("Snow Miser", "You know what I find interesting about you, dreamer?"),
-        ("Snow Miser", "You keep going. Every realm. Every trap. You just... keep going."),
-        ("Snow Miser", "I wonder if you even know why."),
+    "cp3": [
+        ("Lumen", "Almost there! The portal is just ahead!"),
+        ("Lumen", "Santa should appear any moment. Do not panic. Breathe. Aim."),
+        ("Lumen", "You survived ice. You can survive the sky. One more push."),
     ],
-
-    # ── Checkpoint D: Safe platform after phantoms, before countdown ─────
-    "cp_d": [
-        ("Snow Miser", "Breathe. You've earned it."),
-        ("Snow Miser", "What comes next is my personal favourite. The COUNTDOWN platform."),
-        ("Snow Miser", "You step on it. A number appears. 3... 2... 1... GO!"),
-        ("Snow Miser", "When it says GO -- you jump. Immediately. To the platform ahead."),
-        ("Snow Miser", "If you hesitate, the pad falls away and takes you with it."),
-        ("Snow Miser", "The target platform only appears at GO. Not before. Not during the countdown."),
-        ("Snow Miser", "Don't try to jump early. There's nothing there yet."),
-        ("Snow Miser", "And if you die after reaching the target... it stays solid. You won't be trapped."),
-        ("Snow Miser", "I'm cold, dreamer. Not cruel."),
-    ],
-
-    # ── Checkpoint E: After countdown, approaching zigzag ───────────────
-    "cp_e": [
-        ("Snow Miser", "The countdown platform. Down in one try, were you? Or did it take a few?"),
-        ("Snow Miser", "Doesn't matter. You're here."),
-        ("Snow Miser", "The ZIGZAG climb is next. Floating ledges. No walls. Just the void."),
-        ("Snow Miser", "Blue ledges are on the left. Gold ledges are on the right."),
-        ("Snow Miser", "Jump right to gold. Then left to blue. Alternate. Rise."),
-        ("Snow Miser", "You need to reach the TENTH ledge. The very top one."),
-        ("Snow Miser", "Miss a ledge and you fall back down. Start the zigzag again."),
-        ("Snow Miser", "This one tests patience more than skill, dreamer."),
-        ("Snow Miser", "Which one do you have more of?"),
-    ],
-
-    # ── Checkpoint F: After zigzag, before tram + Santa ─────────────────
-    "cp_f": [
-        ("Snow Miser", "Ten ledges. You climbed all ten. I'm... actually impressed."),
-        ("Snow Miser", "Don't let it go to your head."),
-        ("Snow Miser", "Ahead is the final obstacle of this realm. The TRAM."),
-        ("Snow Miser", "Step on the golden cart. It starts moving. Ride it to the right."),
-        ("Snow Miser", "At some point... Santa Claus will appear. In his sleigh. With a rope."),
-        ("Snow Miser", "Yes. That Santa. In my realm. I know. Believe me, I know."),
-        ("Snow Miser", "Jump and GRAB the rope. Press SPACE to release when you're over the portal."),
-        ("Snow Miser", "Release too early and you fall short. Too late and Santa takes you for a ride."),
-        ("Snow Miser", "A very long, very unwanted ride."),
-        ("Snow Miser", "The portal is your way out of this realm. Through it -- the Third Realm."),
-        ("Snow Miser", "Storm. Grief. Someone else's problem to explain."),
-        ("Snow Miser", "But first... survive this. Go on, dreamer."),
-        ("Snow Miser", "I'll be watching."),
+    "ending": [
+        ("Seraphiel", "...You did it, Dreamer. The sky realm is free."),
+        ("Lumen", "You shot Santa out of the sky! I was hiding behind a cloud, but STILL. Amazing."),
+        ("Seraphiel", "The gift you claimed holds a fragment of the sun's power. Carry it forward."),
+        ("Seraphiel", "Two realms down. Two remain. The Third Realm will test your speed and courage."),
+        ("Seraphiel", "You are halfway home, Dreamer."),
+        ("Lumen", "Hey. When you wake up... look at the sky for me, will you?"),
+        ("Lumen", "Even a dreaming sky is beautiful. The real one must be incredible."),
+        ("Seraphiel", "Step through the portal. Christmas morning is waiting."),
+        ("", "The portal blazes with warmth. You step through."),
+        ("", "The sky dissolves into golden light."),
+        ("", "Two realms remain. But for a moment -- just a moment --"),
+        ("", "you feel the sun on your face. Real sunlight. Warm and certain."),
+        ("", "Onward, Dreamer."),
     ],
 }
+
+# ── Sound (graceful fallback) ─────────────────────────────────────────────────
+# level2.py lives in levels/, audio lives in ../assets/audio/
+_LEVELS_DIR = os.path.dirname(os.path.abspath(__file__))
+_BASE = os.path.dirname(_LEVELS_DIR)
+SOUND_DIR    = os.path.join(_BASE, "assets", "audio")
+MUSIC_FILE   = os.path.join(_BASE, "assets", "audio", "Level3MusicNew.mp3")
+ENDING_MUSIC = os.path.join(_BASE, "assets", "audio", "soundsending.mp3")
+PRESENT_MUSIC = os.path.join(_BASE, "assets", "audio", "captured_present.mp3")
+
+SOUND_FILES = {
+    "jump":         "jump.wav",
+    "death":        "death.wav",
+    "respawn":      "hit.wav",           # no respawn.wav, reuse hit
+    "stomp":        "stomp.wav",
+    "monster_kill": "monster_kill.wav",
+    "powerup":      "powerup.wav",
+    "checkpoint":   "checkpoint.wav",
+    "win":          "powerup.wav",       # no win.wav, reuse powerup
+    "shoot":        "shoot.wav",
+    "arrow_hit":    "hit.wav",           # use hit.wav for arrow impacts
+    "santa_die":    "bomb_explode.wav",
+    "balloon_hit":  "death.wav",
+    "soul_rise":    "hit.wav",           # no soul_rise.wav, fallback
+    "soul_land":    "stomp.wav",         # no soul_land.wav, fallback
+}
+
+
+class SoundManager:
+    def __init__(self):
+        self.sounds = {}
+        self.music_loaded = False
+        print(f"[AUDIO] Sound dir: {SOUND_DIR}")
+        print(f"[AUDIO] Music file exists: {os.path.isfile(MUSIC_FILE)} -> {MUSIC_FILE}")
+        for name, fn in SOUND_FILES.items():
+            path = os.path.join(SOUND_DIR, fn)
+            exists = os.path.isfile(path)
+            print(f"[AUDIO] {name}: {'OK' if exists else 'MISSING'} -> {path}")
+            try:
+                self.sounds[name] = pygame.mixer.Sound(path) if exists else None
+            except Exception as e:
+                print(f"[AUDIO] ERROR loading {name}: {e}")
+                self.sounds[name] = None
+        if os.path.isfile(MUSIC_FILE):
+            try:
+                pygame.mixer.music.load(MUSIC_FILE)
+                self.music_loaded = True
+                print("[AUDIO] Music loaded OK")
+            except Exception as e:
+                print(f"[AUDIO] Music load ERROR: {e}")
+
+    def play(self, n):
+        s = self.sounds.get(n)
+        if s:
+            s.play()
+
+    def start_music(self, loops=-1, volume=0.5):
+        if self.music_loaded:
+            pygame.mixer.music.set_volume(volume)
+            pygame.mixer.music.play(loops)
+
+    def stop_music(self):
+        pygame.mixer.music.stop()
+
+    def start_ending_music(self):
+        if os.path.isfile(ENDING_MUSIC):
+            try:
+                pygame.mixer.music.load(ENDING_MUSIC)
+                pygame.mixer.music.set_volume(0.4)
+                pygame.mixer.music.play(-1)
+            except:
+                pass
+
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 def lerp_color(a, b, t):
-    return tuple(int(a[i] + (b[i]-a[i])*t) for i in range(3))
+    t = max(0.0, min(1.0, t))
+    return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(3))
 
-def rainbow_color(tick, speed=0.05):
-    RB = [(255,60,60),(255,160,40),(255,240,50),(80,255,80),(50,200,255),(120,80,255),(220,50,220)]
-    idx = (tick*speed) % len(RB)
-    i   = int(idx)
-    return lerp_color(RB[i], RB[(i+1)%len(RB)], idx-i)
+
+def lerp(a, b, t):
+    return a + (b - a) * t
+
 
 # ---------------------------------------------------------------------------
 # Camera
 # ---------------------------------------------------------------------------
 class Camera:
     def __init__(self, w, h):
-        self.offset_x = self.offset_y = 0.0
-        self.width = w; self.height = h
-        self.shake_amount = self.shake_x = self.shake_y = 0
+        self.offset_x = 0.0
+        self.offset_y = 0.0
+        self.width = w
+        self.height = h
+        self.shake_amount = 0.0
+        self.shake_x = 0
+        self.shake_y = 0
 
-    def update(self, tr):
-        self.offset_x += (tr.centerx - self.width//3 - self.offset_x) * 0.1
-        oy = tr.centery - self.height//2
-        self.offset_y += (oy - self.offset_y) * 0.05
-        self.offset_y = max(-900, min(self.offset_y, 200))
+    def update(self, r):
+        self.offset_x += (r.centerx - self.width // 3 - self.offset_x) * 0.10
+        ty = r.centery - self.height // 2
+        self.offset_y += (ty - self.offset_y) * 0.06
+        self.offset_y = max(-300, min(self.offset_y, 200))
         if self.shake_amount > 0.5:
             self.shake_x = random.randint(int(-self.shake_amount), int(self.shake_amount))
             self.shake_y = random.randint(int(-self.shake_amount), int(self.shake_amount))
-            self.shake_amount *= 0.85
+            self.shake_amount *= 0.82
         else:
-            self.shake_amount = self.shake_x = self.shake_y = 0
+            self.shake_amount = 0
+            self.shake_x = self.shake_y = 0
 
-    def add_shake(self, v): self.shake_amount = min(self.shake_amount+v, 20)
+    def add_shake(self, a):
+        self.shake_amount = min(self.shake_amount + a, 22)
 
     def apply(self, rect):
-        return pygame.Rect(rect.x - int(self.offset_x)+self.shake_x,
-                           rect.y - int(self.offset_y)+self.shake_y,
-                           rect.width, rect.height)
+        return pygame.Rect(
+            rect.x - int(self.offset_x) + self.shake_x,
+            rect.y - int(self.offset_y) + self.shake_y,
+            rect.width, rect.height)
+
 
 # ---------------------------------------------------------------------------
-# Particle / Ring / Flash
+# Particles / Effects
 # ---------------------------------------------------------------------------
 class Particle:
-    def __init__(self, x, y, color, vx=0, vy=0, lifetime=30, size=4, grav=0.1, fade=True):
-        self.x=float(x); self.y=float(y); self.color=color
-        self.vx=vx; self.vy=vy; self.lt=lifetime; self.mlt=lifetime
-        self.size=size; self.grav=grav; self.fade=fade
+    def __init__(self, x, y, color, vx=0, vy=0, lifetime=30, size=4,
+                 gravity=0.1, fade=True):
+        self.x, self.y = float(x), float(y)
+        self.color = color
+        self.vel_x, self.vel_y = vx, vy
+        self.lifetime = lifetime
+        self.max_lifetime = lifetime
+        self.base_size = size
+        self.gravity_val = gravity
+        self.fade = fade
+
     def update(self):
-        self.x+=self.vx; self.y+=self.vy; self.vy+=self.grav; self.lt-=1
-        return self.lt>0
-    def draw(self, surf, cam):
-        a = self.lt/self.mlt if self.fade else 1.0
-        s = max(1, int(self.size*a))
-        c = tuple(max(0,min(255,int(v*a))) for v in self.color)
-        p = cam.apply(pygame.Rect(int(self.x),int(self.y),1,1))
-        pygame.draw.rect(surf, c, (p.x,p.y,s,s))
+        self.x += self.vel_x
+        self.y += self.vel_y
+        self.vel_y += self.gravity_val
+        self.lifetime -= 1
+        return self.lifetime > 0
+
+    def draw(self, surface, camera):
+        a = self.lifetime / self.max_lifetime if self.fade else 1.0
+        sz = max(1, int(self.base_size * a))
+        c = tuple(max(0, min(255, int(v * a))) for v in self.color)
+        p = camera.apply(pygame.Rect(int(self.x), int(self.y), 1, 1))
+        pygame.draw.rect(surface, c, (p.x, p.y, sz, sz))
+
 
 class RingEffect:
-    def __init__(self, x, y, color, max_r=120, speed=4, w=4):
-        self.x=x; self.y=y; self.color=color; self.r=0; self.mr=max_r; self.sp=speed; self.w=w
-    def update(self): self.r+=self.sp; return self.r<self.mr
-    def draw(self, surf, cam):
-        a = 1-(self.r/self.mr)
-        c = tuple(max(0,min(255,int(v*a))) for v in self.color)
-        w = max(1,int(self.w*a))
-        p = cam.apply(pygame.Rect(int(self.x),int(self.y),1,1))
-        if -50<p.x<SCREEN_WIDTH+50:
-            pygame.draw.circle(surf, c, (p.x,p.y), int(self.r), w)
+    def __init__(self, x, y, color, max_radius=120, speed=4, width=4):
+        self.x, self.y = x, y
+        self.color = color
+        self.radius = 0
+        self.max_radius = max_radius
+        self.speed = speed
+        self.width = width
+
+    def update(self):
+        self.radius += self.speed
+        return self.radius < self.max_radius
+
+    def draw(self, surface, camera):
+        a = 1.0 - (self.radius / self.max_radius)
+        c = tuple(max(0, min(255, int(v * a))) for v in self.color)
+        w = max(1, int(self.width * a))
+        p = camera.apply(pygame.Rect(int(self.x), int(self.y), 1, 1))
+        if 0 <= p.x <= SCREEN_WIDTH and 0 <= p.y <= SCREEN_HEIGHT:
+            pygame.draw.circle(surface, c, (p.x, p.y), int(self.radius), w)
+
 
 class FlashOverlay:
-    def __init__(self, color, dur=15, max_alpha=180):
-        self.dur=dur; self.t=dur; self.ma=max_alpha
-        self.surf=pygame.Surface((SCREEN_WIDTH,SCREEN_HEIGHT)); self.surf.fill(color)
-    def update(self): self.t-=1; return self.t>0
-    def draw(self, surf): self.surf.set_alpha(int(self.ma*(self.t/self.dur))); surf.blit(self.surf,(0,0))
+    def __init__(self, color, duration=15, max_alpha=180):
+        self.color = color
+        self.duration = duration
+        self.timer = duration
+        self.max_alpha = max_alpha
+        self.surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self.surface.fill(color[:3])
+
+    def update(self):
+        self.timer -= 1
+        return self.timer > 0
+
+    def draw(self, surface):
+        self.surface.set_alpha(int(self.max_alpha * (self.timer / self.duration)))
+        surface.blit(self.surface, (0, 0))
+
+
+class DamageFlash:
+    """Red vignette on damage."""
+
+    def __init__(self):
+        self.timer = 20
+        self.max_timer = 20
+
+    def update(self):
+        self.timer -= 1
+        return self.timer > 0
+
+    def draw(self, surface):
+        a = int(160 * (self.timer / self.max_timer))
+        if a <= 0:
+            return
+        w, h = surface.get_size()
+        t = 60
+        s = pygame.Surface((w, h), pygame.SRCALPHA)
+        for i in range(t):
+            ia = int(a * (1 - i / t))
+            if ia > 0:
+                pygame.draw.rect(s, (220, 30, 30, ia),
+                                 (i, i, w - 2 * i, h - 2 * i), 1)
+        surface.blit(s, (0, 0))
+
 
 # ---------------------------------------------------------------------------
-# NPC — Snow Miser  (styled like Level 4 NPCs)
+# Cloud (pixel-art style with shadow blobs — like the reference screenshot)
+# ---------------------------------------------------------------------------
+class Cloud:
+    def __init__(self, x=None, y=None, speed=None, size=None):
+        self.x = x if x is not None else random.uniform(0, SCREEN_WIDTH)
+        self.y = y if y is not None else random.uniform(30, SCREEN_HEIGHT * 0.55)
+        self.speed = speed if speed is not None else random.uniform(0.15, 0.45)
+        self.size = size if size is not None else random.uniform(0.8, 1.8)
+        # Each cloud gets a fixed random seed so it looks consistent every frame
+        self.seed = random.randint(0, 9999)
+
+    def update(self):
+        self.x += self.speed
+        if self.x > SCREEN_WIDTH + 300:
+            self.x = -300
+            self.y = random.uniform(30, SCREEN_HEIGHT * 0.55)
+
+    def draw(self, surface):
+        cx, cy = int(self.x), int(self.y)
+        s = self.size
+        rng = random.Random(self.seed)
+
+        # ── Shadow blobs (purple-grey, offset down-right) ──
+        shadow_c = (160, 150, 185)   # muted purple-grey like the screenshot
+        shadow_blobs = [
+            (int(10 * s),  int(10 * s),  int(24 * s)),
+            (int(-14 * s), int(14 * s),  int(18 * s)),
+            (int(28 * s),  int(14 * s),  int(16 * s)),
+            (int(6 * s),   int(20 * s),  int(14 * s)),
+        ]
+        for ox, oy, r in shadow_blobs:
+            pygame.draw.circle(surface, shadow_c, (cx + ox, cy + oy), max(1, r))
+
+        # ── Main white cloud blobs (chunky, blocky like pixel art) ──
+        # Use large overlapping circles with flat bottom feel
+        main_c  = (245, 248, 255)   # near-white
+        light_c = (255, 255, 255)   # brightest highlight
+
+        main_blobs = [
+            (0,            0,           int(28 * s)),
+            (int(-26 * s), int(8 * s),  int(20 * s)),
+            (int(26 * s),  int(8 * s),  int(22 * s)),
+            (int(-10 * s), int(14 * s), int(18 * s)),
+            (int(14 * s),  int(16 * s), int(16 * s)),
+            (int(-38 * s), int(14 * s), int(13 * s)),
+            (int(40 * s),  int(16 * s), int(12 * s)),
+        ]
+        for ox, oy, r in main_blobs:
+            pygame.draw.circle(surface, main_c, (cx + ox, cy + oy), max(1, r))
+
+        # ── Pixel-art "blocky" highlight on top-left of each main blob ──
+        highlight_offsets = [
+            (int(-6 * s),  int(-10 * s), int(10 * s)),
+            (int(-30 * s), int(-2 * s),  int(8 * s)),
+            (int(20 * s),  int(-4 * s),  int(9 * s)),
+        ]
+        for ox, oy, r in highlight_offsets:
+            pygame.draw.circle(surface, light_c, (cx + ox, cy + oy), max(1, r))
+
+        # ── Hard pixel-art edge: draw a 1-pixel dark outline on bottom ──
+        # Gives that crisp retro look
+        outline_c = (180, 185, 200)
+        for ox, oy, r in main_blobs:
+            pygame.draw.circle(surface, outline_c, (cx + ox, cy + oy), max(1, r), 1)
+
+
+# ---------------------------------------------------------------------------
+# Floating Island Platform
+# ---------------------------------------------------------------------------
+class IslandPlatform:
+    def __init__(self, x, y, w, h=22):
+        self.rect = pygame.Rect(x, y, w, h)
+
+    def is_active(self):
+        return True
+
+    def get_rect(self):
+        return self.rect
+
+    def on_player_land(self, player):
+        pass
+
+    def update(self):
+        pass
+
+    def draw(self, surface, camera):
+        sr = camera.apply(self.rect)
+        if sr.right < -80 or sr.left > SCREEN_WIDTH + 80:
+            return
+
+        # ── Stone brick body ──
+        STONE_MID   = (140,  80,  90)   # main brick colour (pinkish-red like screenshot)
+        STONE_DARK  = ( 90,  45,  55)   # mortar / shadow
+        STONE_LIGHT = (175, 110, 120)   # highlight face of brick
+        STONE_TOP   = (110,  60,  70)   # top row darker cap
+
+        body = pygame.Rect(sr.x, sr.y + 10, sr.width, sr.height + 40)
+        # Fill solid
+        pygame.draw.rect(surface, STONE_MID, body)
+
+        # Horizontal mortar lines every 10px
+        for my in range(body.top + 10, body.bottom, 10):
+            pygame.draw.line(surface, STONE_DARK, (body.left, my), (body.right, my), 1)
+
+        # Vertical brick joints — stagger every row
+        rng = random.Random(self.rect.x * 13 + self.rect.y * 7)
+        brick_w = rng.randint(18, 26)
+        for row_i, my in enumerate(range(body.top, body.bottom, 10)):
+            offset = (brick_w // 2) if row_i % 2 == 1 else 0
+            bx = body.left - offset
+            while bx < body.right:
+                pygame.draw.line(surface, STONE_DARK, (bx, my), (bx, min(my + 10, body.bottom)), 1)
+                # Light highlight on left face of each brick
+                pygame.draw.line(surface, STONE_LIGHT, (bx + 1, my + 1), (bx + 1, min(my + 9, body.bottom - 1)), 1)
+                bx += brick_w
+
+        # Dark shadow on right and bottom edges
+        pygame.draw.rect(surface, STONE_DARK, (body.right - 3, body.top, 3, body.height))
+        pygame.draw.rect(surface, STONE_DARK, (body.left, body.bottom - 3, body.width, 3))
+
+        # Top cap row (slightly darker)
+        pygame.draw.rect(surface, STONE_TOP, (sr.x, sr.y + 8, sr.width, 6))
+
+        # ── Grass top strip ──
+        GRASS_TOP   = ( 80, 170,  70)
+        GRASS_SHADE = ( 55, 120,  50)
+        GRASS_DARK2 = ( 40,  90,  40)
+        pygame.draw.rect(surface, GRASS_TOP,   (sr.x - 1, sr.y - 2, sr.width + 2, 12), border_radius=2)
+        pygame.draw.rect(surface, GRASS_SHADE, (sr.x,     sr.y + 5, sr.width,      4))
+
+        # Pixel-art grass tufts — blocky 2px wide spikes
+        rng2 = random.Random(self.rect.x * 31 + self.rect.y * 17)
+        tx = sr.x + 3
+        while tx < sr.right - 3:
+            th = rng2.randint(3, 7)
+            pygame.draw.rect(surface, GRASS_DARK2, (tx, sr.y - 2 - th, 2, th))
+            tx += rng2.randint(5, 11)
+
+        # ── Pixel-art trees on top (like the screenshot) ──
+        # Only add trees based on platform width and a deterministic seed
+        tree_rng = random.Random(self.rect.x * 99 + self.rect.y * 43)
+        # Decide how many trees (0 to 2 depending on width)
+        n_trees = 0
+        if sr.width > 60:  n_trees = 1
+        if sr.width > 110: n_trees = 2
+        if sr.width > 180: n_trees = 3
+
+        # Pick tree x positions spread across the platform
+        tree_positions = []
+        if n_trees == 1:
+            tree_positions = [sr.x + sr.width // 2]
+        elif n_trees == 2:
+            tree_positions = [sr.x + sr.width // 3, sr.x + 2 * sr.width // 3]
+        elif n_trees == 3:
+            tree_positions = [sr.x + sr.width // 4,
+                              sr.x + sr.width // 2,
+                              sr.x + 3 * sr.width // 4]
+
+        for tx2 in tree_positions:
+            self._draw_pixel_tree(surface, tx2, sr.y - 2, tree_rng)
+
+    def _draw_pixel_tree(self, surface, cx, base_y, rng):
+        """Lush layered conifer tree — scenic and cartoony with contrast."""
+        trunk_h = rng.randint(16, 28)
+        n_tiers = rng.randint(3, 5)
+        base_r  = rng.randint(14, 22)
+        lean    = rng.randint(-2, 2)
+        TRUNK_D  = ( 80,  45,  18)
+        TRUNK_L  = (120,  72,  30)
+        BARK_H   = (145,  90,  38)
+        LEAF_DEEP   = ( 28,  80,  38)
+        LEAF_MID    = ( 48, 115,  55)
+        LEAF_BRIGHT = ( 72, 158,  68)
+        LEAF_HILIT  = (105, 190,  85)
+        LEAF_EDGE   = ( 38,  95,  45)
+        # Trunk
+        trunk_top = base_y - trunk_h
+        pygame.draw.polygon(surface, TRUNK_D,
+            [(cx - 5, base_y),(cx - 3 + lean, trunk_top + trunk_h//2),(cx + 3 + lean, trunk_top + trunk_h//2),(cx + 5, base_y)])
+        pygame.draw.rect(surface, TRUNK_D, (cx - 3 + lean, trunk_top, 6, trunk_h))
+        pygame.draw.rect(surface, TRUNK_L, (cx - 3 + lean, trunk_top, 3, trunk_h))
+        pygame.draw.rect(surface, BARK_H,  (cx - 2 + lean, trunk_top + 2, 1, trunk_h - 4))
+        # Tiers
+        for tier in range(n_tiers):
+            t_frac = tier / max(1, n_tiers - 1)
+            t_r  = int(base_r * (1.0 - t_frac * 0.45))
+            t_y  = trunk_top - tier * (base_r * 4 // 5) + (n_tiers - 1) * (base_r // 3)
+            t_cx = cx + lean * (n_tiers - tier) // n_tiers
+            # Shadow
+            ss = pygame.Surface((t_r * 2 + 8, t_r * 2 + 8), pygame.SRCALPHA)
+            pygame.draw.circle(ss, (*LEAF_DEEP, 120), (t_r + 6, t_r + 6), t_r)
+            surface.blit(ss, (t_cx - t_r - 2, t_y - t_r + 2))
+            # Main blob
+            pygame.draw.circle(surface, LEAF_MID, (t_cx, t_y), t_r)
+            # Dark bottom half
+            for dy in range(t_r // 2, t_r):
+                rw = int(math.sqrt(max(0, t_r * t_r - dy * dy)))
+                if rw > 0:
+                    pygame.draw.line(surface, LEAF_DEEP, (t_cx - rw, t_y + dy), (t_cx + rw, t_y + dy), 1)
+            # Sunlit face
+            pygame.draw.circle(surface, LEAF_BRIGHT, (t_cx - t_r//4, t_y - t_r//5), max(3, t_r*2//3))
+            pygame.draw.circle(surface, LEAF_HILIT,  (t_cx - t_r//3, t_y - t_r//2), max(2, t_r//3))
+            # Texture bumps
+            bump_rng = random.Random(rng.randint(0, 9999) + tier * 17)
+            for _ in range(5):
+                ba  = bump_rng.uniform(0, math.pi * 2)
+                bd  = bump_rng.uniform(t_r * 0.55, t_r * 0.9)
+                br2 = bump_rng.randint(3, 6)
+                bx2 = int(t_cx + math.cos(ba) * bd)
+                by2 = int(t_y  + math.sin(ba) * bd * 0.7)
+                bc  = LEAF_BRIGHT if math.cos(ba) < 0 else LEAF_EDGE
+                pygame.draw.circle(surface, bc, (bx2, by2), br2)
+            pygame.draw.circle(surface, LEAF_EDGE, (t_cx, t_y), t_r, 1)
+        # Tip spike
+        tip_y = trunk_top - (n_tiers - 1) * (base_r * 4 // 5) + (n_tiers - 1) * (base_r // 3) - base_r
+        pygame.draw.polygon(surface, LEAF_BRIGHT,
+            [(cx + lean - 3, tip_y + 10),(cx + lean, tip_y),(cx + lean + 3, tip_y + 10)])
+        pygame.draw.polygon(surface, LEAF_HILIT,
+            [(cx + lean - 1, tip_y + 8),(cx + lean, tip_y),(cx + lean + 1, tip_y + 6)])
+
+
+# ---------------------------------------------------------------------------
+# NPC
 # ---------------------------------------------------------------------------
 class NPC:
-    """
-    Snow Miser NPC.  Drawn as a robed figure with an icy blue robe and
-    snowflake-tipped staff, matching the Level 4 NPC visual style.
-    """
     WIDTH, HEIGHT = 24, 40
 
-    def __init__(self, x, y, dialogue_key, name="Snow Miser"):
+    def __init__(self, x, y, dialogue_key, name="Seraphiel"):
         self.rect = pygame.Rect(x, y - self.HEIGHT, self.WIDTH, self.HEIGHT)
         self.dialogue_key = dialogue_key
         self.name = name
         self.talked = False
-        self.bob = random.uniform(0, math.pi*2)
+        self.bob = random.uniform(0, math.pi * 2)
         self.proximity_shown = False
 
     def check_proximity(self, player):
         dx = abs(player.rect.centerx - self.rect.centerx)
         dy = abs(player.rect.centery - self.rect.centery)
-        return dx < 80 and dy < 80
+        return dx < 65 and dy < 65
 
     def draw(self, surface, camera, tick):
         sr = camera.apply(self.rect)
@@ -325,79 +603,88 @@ class NPC:
         bob = int(math.sin(tick * 0.04 + self.bob) * 2)
         bx, by = sr.x, sr.y + bob
 
-        # Robe — icy blue for Snow Miser
-        robe_c    = SNOW_MISER_ROBE
-        robe_dark = tuple(max(0, c - 35) for c in robe_c)
+        is_angel = "Seraphiel" in self.name
+        robe_c = ANGEL_BLUE if is_angel else HOLY_GOLD
+
+        # Robe
         pygame.draw.polygon(surface, robe_c,
-            [(bx+4, by+14), (bx+20, by+14), (bx+22, by+40), (bx, by+40)])
-        pygame.draw.polygon(surface, robe_dark,
-            [(bx+4, by+14), (bx+20, by+14), (bx+22, by+40), (bx, by+40)], 1)
-
+                            [(bx + 4, by + 14), (bx + 20, by + 14),
+                             (bx + 22, by + 40), (bx, by + 40)])
         # Head
-        pygame.draw.circle(surface, (220, 190, 160), (bx+12, by+10), 8)
-        # Icy hood arc
-        pygame.draw.arc(surface, robe_c, (bx+2, by, 20, 18), 0.3, 2.8, 3)
+        pygame.draw.circle(surface, (220, 190, 160), (bx + 12, by + 10), 8)
+        pygame.draw.arc(surface, robe_c, (bx + 2, by, 20, 18), 0.3, 2.8, 3)
 
-        # Eyes — slightly mischievous
-        pygame.draw.circle(surface, WHITE, (bx+9,  by+9), 2)
-        pygame.draw.circle(surface, WHITE, (bx+15, by+9), 2)
-        pygame.draw.circle(surface, BLACK, (bx+9,  by+10), 1)
-        pygame.draw.circle(surface, BLACK, (bx+15, by+10), 1)
+        # Eyes
+        pygame.draw.circle(surface, WHITE, (bx + 9, by + 9), 2)
+        pygame.draw.circle(surface, WHITE, (bx + 15, by + 9), 2)
+        pygame.draw.circle(surface, BLACK, (bx + 9, by + 10), 1)
+        pygame.draw.circle(surface, BLACK, (bx + 15, by + 10), 1)
 
-        # Staff with snowflake tip
-        pygame.draw.line(surface, (160, 200, 230), (bx+22, by+5), (bx+22, by+40), 2)
-        # Snowflake star at tip
-        sf_cx, sf_cy = bx+22, by+3
-        for si in range(6):
-            sa = si * math.pi / 3
-            ex2 = sf_cx + int(math.cos(sa) * 5)
-            ey2 = sf_cy + int(math.sin(sa) * 5)
-            pygame.draw.line(surface, ICE_BLUE, (sf_cx, sf_cy), (ex2, ey2), 1)
-        snowflake_pulse = abs(math.sin(tick * 0.06)) * 0.5 + 0.5
-        pygame.draw.circle(surface,
-            lerp_color(ICE_BLUE, WHITE, snowflake_pulse), (sf_cx, sf_cy), 3)
+        if is_angel:
+            # Halo
+            halo_pulse = abs(math.sin(tick * 0.05)) * 0.3 + 0.7
+            halo_c = tuple(min(255, int(v * halo_pulse)) for v in HOLY_GOLD)
+            pygame.draw.ellipse(surface, halo_c, (bx + 2, by - 10, 20, 7), 2)
+            # Wings
+            wing_a = abs(math.sin(tick * 0.06)) * 8
+            pygame.draw.polygon(surface, (220, 230, 255),
+                                [(bx + 12, by + 16),
+                                 (bx - 12, by + 8 - int(wing_a)),
+                                 (bx - 8, by + 20)])
+            pygame.draw.polygon(surface, (220, 230, 255),
+                                [(bx + 12, by + 16),
+                                 (bx + 36, by + 8 - int(wing_a)),
+                                 (bx + 32, by + 20)])
+            # Sword
+            pygame.draw.line(surface, (180, 180, 220), (bx + 22, by + 6), (bx + 22, by + 38), 3)
+            pygame.draw.line(surface, HOLY_GOLD, (bx + 16, by + 22), (bx + 28, by + 22), 2)
+            pygame.draw.circle(surface, HOLY_GOLD, (bx + 22, by + 6), 4)
+            glow = abs(math.sin(tick * 0.1))
+            gs = pygame.Surface((16, 16), pygame.SRCALPHA)
+            pygame.draw.circle(gs, (255, 230, 100, int(80 * glow)), (8, 8), 8)
+            surface.blit(gs, (bx + 14, by - 2))
+        else:
+            # Lumen: glowing orb staff
+            pygame.draw.line(surface, BROWN, (bx + 22, by + 8), (bx + 22, by + 38), 2)
+            pygame.draw.circle(surface, CYAN, (bx + 22, by + 6), 5)
+            pygame.draw.circle(surface, WHITE, (bx + 22, by + 6), 2)
 
-        # Name tag (only before talked)
+        # Name tag
         if not self.talked:
-            font = pygame.font.SysFont("consolas", 10, bold=True)
-            tag    = font.render(self.name, True, ICE_BLUE)
-            tag_sh = font.render(self.name, True, (0, 0, 0))
-            surface.blit(tag_sh, (bx + 12 - tag.get_width()//2 + 1, by - 13))
-            surface.blit(tag,    (bx + 12 - tag.get_width()//2,     by - 14))
-            # Pulsing exclamation mark
-            exc_pulse = abs(math.sin(tick * 0.1)) * 0.5 + 0.5
-            exc_c     = lerp_color(CYAN, WHITE, exc_pulse)
-            exc_scale = int(exc_pulse * 2)
-            exc_font  = pygame.font.SysFont("consolas", 12 + exc_scale, bold=True)
-            exc    = exc_font.render("!", True, exc_c)
-            exc_sh = exc_font.render("!", True, (0, 0, 0))
-            surface.blit(exc_sh, (bx + 12 - exc.get_width()//2 + 1, by - 25))
-            surface.blit(exc,    (bx + 12 - exc.get_width()//2,     by - 26))
+            font = pygame.font.Font(TITLE_FONT_PATH,10)
+            tag = font.render(self.name, True, HOLY_GOLD)
+            surface.blit(font.render(self.name, True, BLACK), (bx + 12 - tag.get_width() // 2 + 1, by - 13))
+            surface.blit(tag, (bx + 12 - tag.get_width() // 2, by - 14))
+            # Exclamation pulse
+            ep = abs(math.sin(tick * 0.1)) * 0.5 + 0.5
+            ec = lerp_color(HOLY_GOLD, WHITE, ep)
+            ef = pygame.font.Font(TITLE_FONT_PATH,14 + int(ep * 2))
+            exc = ef.render("!", True, ec)
+            surface.blit(exc, (bx + 12 - exc.get_width() // 2, by - 28))
 
-        # Talk prompt pill
         if self.proximity_shown and not self.talked:
-            font2  = pygame.font.SysFont("consolas", 11)
-            prompt = font2.render("[E] Talk", True, SNOW_WHITE)
+            font2 = pygame.font.Font(TITLE_FONT_PATH,11)
+            prompt = font2.render("[E] Talk", True, WHITE)
             pw, ph = prompt.get_width() + 8, prompt.get_height() + 4
-            px2 = bx + 12 - pw // 2
-            py2 = by - 38
+            px2, py2 = bx + 12 - pw // 2, by - 40
             pill = pygame.Surface((pw, ph), pygame.SRCALPHA)
             pill.fill((0, 0, 0, 140))
-            surface.blit(pill,   (px2, py2))
+            surface.blit(pill, (px2, py2))
             surface.blit(prompt, (px2 + 4, py2 + 2))
 
+
 # ---------------------------------------------------------------------------
-# Dialogue Box  — exact match to Level 4 style
+# Dialogue Box
 # ---------------------------------------------------------------------------
 class DialogueBox:
     def __init__(self, dialogues):
-        self.dialogues    = dialogues
-        self.index        = 0
-        self.active       = True
-        self.char_index   = 0
-        self.char_speed   = 1.5
-        self.char_timer   = 0
-        self.done_typing  = False
+        self.dialogues = dialogues
+        self.index = 0
+        self.active = True
+        self.char_index = 0
+        self.char_speed = 1.5
+        self.char_timer = 0
+        self.done_typing = False
 
     def advance(self):
         if not self.done_typing:
@@ -415,1815 +702,2063 @@ class DialogueBox:
         if not self.active or self.done_typing:
             return
         self.char_timer += self.char_speed
-        full_text = self.dialogues[self.index][1]
-        self.char_index = min(int(self.char_timer), len(full_text))
-        if self.char_index >= len(full_text):
+        full = self.dialogues[self.index][1]
+        self.char_index = min(int(self.char_timer), len(full))
+        if self.char_index >= len(full):
             self.done_typing = True
 
     def draw(self, surface, tick):
         if not self.active:
             return
-
-        # Box background
-        box_h   = 130
-        box_y   = SCREEN_HEIGHT - box_h - 20
+        box_h = 130
+        box_y = SCREEN_HEIGHT - box_h - 20
         box_rect = pygame.Rect(40, box_y, SCREEN_WIDTH - 80, box_h)
 
         bg = pygame.Surface((box_rect.width, box_rect.height), pygame.SRCALPHA)
-        r  = 6
-        bg.fill((0, 0, 0, 0))
-        pygame.draw.rect(bg, (8, 12, 30, 225), (r, 0, box_rect.width - 2*r, box_rect.height))
-        pygame.draw.rect(bg, (8, 12, 30, 225), (0, r, box_rect.width, box_rect.height - 2*r))
-        for cx2, cy2 in [(r, r), (box_rect.width-r, r),
-                         (r, box_rect.height-r), (box_rect.width-r, box_rect.height-r)]:
-            pygame.draw.circle(bg, (8, 12, 30, 225), (cx2, cy2), r)
+        r = 6
+        for cx2, cy2 in [(r, r), (box_rect.width - r, r),
+                         (r, box_rect.height - r), (box_rect.width - r, box_rect.height - r)]:
+            pygame.draw.circle(bg, (8, 18, 40, 220), (cx2, cy2), r)
+        pygame.draw.rect(bg, (8, 18, 40, 220), (r, 0, box_rect.width - 2 * r, box_rect.height))
+        pygame.draw.rect(bg, (8, 18, 40, 220), (0, r, box_rect.width, box_rect.height - 2 * r))
         surface.blit(bg, box_rect.topleft)
+        pygame.draw.rect(surface, HOLY_GOLD, box_rect, 2, border_radius=6)
 
-        # Border — icy cyan instead of gold
-        pygame.draw.rect(surface, ICE_BLUE, box_rect, 2, border_radius=6)
+        # Corner ornaments
+        for cx3, cy3 in [(box_rect.left + 3, box_rect.top + 3),
+                         (box_rect.right - 3, box_rect.top + 3),
+                         (box_rect.left + 3, box_rect.bottom - 3),
+                         (box_rect.right - 3, box_rect.bottom - 3)]:
+            pygame.draw.circle(surface, ANGEL_BLUE, (cx3, cy3), 5)
+            pygame.draw.circle(surface, HOLY_GOLD, (cx3, cy3), 3)
 
-        # Corner snowflake ornaments
-        for cx3, cy3 in [(box_rect.left+3, box_rect.top+3),
-                         (box_rect.right-3, box_rect.top+3),
-                         (box_rect.left+3, box_rect.bottom-3),
-                         (box_rect.right-3, box_rect.bottom-3)]:
-            pygame.draw.circle(surface, ICE_DARK, (cx3, cy3), 5)
-            pygame.draw.circle(surface, ICE_BLUE, (cx3, cy3), 3)
-
-        # Speaker name
         speaker, text = self.dialogues[self.index]
-        font_name = pygame.font.SysFont("consolas", 17, bold=True)
-        font_text = pygame.font.SysFont("consolas", 14)
-
+        fn = pygame.font.Font(TITLE_FONT_PATH,17)
+        ft = pygame.font.Font(TITLE_FONT_PATH,14)
         if speaker:
-            # Snow Miser gets icy cyan; narrator lines have no speaker
-            name_c = ICE_BLUE
-            surface.blit(font_name.render(speaker, True, (0,0,0)),
-                         (box_rect.x + 17, box_rect.y + 11))
-            name_surf = font_name.render(speaker, True, name_c)
-            surface.blit(name_surf, (box_rect.x + 16, box_rect.y + 10))
-            pygame.draw.line(surface, name_c,
-                             (box_rect.x+16, box_rect.y+30),
-                             (box_rect.x+16+name_surf.get_width(), box_rect.y+30), 1)
+            nc = HOLY_GOLD if "Seraphiel" in speaker else CYAN
+            surface.blit(fn.render(speaker, True, BLACK), (box_rect.x + 17, box_rect.y + 11))
+            ns = fn.render(speaker, True, nc)
+            surface.blit(ns, (box_rect.x + 16, box_rect.y + 10))
+            pygame.draw.line(surface, nc,
+                             (box_rect.x + 16, box_rect.y + 30),
+                             (box_rect.x + 16 + ns.get_width(), box_rect.y + 30), 1)
             text_y = box_rect.y + 36
         else:
             text_y = box_rect.y + 14
 
-        # Typewriter text
         shown = text[:self.char_index]
         words = shown.split(" ")
-        line  = ""
-        ly    = text_y
+        line = ""
+        ly = text_y
         max_w = box_rect.width - 32
         for word in words:
             test = line + (" " if line else "") + word
-            if font_text.size(test)[0] > max_w:
-                ts = font_text.render(line, True, SNOW_WHITE)
-                surface.blit(ts, (box_rect.x + 16, ly))
-                ly += 20; line = word
+            if ft.size(test)[0] > max_w:
+                surface.blit(ft.render(line, True, HOLY_WHITE), (box_rect.x + 16, ly))
+                ly += 20
+                line = word
             else:
                 line = test
         if line:
-            ts = font_text.render(line, True, SNOW_WHITE)
-            surface.blit(ts, (box_rect.x + 16, ly))
+            surface.blit(ft.render(line, True, HOLY_WHITE), (box_rect.x + 16, ly))
 
-        # Continue prompt
-        if self.done_typing:
-            blink = (tick // 20) % 2 == 0
-            if blink:
-                if self.index < len(self.dialogues) - 1:
-                    prompt = font_text.render("[ENTER] Continue...", True, GRAY)
-                else:
-                    prompt = font_text.render("[ENTER] Close", True, GRAY)
-                surface.blit(prompt,
-                             (box_rect.right - prompt.get_width() - 16, box_rect.bottom - 22))
+        if self.done_typing and (tick // 20) % 2 == 0:
+            lbl = "[ENTER] Continue..." if self.index < len(self.dialogues) - 1 else "[ENTER] Close"
+            surface.blit(ft.render(lbl, True, GRAY),
+                         (box_rect.right - ft.size(lbl)[0] - 16, box_rect.bottom - 22))
 
-        # Page counter
-        pg_font = pygame.font.SysFont("consolas", 11)
-        pg = pg_font.render(f"{self.index+1}/{len(self.dialogues)}", True, (60, 60, 70))
-        surface.blit(pg, (box_rect.x + 16, box_rect.bottom - 18))
+        pg_f = pygame.font.Font(TITLE_FONT_PATH,11)
+        surface.blit(pg_f.render(f"{self.index + 1}/{len(self.dialogues)}", True, (60, 60, 80)),
+                     (box_rect.x + 16, box_rect.bottom - 18))
+
 
 # ---------------------------------------------------------------------------
-# Section Checkpoint — floating flag  (unchanged from original)
+# Checkpoint
 # ---------------------------------------------------------------------------
-class SectionCheckpoint:
-    FLAG_W = 22; FLAG_H = 14
+class Checkpoint:
+    def __init__(self, x, y):
+        self.rect = pygame.Rect(x, y - 50, 20, 50)
+        self.spawn_x = x
+        self.spawn_y = y - 60
+        self.activated = False
+        self.glow = 0
+        self.base_y = y
 
-    def __init__(self, trigger_x, spawn_x, spawn_y, float_y, label=""):
-        self.trigger_x   = trigger_x
-        self.spawn_x     = spawn_x
-        self.spawn_y     = spawn_y
-        self.float_y     = float_y
-        self.label       = label
-        self.activated   = False
-        self.toast_timer = 0
-        self.glow_tick   = 0
-        self.bob_tick    = random.randint(0, 60)
+    def update(self):
+        if self.activated:
+            self.glow = (self.glow + 3) % 360
 
     def check(self, player):
-        if self.activated or not player.alive: return False
-        if player.rect.right >= self.trigger_x:
-            self._activate(player); return True
+        if not self.activated and player.rect.colliderect(self.rect):
+            self.activated = True
+            player.set_checkpoint(self.spawn_x, self.spawn_y)
+            return True
         return False
 
-    def activate_direct(self, player):
-        if not self.activated:
-            self._activate(player); return True
-        return False
-
-    def _activate(self, player):
-        self.activated   = True
-        self.toast_timer = 150
-        self.glow_tick   = 0
-        player.spawn_x   = self.spawn_x
-        player.spawn_y   = self.spawn_y
-
-    def update(self):
-        self.bob_tick += 1
-        if self.toast_timer > 0: self.toast_timer -= 1
-        if self.activated:       self.glow_tick   += 1
-
-    def draw_flag(self, surface, camera, font):
-        if self.trigger_x > 100000:
-            if self.toast_timer > 0:
-                pos = camera.apply(pygame.Rect(int(self.spawn_x), int(self.float_y), 1, 1))
-                sx, sy = pos.x, pos.y
-                alpha  = min(255, self.toast_timer * 4)
-                rise   = (150 - self.toast_timer) // 4
-                ts = font.render(f"CHECKPOINT  {self.label}", True, CP_ACTIVE)
-                ts.set_alpha(alpha)
-                surface.blit(ts, (sx - ts.get_width()//2, sy - rise))
-            return
-
-        bob  = math.sin(self.bob_tick * 0.06) * 5
-        wx   = self.trigger_x
-        wy   = self.float_y + bob
-        pos  = camera.apply(pygame.Rect(int(wx), int(wy), 1, 1))
-        sx, sy = pos.x, pos.y
-        if sx < -80 or sx > SCREEN_WIDTH + 80: return
-
-        col   = CP_ACTIVE if self.activated else CP_INACTIVE
-        pulse = abs(math.sin(self.glow_tick * 0.08)) if self.activated else 0.0
-
+    def draw(self, surface, camera):
+        sr = camera.apply(self.rect)
+        cx = sr.centerx
+        # Pole
+        pygame.draw.rect(surface, BROWN, (cx - 3, sr.bottom - 12, 6, 12))
+        # Star on top
+        star_c = HOLY_GOLD if self.activated else DARK_GRAY
+        pygame.draw.circle(surface, star_c, (cx, sr.bottom - 60), 7)
         if self.activated:
-            glow_r = 18 + int(6 * pulse)
-            gc     = lerp_color(CP_GLOW, (0,0,0), 1 - pulse * 0.6)
-            pygame.draw.circle(surface, gc, (sx, sy), glow_r, 2)
+            gp = abs(math.sin(math.radians(self.glow))) * 0.5 + 0.5
+            pygame.draw.circle(surface, WHITE, (cx, sr.bottom - 60), 4)
+            # Light rays
+            for i in range(6):
+                a = math.radians(self.glow + i * 60)
+                x1 = cx + int(math.cos(a) * 8)
+                y1 = sr.bottom - 60 + int(math.sin(a) * 8)
+                x2 = cx + int(math.cos(a) * 14)
+                y2 = sr.bottom - 60 + int(math.sin(a) * 14)
+                pygame.draw.line(surface, HOLY_GOLD, (x1, y1), (x2, y2), 1)
+            pygame.draw.rect(surface, tuple(int(v * gp) for v in HOLY_GOLD), sr.inflate(8, 8), 2)
 
-        pole_top = sy - 18; pole_bot = sy + 18
-        pygame.draw.line(surface, GRAY, (sx, pole_top), (sx, pole_bot), 3)
-        fc  = lerp_color(col, WHITE, pulse * 0.45)
-        pts = [(sx+1, pole_top),
-               (sx+1+self.FLAG_W, pole_top+self.FLAG_H//2),
-               (sx+1, pole_top+self.FLAG_H)]
-        pygame.draw.polygon(surface, fc, pts)
-        pygame.draw.polygon(surface, WHITE, pts, 1)
-        lbl = font.render(self.label, True, col)
-        surface.blit(lbl, (sx - lbl.get_width()//2, sy + 22))
-
-        if self.toast_timer > 0:
-            alpha = min(255, self.toast_timer * 4)
-            rise  = (150 - self.toast_timer) // 4
-            ts    = font.render(f"CHECKPOINT  {self.label}", True, CP_ACTIVE)
-            ts.set_alpha(alpha)
-            surface.blit(ts, (sx - ts.get_width()//2, sy - 50 - rise))
 
 # ---------------------------------------------------------------------------
-# Base Platform
+# Exit Portal
 # ---------------------------------------------------------------------------
-class Platform:
-    def __init__(self, x, y, w, h, color=GRAY):
-        self.rect  = pygame.Rect(x,y,w,h)
-        self.color = color
+class ExitPortal:
+    def __init__(self, x, y):
+        self.rect = pygame.Rect(x, y - 80, 60, 80)
+        self.pulse = 0
+        self.particles = []
 
-    def is_active(self):              return True
-    def get_rect(self):               return self.rect
-    def on_player_land(self, player): pass
-    def update(self):                 pass
+    def update(self):
+        self.pulse = (self.pulse + 2) % 360
+        if random.random() < 0.5:
+            self.particles.append([
+                self.rect.centerx + random.randint(-20, 20),
+                float(self.rect.bottom - 5),
+                random.uniform(-0.3, 0.3),
+                random.uniform(-2.0, -0.8),
+                random.randint(30, 55),
+                random.choice([HOLY_GOLD, SUN_YELLOW, WHITE, ANGEL_BLUE])
+            ])
+        self.particles = [[x + vx, y + vy, vx, vy, t - 1, c]
+                          for x, y, vx, vy, t, c in self.particles if t > 1]
 
-    def draw(self, surface, camera):
+    def check(self, player):
+        return player.rect.colliderect(self.rect)
+
+    def draw(self, surface, camera, tick):
         sr = camera.apply(self.rect)
-        if sr.right < -10 or sr.left > SCREEN_WIDTH + 10: return
-        pygame.draw.rect(surface, self.color, sr)
-        pygame.draw.rect(surface, SNOW_WHITE, (sr.x, sr.y, sr.width, 5))
+        cx, cy = sr.centerx, sr.centery
+        p = abs(math.sin(math.radians(self.pulse)))
+
+        # Glow
+        for gr, ga in [(70, 30), (50, 55), (35, 90)]:
+            gs = pygame.Surface((gr * 2, gr * 2), pygame.SRCALPHA)
+            pygame.draw.circle(gs, (*SUN_GOLD, int(ga * (0.6 + 0.4 * p))), (gr, gr), gr)
+            surface.blit(gs, (cx - gr, cy - 10 - gr))
+
+        # Pillar archway
+        pw = 10
+        pygame.draw.rect(surface, (160, 130, 60), (sr.x - 4, sr.y + 16, pw, sr.height - 16))
+        pygame.draw.rect(surface, (160, 130, 60), (sr.right - pw + 4, sr.y + 16, pw, sr.height - 16))
+        pygame.draw.ellipse(surface, (160, 130, 60), (sr.x - 4, sr.y - 4, sr.width + 8, 42))
+
+        # Inner portal glow
+        inner = pygame.Rect(sr.x + 8, sr.y + 18, sr.width - 16, sr.height - 22)
+        void = pygame.Surface((inner.width, inner.height), pygame.SRCALPHA)
+        for row in range(inner.height):
+            t2 = row / max(1, inner.height - 1)
+            rc = lerp_color((255, 230, 80), (200, 240, 255), t2)
+            al = 180 + int(75 * p)
+            pygame.draw.line(void, (*rc, min(255, al)), (0, row), (inner.width, row))
+        surface.blit(void, inner.topleft)
+
+        # Particles
+        for px, py, _, _, pt, pc in self.particles:
+            pp = camera.apply(pygame.Rect(int(px), int(py), 1, 1))
+            al = min(255, int(pt * 5))
+            sz = 1 + int(pt / 18)
+            ps = pygame.Surface((sz * 2, sz * 2), pygame.SRCALPHA)
+            pygame.draw.circle(ps, (*pc, al), (sz, sz), sz)
+            surface.blit(ps, (pp.x - sz, pp.y - sz))
+
+        # Label
+        font = pygame.font.Font(TITLE_FONT_PATH,11)
+        lbl = font.render("The way home...", True, HOLY_GOLD)
+        ly = sr.top - 22 + int(math.sin(tick * 0.05) * 3)
+        surface.blit(lbl, (cx - lbl.get_width() // 2, ly))
+
 
 # ---------------------------------------------------------------------------
-# Shrinking Platform
+# Arrow  (player projectile)
 # ---------------------------------------------------------------------------
-class ShrinkingPlatform(Platform):
-    def __init__(self, x, y, w, h, shrink_speed=1.2, respawn_time=300):
-        super().__init__(x,y,w,h,ICE_BLUE)
-        self.SHRINK_SPEED=shrink_speed; self.respawn_time=respawn_time
-        self.ox=x; self.oy=y; self.ow=w; self.oh=h
-        self.shrinking=self.gone=False; self.rc=0; self.flicker=0
+class Arrow:
+    RADIUS = 4
 
-    def on_player_land(self, player):
-        if not self.gone: self.shrinking=True
-
-    def is_active(self): return not self.gone
+    def __init__(self, x, y, vx, vy):
+        self.x = float(x)
+        self.y = float(y)
+        norm = math.sqrt(vx * vx + vy * vy) or 1
+        self.vx = vx / norm * ARROW_SPEED
+        self.vy = vy / norm * ARROW_SPEED
+        self.lifetime = ARROW_LIFETIME
+        self.alive = True
+        self.angle = math.atan2(vy, vx)
+        self.trail = []
 
     def update(self):
-        if self.gone:
-            self.rc+=1
-            if self.rc>=self.respawn_time:
-                self.rect=pygame.Rect(self.ox,self.oy,self.ow,self.oh)
-                self.gone=self.shrinking=False; self.rc=0
+        self.trail.append((self.x, self.y, 200))
+        if len(self.trail) > 10:
+            self.trail.pop(0)
+        self.trail = [(x, y, a - 22) for x, y, a in self.trail if a > 22]
+        self.x += self.vx
+        self.y += self.vy
+        self.vy += 0.08
+        self.angle = math.atan2(self.vy, self.vx)
+        self.lifetime -= 1
+        if self.lifetime <= 0:
+            self.alive = False
+        return self.alive
+
+    def get_rect(self):
+        return pygame.Rect(int(self.x) - self.RADIUS, int(self.y) - self.RADIUS,
+                           self.RADIUS * 2, self.RADIUS * 2)
+
+    def draw(self, surface, camera, tick):
+        if not self.alive:
             return
-        if self.shrinking:
-            self.flicker+=1
-            nw=self.rect.width-self.SHRINK_SPEED*2
-            if nw<=0: self.gone=True; self.rc=0; return
-            cx=self.rect.centerx
-            self.rect.width=int(nw); self.rect.centerx=cx
+        for i, (tx, ty, ta) in enumerate(self.trail):
+            tp = camera.apply(pygame.Rect(int(tx), int(ty), 1, 1))
+            frac = (i + 1) / max(1, len(self.trail))
+            r = max(1, int(4 * frac))
+            a = max(0, min(255, int(ta * frac)))
+            ts = pygame.Surface((r * 2 + 2, r * 2 + 2), pygame.SRCALPHA)
+            c = lerp_color(ICE_DARK, ICE_WHITE, frac)
+            pygame.draw.circle(ts, (*c, a), (r + 1, r + 1), r)
+            surface.blit(ts, (tp.x - r - 1, tp.y - r - 1))
+        p = camera.apply(pygame.Rect(int(self.x), int(self.y), 1, 1))
+        length = 18
+        ex = p.x + int(math.cos(self.angle) * length)
+        ey = p.y + int(math.sin(self.angle) * length)
+        pygame.draw.line(surface, (60, 60, 80), (p.x + 1, p.y + 1), (ex + 1, ey + 1), 2)
+        pygame.draw.line(surface, ICE_DARK,  (p.x, p.y), (ex, ey), 3)
+        pygame.draw.line(surface, ICE_WHITE, (p.x, p.y), (ex, ey), 1)
+        pygame.draw.circle(surface, ICE_BLUE,  (ex, ey), 4)
+        pygame.draw.circle(surface, ICE_WHITE, (ex, ey), 2)
+        if tick % 4 < 2:
+            pygame.draw.line(surface, WHITE, (ex - 3, ey), (ex + 3, ey), 1)
+            pygame.draw.line(surface, WHITE, (ex, ey - 3), (ex, ey + 3), 1)
+        bx = p.x + int(math.cos(self.angle + math.pi) * 8)
+        by = p.y + int(math.sin(self.angle + math.pi) * 8)
+        pygame.draw.line(surface, ICE_WHITE, (bx, by),
+                         (bx + int(math.cos(self.angle + math.pi / 2) * 5),
+                          by + int(math.sin(self.angle + math.pi / 2) * 5)), 1)
+        pygame.draw.line(surface, ICE_WHITE, (bx, by),
+                         (bx + int(math.cos(self.angle - math.pi / 2) * 5),
+                          by + int(math.sin(self.angle - math.pi / 2) * 5)), 1)
 
-    def draw(self, surface, camera):
-        if self.gone: return
-        sr=camera.apply(self.rect)
-        if sr.right<-10 or sr.left>SCREEN_WIDTH+10: return
-        ratio=self.rect.width/self.ow
-        bc=(lerp_color(ICE_BLUE,RED,1-ratio) if self.shrinking and ratio<0.35 and self.flicker%4<2
-            else lerp_color(ICE_DARK,ICE_BLUE,ratio))
-        pygame.draw.rect(surface,bc,sr)
-        for ix in range(0,sr.width,10):
-            pygame.draw.line(surface,SNOW_WHITE,(sr.x+ix,sr.y+2),(sr.x+ix+4,sr.y+6),1)
-        pygame.draw.rect(surface,SNOW_WHITE,(sr.x,sr.y,sr.width,4))
-        if self.shrinking and ratio<0.5:
-            pygame.draw.rect(surface,RED if self.flicker%6<3 else YELLOW,sr,2)
 
 # ---------------------------------------------------------------------------
-# Falling Platform
+# Water Balloon  (Santa projectile)
 # ---------------------------------------------------------------------------
-class FallingPlatform(Platform):
-    FALL_ACCEL=0.15; MAX_FALL=8.0
-    def __init__(self, x, y, w, h, delay=25, respawn_time=300):
-        super().__init__(x,y,w,h,FALLING_BROWN)
-        self.delay=delay; self.respawn_time=respawn_time
-        self.ox=x; self.oy=y
-        self.dt=0; self.falling=False; self.fs=0.0; self.gone=False; self.rc=0; self.st=0
+class WaterBalloon:
+    RADIUS = 9
 
-    def on_player_land(self, player):
-        if not self.falling and not self.gone:
-            self.dt=self.delay; self.st=0
+    def __init__(self, x, y, target_x, target_y):
+        self.x = float(x)
+        self.y = float(y)
+        dx = target_x - x
+        dy = target_y - y
+        dist = math.sqrt(dx * dx + dy * dy) or 1
+        # Give balloon an arc: aim below target
+        self.vx = (dx / dist) * SANTA_BALLOON_SPEED
+        self.vy = (dy / dist) * SANTA_BALLOON_SPEED - 2
+        self.lifetime = BALLOON_LIFETIME
+        self.alive = True
+        self.splashing = False
+        self.splash_timer = 0
+        self.splash_x = 0
+        self.splash_y = 0
 
-    def is_active(self): return not self.gone
+    def update(self, platforms):
+        if self.splashing:
+            self.splash_timer -= 1
+            return self.splash_timer > 0
+        self.x += self.vx
+        self.y += self.vy
+        self.vy += 0.18  # gravity
+        self.lifetime -= 1
+        if self.lifetime <= 0:
+            self.alive = False
+            return False
+        # Check platform collision
+        br = self.get_rect()
+        for plat in platforms:
+            if plat.is_active() and br.colliderect(plat.get_rect()):
+                self.splashing = True
+                self.splash_timer = 18
+                self.splash_x = int(self.x)
+                self.splash_y = plat.get_rect().top
+                return True
+        return True
 
-    def update(self):
-        if self.gone:
-            self.rc+=1
-            if self.rc>=self.respawn_time:
-                self.rect.x=self.ox; self.rect.y=self.oy
-                self.gone=self.falling=False; self.fs=0.0; self.dt=0; self.rc=0
+    def get_rect(self):
+        return pygame.Rect(int(self.x) - self.RADIUS, int(self.y) - self.RADIUS,
+                           self.RADIUS * 2, self.RADIUS * 2)
+
+    def draw(self, surface, camera, tick):
+        if not self.alive:
             return
-        if self.dt>0:
-            self.dt-=1; self.st+=1
-            if self.dt==0: self.falling=True
-        if self.falling:
-            self.fs=min(self.fs+self.FALL_ACCEL,self.MAX_FALL)
-            self.rect.y+=int(self.fs)
-            if self.rect.top>DEATH_Y+100: self.gone=True; self.rc=0
-
-    def draw(self, surface, camera):
-        if self.gone: return
-        shake=int(math.sin(self.st*1.2)*3) if self.dt>0 else 0
-        dr=self.rect.copy(); dr.x+=shake
-        sr=camera.apply(dr)
-        if sr.right<-10 or sr.left>SCREEN_WIDTH+10: return
-        pygame.draw.rect(surface,FALLING_BROWN,sr)
-        for i in range(3):
-            ly=sr.y+6+i*8
-            if ly<sr.bottom:
-                pygame.draw.line(surface,(120,70,30),(sr.x+2,ly),(sr.right-2,ly),1)
-        pygame.draw.rect(surface,SNOW_WHITE,(sr.x,sr.y,sr.width,5))
-        if self.falling: pygame.draw.rect(surface,ORANGE,sr,2)
-
-# ---------------------------------------------------------------------------
-# Phantom Platform
-# ---------------------------------------------------------------------------
-class PhantomPlatform(Platform):
-    def __init__(self, x, y, w, h, visible_frames=18, respawn_time=240):
-        super().__init__(x,y,w,h,PHANTOM_TEAL)
-        self.VF=visible_frames; self.respawn_time=respawn_time
-        self.touched=self.gone=False; self.vt=0; self.rc=0
-        self.tick=random.randint(0,60)
-
-    def on_player_land(self, player):
-        if not self.gone and not self.touched:
-            self.touched=True; self.vt=self.VF
-
-    def is_active(self): return not self.gone
-
-    def update(self):
-        self.tick+=1
-        if self.gone:
-            self.rc+=1
-            if self.rc>=self.respawn_time:
-                self.gone=self.touched=False; self.vt=0; self.rc=0
+        if self.splashing:
+            # Splash ripple
+            sp = camera.apply(pygame.Rect(self.splash_x, self.splash_y, 1, 1))
+            r = int((18 - self.splash_timer) * 2.5)
+            a = max(0, int(255 * self.splash_timer / 18))
+            pygame.draw.circle(surface, (100, 160, 255), (sp.x, sp.y), r, 2)
+            for _ in range(2):
+                ox = random.randint(-r, r)
+                pygame.draw.circle(surface, (150, 200, 255), (sp.x + ox, sp.y - random.randint(0, 4)), 2)
             return
-        if self.touched:
-            self.vt-=1
-            if self.vt<=0: self.gone=True; self.rc=0
+        p = camera.apply(pygame.Rect(int(self.x), int(self.y), 1, 1))
+        # Balloon body
+        pygame.draw.circle(surface, BALLOON_DARK, (p.x, p.y), self.RADIUS + 1)
+        pygame.draw.circle(surface, BALLOON_BLUE, (p.x, p.y), self.RADIUS)
+        pygame.draw.circle(surface, (140, 190, 255), (p.x - 2, p.y - 2), 3)
+        # String
+        pygame.draw.line(surface, (180, 180, 200), (p.x, p.y + self.RADIUS), (p.x + 2, p.y + self.RADIUS + 5), 1)
 
-    def draw(self, surface, camera):
-        sr=camera.apply(self.rect)
-        if sr.right<-10 or sr.left>SCREEN_WIDTH+10: return
-        if self.gone:
-            pygame.draw.rect(surface,(20,60,55),sr,1); return
-        ar=(self.vt/self.VF if self.touched
-            else 0.55+0.25*abs(math.sin(self.tick*0.07)))
-        col=tuple(max(0,min(255,int(c*ar))) for c in PHANTOM_TEAL)
-        pygame.draw.rect(surface,col,sr)
-        for ix in range(0,sr.width,7):
-            if (self.tick+ix)%10<5:
-                lc=tuple(min(c+60,255) for c in col)
-                pygame.draw.line(surface,lc,(sr.x+ix,sr.y),(sr.x+ix,sr.bottom))
-        pygame.draw.rect(surface,CYAN,sr,1)
-        if self.touched and self.vt%4<2:
-            pygame.draw.rect(surface,RED,sr,2)
 
 # ---------------------------------------------------------------------------
-# OBSTACLE 1 — Countdown Platform
+# Mushroom Enemy
 # ---------------------------------------------------------------------------
-class CountdownPlatform(Platform):
-    IDLE     = "idle"
-    COUNTING = "counting"
-    GO       = "go"
-    FALLING  = "falling"
+class MushroomEnemy:
+    WIDTH, HEIGHT = 28, 28
 
-    def __init__(self, x, y, w, h, countdown_frames=180, grace_frames=COUNTDOWN_GRACE):
-        super().__init__(x,y,w,h,COUNTDOWN_COL)
-        self.countdown_frames = countdown_frames
-        self.grace_frames     = grace_frames
-        self.ox = x; self.oy = y
-        self.state     = self.IDLE
-        self.countdown = 0
-        self.grace     = 0
-        self.fall_vy   = 0.0
-        self.tick      = 0
-        self.target    = None
-
-    def reset(self):
-        self.rect.x  = self.ox
-        self.rect.y  = self.oy
-        self.state   = self.IDLE
-        self.countdown = 0
-        self.grace   = 0
-        self.fall_vy = 0.0
-        if self.target:
-            self.target.on_countdown_reset()
-
-    def on_player_land(self, player):
-        if self.state == self.IDLE:
-            self.state     = self.COUNTING
-            self.countdown = self.countdown_frames
-
-    def is_active(self):
-        return self.state != self.FALLING or self.rect.y < DEATH_Y + 200
-
-    def target_visible(self):
-        return self.state in (self.GO, self.FALLING)
+    def __init__(self, x, y, pl, pr, speed=1.3):
+        self.rect = pygame.Rect(x, y, self.WIDTH, self.HEIGHT)
+        self.patrol_left = pl
+        self.patrol_right = pr
+        self.speed = speed
+        self.direction = 1
+        self.alive = True
+        self.death_timer = 0
+        self.squish_timer = 0
+        self.tick = 0
 
     def update(self):
+        if not self.alive:
+            self.death_timer -= 1
+            return
+        if self.squish_timer > 0:
+            self.squish_timer -= 1
+            if self.squish_timer <= 0:
+                self.alive = False
+                self.death_timer = 1
+            return
         self.tick += 1
-        if self.state == self.COUNTING:
-            self.countdown -= 1
-            if self.countdown <= 0:
-                self.state = self.GO
-                self.grace = self.grace_frames
-        elif self.state == self.GO:
-            self.grace -= 1
-            if self.grace <= 0:
-                self.state   = self.FALLING
-                self.fall_vy = 0.0
-        elif self.state == self.FALLING:
-            self.fall_vy = min(self.fall_vy + 0.4, 12)
-            self.rect.y += int(self.fall_vy)
-            if self.rect.top > DEATH_Y + 300:
-                self.reset()
+        self.rect.x += int(self.speed * self.direction)
+        if self.rect.x >= self.patrol_right:
+            self.rect.x = self.patrol_right
+            self.direction = -1
+        elif self.rect.x <= self.patrol_left:
+            self.rect.x = self.patrol_left
+            self.direction = 1
 
-    def current_display(self):
-        if self.state == self.IDLE:     return None
-        if self.state == self.COUNTING:
-            seg = self.countdown_frames // 3
-            if self.countdown > seg*2: return "3"
-            elif self.countdown > seg: return "2"
-            else:                      return "1"
-        if self.state == self.GO:       return "GO!"
-        return None
+    def stomp(self):
+        self.squish_timer = 12
 
-    def draw(self, surface, camera):
-        if self.state == self.FALLING and self.rect.top > DEATH_Y: return
-        sr = camera.apply(self.rect)
-        if sr.right < -10 or sr.left > SCREEN_WIDTH + 10: return
+    def kill(self):
+        self.alive = False
+        self.death_timer = 1
 
-        pulse = abs(math.sin(self.tick * 0.15))
-        if self.state == self.COUNTING:
-            col = lerp_color(COUNTDOWN_COL, WHITE, pulse * 0.4)
-        elif self.state == self.GO:
-            col = lerp_color((30,180,80), GOLD, pulse)
-        elif self.state == self.FALLING:
-            col = lerp_color(RED, (80,20,20), pulse)
-        else:
-            col = COUNTDOWN_COL
+    def check_collision(self, player):
+        if not self.alive or self.squish_timer > 0 or not player.alive:
+            return None
+        if not self.rect.colliderect(player.rect):
+            return None
+        if player.vel_y > 0 and player.rect.bottom <= self.rect.centery + 8:
+            return "stomp"
+        return "kill_player"
 
-        pygame.draw.rect(surface, col, sr)
-        pygame.draw.rect(surface, SNOW_WHITE, (sr.x, sr.y, sr.width, 5))
-
-        txt = self.current_display()
-        if txt:
-            f  = pygame.font.SysFont("consolas", 52, bold=True)
-            tc = lerp_color(GOLD, WHITE, pulse) if txt=="GO!" else lerp_color(RED, YELLOW, pulse)
-            t  = f.render(txt, True, tc)
-            surface.blit(t, (sr.centerx - t.get_width()//2, sr.y - 70))
-
-        if self.state == self.GO and self.grace > 0:
-            bar_w = int(sr.width * self.grace / self.grace_frames)
-            bar_y = sr.y - 12
-            pygame.draw.rect(surface, DARK_GRAY, (sr.x, bar_y, sr.width, 6))
-            pygame.draw.rect(surface,
-                             lerp_color(RED, (50,220,80), self.grace/self.grace_frames),
-                             (sr.x, bar_y, bar_w, 6))
-
-
-class CountdownTargetPlatform(Platform):
-    def __init__(self, x, y, w, h, owner):
-        super().__init__(x, y, w, h, PINE_GREEN)
-        self.owner      = owner
-        self.section_cp = None
-        self.landed     = False
-
-    def is_active(self):
-        if self.landed: return True
-        return self.owner.target_visible()
-
-    def on_countdown_reset(self):
-        pass  # landing flag keeps it solid
-
-    def on_player_land(self, player):
-        self.landed = True
-        if self.section_cp is not None:
-            self.section_cp.activate_direct(player)
-
-    def draw(self, surface, camera):
-        if not self.is_active():
-            sr = camera.apply(self.rect)
-            if sr.right < -10 or sr.left > SCREEN_WIDTH + 10: return
-            s = pygame.Surface((sr.width, sr.height), pygame.SRCALPHA)
-            s.fill((COUNTDOWN_COL[0], COUNTDOWN_COL[1], COUNTDOWN_COL[2], 40))
-            surface.blit(s, (sr.x, sr.y))
+    def draw(self, surface, camera, tick):
+        if not self.alive:
             return
-        if self.landed:
-            sr = camera.apply(self.rect)
-            if sr.right < -10 or sr.left > SCREEN_WIDTH + 10: return
-            pygame.draw.rect(surface, lerp_color(PINE_GREEN, GOLD, 0.25), sr)
-            pygame.draw.rect(surface, SNOW_WHITE, (sr.x, sr.y, sr.width, 5))
-        else:
-            super().draw(surface, camera)
-
-# ---------------------------------------------------------------------------
-# OBSTACLE 2 — Zigzag Floating Ledges
-# ---------------------------------------------------------------------------
-PH = 28   # platform height constant used throughout
-
-class ZigzagLedge(Platform):
-    LEDGE_W = 70
-    LEDGE_H = 14
-
-    def __init__(self, x, y, side, owner_climb, step_index, ledge_w=None):
-        col = LEDGE_L_COL if side == "LEFT" else LEDGE_R_COL
-        w = ledge_w if ledge_w is not None else self.LEDGE_W
-        super().__init__(x, y, w, self.LEDGE_H, col)
-        self.side        = side
-        self.owner_climb = owner_climb
-        self.step_index  = step_index
-        self.flash       = 0
-        self.done        = False
-
-    def on_player_land(self, player):
-        result = self.owner_climb.register_landing(self.step_index)
-        self.flash = 12
-        self.done  = True
-
-    def update(self):
-        if self.flash > 0:   self.flash -= 1
-        elif self.flash < 0: self.flash += 1
-
-    def draw(self, surface, camera):
         sr = camera.apply(self.rect)
-        if sr.right < -10 or sr.left > SCREEN_WIDTH + 10: return
-
-        base_col = lerp_color(self.color, PINE_GREEN, 0.55) if self.done else self.color
-        if self.flash > 0:
-            col = lerp_color(base_col, WHITE, self.flash/12)
-        elif self.flash < 0:
-            col = lerp_color(base_col, RED, abs(self.flash)/20)
-        else:
-            col = base_col
-
-        pygame.draw.rect(surface, col, sr)
-        pygame.draw.rect(surface, SNOW_WHITE, (sr.x, sr.y, sr.width, 4))
-
-        f = pygame.font.SysFont("consolas", 10, bold=True)
-        n = f.render(str(self.step_index+1), True, WHITE)
-        surface.blit(n, (sr.centerx - n.get_width()//2, sr.y - 14))
-
-
-class ZigzagClimbSection:
-    def __init__(self):
-        self.total_steps  = WALL_STEPS * 2
-        self.top_index    = self.total_steps - 1
-        self.highest_hit  = -1
-        self.unlocked     = False
-        self.started      = False
-
-    def register_landing(self, step_index):
-        if self.unlocked: return "already_done"
-        self.started = True
-        if step_index > self.highest_hit:
-            self.highest_hit = step_index
-        if step_index == self.top_index:
-            self.unlocked = True
-        return "hit"
-
-    def progress_text(self):
-        if self.unlocked:    return "CLIMB COMPLETE!  Jump to exit →"
-        if not self.started: return "Zigzag up! Reach the TOP ledge (10)"
-        remaining = self.top_index - self.highest_hit
-        return f"Reached {self.highest_hit+1}/10 — {remaining} more to go!"
-
-
-class ZigzagExitPlatform(Platform):
-    def __init__(self, x, y, w, h, owner):
-        super().__init__(x, y, w, h, PINE_GREEN)
-        self.owner = owner
-
-    def is_active(self): return self.owner.unlocked
-
-    def draw(self, surface, camera):
-        if not self.is_active():
-            sr = camera.apply(self.rect)
-            if sr.right < -10 or sr.left > SCREEN_WIDTH + 10: return
-            s = pygame.Surface((sr.width, sr.height), pygame.SRCALPHA)
-            s.fill((LEDGE_R_COL[0], LEDGE_R_COL[1], LEDGE_R_COL[2], 60))
-            surface.blit(s, (sr.x, sr.y))
+        if sr.right < -10 or sr.left > SCREEN_WIDTH + 10:
             return
-        super().draw(surface, camera)
-
-
-def build_zigzag_section(base_x, base_y, ledge_w=70):
-    climb = ZigzagClimbSection()
-    plats = []
-
-    right_x = base_x + LEDGE_GAP
-    left_x  = base_x
-
-    step = 0
-    for i in range(WALL_STEPS):
-        r_y = base_y - i * LEDGE_RISE
-        r_ledge = ZigzagLedge(right_x, r_y, "RIGHT", climb, step, ledge_w)
-        plats.append(r_ledge)
-        step += 1
-
-        l_y = base_y - i * LEDGE_RISE - LEDGE_RISE // 2
-        l_ledge = ZigzagLedge(left_x, l_y, "LEFT", climb, step, ledge_w)
-        plats.append(l_ledge)
-        step += 1
-
-    highest_left_y = base_y - (WALL_STEPS - 1) * LEDGE_RISE - LEDGE_RISE // 2
-    exit_y   = highest_left_y - 70 - PH
-    exit_x   = right_x - 20
-    exit_plat = ZigzagExitPlatform(exit_x, exit_y, 220, PH, owner=climb)
-    plats.append(exit_plat)
-
-    return plats, climb, exit_plat
-
-# ---------------------------------------------------------------------------
-# OBSTACLE 3 — Tram + Santa Sleigh
-# ---------------------------------------------------------------------------
-class TramPlatform(Platform):
-    FALL_SPEED = 0.5
-    MAX_FALL   = 14
-
-    def __init__(self, x, y, w, h, speed=3, vanish_x=None):
-        super().__init__(x,y,w,h,MOVING_COL)
-        self.speed      = speed
-        self.moving     = False
-        self.origin_x   = x
-        self.origin_y   = y
-        self.vanish_x   = vanish_x
-        self.dx         = 0
-        self.falling    = False
-        self.fall_vy    = 0.0
-        self.gone       = False
-        self.warn_flash = 0
-
-    def on_player_land(self, player):
-        if not self.falling and not self.gone:
-            self.moving = True
-
-    def is_active(self):
-        return not self.gone
-
-    def reset(self):
-        self.rect.x   = self.origin_x
-        self.rect.y   = self.origin_y
-        self.moving   = False
-        self.falling  = False
-        self.gone     = False
-        self.fall_vy  = 0.0
-        self.dx       = 0
-        self.warn_flash = 0
-
-    def update(self):
-        if self.gone:
-            self.dx = 0; return
-        if self.falling:
-            self.dx       = 0
-            self.fall_vy  = min(self.fall_vy + self.FALL_SPEED, self.MAX_FALL)
-            self.rect.y  += int(self.fall_vy)
-            if self.rect.top > DEATH_Y + 200:
-                self.gone = True
+        if self.squish_timer > 0:
+            flat = pygame.Rect(sr.x - 4, sr.bottom - 8, sr.width + 8, 8)
+            pygame.draw.rect(surface, BROWN, flat)
+            pygame.draw.ellipse(surface, MUSHROOM_RED, (flat.x, flat.y - 4, flat.width, 8))
             return
-        if self.moving:
-            if self.vanish_x is not None and self.rect.x >= self.vanish_x:
-                self.falling  = True
-                self.fall_vy  = 0.0
-                self.dx       = 0
-            else:
-                self.rect.x  += self.speed
-                self.dx       = self.speed
-                if self.vanish_x is not None:
-                    dist = self.vanish_x - self.rect.x
-                    if dist < 120:
-                        self.warn_flash = (self.warn_flash + 1) % 12
-        else:
-            self.dx = 0
+        bob = int(math.sin(self.tick * 0.2) * 1.5)
+        # Stem
+        pygame.draw.rect(surface, BROWN, (sr.x + 4, sr.centery + bob, sr.width - 8, sr.height // 2))
+        # Cap
+        cr = pygame.Rect(sr.x - 2, sr.y + bob, sr.width + 4, sr.height // 2 + 4)
+        pygame.draw.ellipse(surface, MUSHROOM_RED, cr)
+        # Spots
+        for sx2, sy2, r2 in [(cr.x + 6, cr.y + 5, 3), (cr.right - 8, cr.y + 4, 3), (cr.centerx, cr.y + 2, 2)]:
+            pygame.draw.circle(surface, WHITE, (sx2, sy2 + bob), r2)
+        # Feet
+        pygame.draw.ellipse(surface, (100, 65, 30), (sr.x + 2, sr.bottom + bob - 4, 8, 5))
+        pygame.draw.ellipse(surface, (100, 65, 30), (sr.right - 10, sr.bottom + bob - 4, 8, 5))
+        # Eyes
+        ey2 = sr.centery - 2 + bob
+        po = 1 if self.direction > 0 else -1
+        for ex2 in [sr.centerx - 6, sr.centerx + 6]:
+            pygame.draw.circle(surface, WHITE, (ex2, ey2), 4)
+            pygame.draw.circle(surface, BLACK, (ex2 + po, ey2 + 1), 2)
 
-    def draw(self, surface, camera):
-        if self.gone: return
-        sr = camera.apply(self.rect)
-        if sr.right < -10 or sr.left > SCREEN_WIDTH + 10: return
-        if self.vanish_x is not None and self.moving and not self.falling:
-            dist = self.vanish_x - self.rect.x
-            if dist < 120:
-                warn_t = 1.0 - dist / 120
-                col = lerp_color(MOVING_COL, RED, warn_t)
-            else:
-                col = MOVING_COL
-        else:
-            col = MOVING_COL
-        pygame.draw.rect(surface, col, sr)
-        for i in range(3):
-            lx = sr.x + 15 + i * (sr.width // 3 - 5)
-            pygame.draw.line(surface, SLEIGH_GOLD, (lx, sr.y+4), (lx, sr.bottom-4), 2)
-        pygame.draw.rect(surface, SNOW_WHITE, (sr.x, sr.y, sr.width, 5))
-        pygame.draw.rect(surface, SLEIGH_GOLD, sr, 2)
-        if self.moving and not self.falling:
-            f = pygame.font.SysFont("consolas", 14, bold=True)
-            if self.vanish_x is not None and self.vanish_x - self.rect.x < 200:
-                t = f.render("JUMP TO SLEIGH!", True, RED)
-            else:
-                t = f.render("RIDE THE TRAM", True, GOLD)
-            surface.blit(t, (sr.centerx - t.get_width()//2, sr.y - 22))
-
-
-class SantaSleigh:
-    WIDTH  = 160
-    HEIGHT = 30
-
-    def __init__(self, portal_x, portal_y, tram,
-                 rope_len=130, rope_grab_r=14,
-                 hover_timeout=300, kidnap_dist=250):
-        self.tram          = tram
-        self.portal_x      = portal_x
-        self.portal_y      = portal_y
-        self.ROPE_LEN      = rope_len
-        self.ROPE_W        = rope_grab_r
-        self.HOVER_TIMEOUT = hover_timeout
-        self.KIDNAP_DIST   = kidnap_dist
-        self.wx            = float(SCREEN_WIDTH + 400)
-        self.wy            = float(-200)
-        self.rect          = pygame.Rect(int(self.wx), int(self.wy), self.WIDTH, self.HEIGHT)
-        self.state         = "waiting"
-        self.tick          = 0
-        self.hover_tick    = 0
-        self.player_grabbed= False
-        self.carry_tick    = 0
-
-    def rope_tip_world(self):
-        cx = int(self.wx + self.WIDTH // 2)
-        cy = int(self.wy + self.HEIGHT + self.ROPE_LEN)
-        return cx, cy
-
-    def rope_grab_rect(self):
-        rope_top_x = int(self.wx + self.WIDTH // 2)
-        rope_top_y = int(self.wy + self.HEIGHT)
-        w = max(30, self.ROPE_W * 2)
-        return pygame.Rect(rope_top_x - w // 2, rope_top_y, w, self.ROPE_LEN)
-
-    def reset(self):
-        self.wx             = float(SCREEN_WIDTH + 400)
-        self.wy             = float(-200)
-        self.rect.x         = int(self.wx)
-        self.rect.y         = int(self.wy)
-        self.state          = "waiting"
-        self.tick           = 0
-        self.hover_tick     = 0
-        self.player_grabbed = False
-        self.carry_tick     = 0
-
-    def start(self, tram_rect):
-        self.wx    = float(tram_rect.centerx + 500)
-        self.wy    = float(tram_rect.top - 380)
-        self.state = "flying_in"
-
-    def update(self, player):
-        self.tick += 1
-        tr = self.tram.rect
-
-        if self.state == "flying_in":
-            tx = float(tr.centerx - self.WIDTH // 2)
-            ty = float(tr.top - 260)
-            self.wx += (tx - self.wx) * 0.06
-            self.wy += (ty - self.wy) * 0.06
-            if abs(self.wx - tx) < 10 and abs(self.wy - ty) < 10:
-                self.state      = "hovering"
-                self.hover_tick = 0
-
-        elif self.state == "hovering":
-            if not self.tram.falling and not self.tram.gone:
-                tx = float(tr.centerx - self.WIDTH // 2)
-                ty = float(tr.top - 260) + math.sin(self.tick * 0.07) * 8
-                self.wx += (tx - self.wx) * 0.12
-                self.wy += (ty - self.wy) * 0.10
-            else:
-                self.wy += math.sin(self.tick * 0.09) * 0.6
-
-            self.hover_tick += 1
-
-            if player.alive and not self.player_grabbed:
-                grip = self.rope_grab_rect()
-                if player.rect.colliderect(grip):
-                    self.player_grabbed = True
-                    self.state          = "carrying"
-                    self.carry_tick     = 0
-                    player.riding_platform = None
-
-            if self.hover_tick >= self.HOVER_TIMEOUT:
-                self.state = "kidnapping"
-
-        elif self.state == "carrying":
-            self.carry_tick += 1
-            self.wx += 5
-            self.wy += math.sin(self.tick * 0.05) * 0.4
-
-            if player.alive:
-                cx, cy = self.rope_tip_world()
-                player.rect.centerx = cx
-                player.rect.bottom  = cy + player.HEIGHT // 2
-                player.vel_x        = 0
-                player.vel_y        = 0
-                player.on_ground    = False
-
-                keys = pygame.key.get_pressed()
-                if self.carry_tick > 10 and (
-                        keys[pygame.K_SPACE] or keys[pygame.K_UP] or keys[pygame.K_w]):
-                    self.player_grabbed = False
-                    self.state          = "done"
-                    player.vel_x = 7
-                    player.vel_y = -10
-
-            if self.state == "carrying" and self.wx > self.portal_x + self.KIDNAP_DIST:
-                self.state = "kidnapping"
-
-        elif self.state == "kidnapping":
-            self.wx += 16
-            self.wy -= 6
-            if player.alive and self.player_grabbed:
-                cx, cy = self.rope_tip_world()
-                player.rect.centerx = cx
-                player.rect.bottom  = cy + player.HEIGHT // 2
-                player.vel_x = 0; player.vel_y = 0
-            if self.wx > self.portal_x + 900:
-                result = "kill_player" if self.player_grabbed else None
-                self.player_grabbed = False
-                self.state = "done"
-                return result
-
-        self.rect.x = int(self.wx)
-        self.rect.y = int(self.wy)
-        return None
-
-    def draw(self, surface, camera):
-        if self.state in ("waiting", "done"): return
-
-        sr = camera.apply(self.rect)
-        if -200 < sr.x < SCREEN_WIDTH + 200:
-            pygame.draw.rect(surface, SLEIGH_BROWN, sr)
-            pygame.draw.rect(surface, SLEIGH_GOLD, sr, 2)
-            for side in (sr.x + 8, sr.right - 18):
-                pygame.draw.arc(surface, SLEIGH_GOLD,
-                                (side, sr.bottom-4, 10, 8), 0, math.pi, 2)
-            hx = sr.centerx - 12; hy = sr.y - 28
-            pygame.draw.rect(surface, SANTA_RED,       (hx,    hy+10, 24, 18))
-            pygame.draw.rect(surface, (50, 30, 10),    (hx,    hy+18, 24,  4))
-            pygame.draw.rect(surface, SLEIGH_GOLD,     (hx+9,  hy+17,  6,  6))
-            pygame.draw.rect(surface, (240, 200, 160), (hx+4,  hy,    16, 12))
-            pygame.draw.rect(surface, SANTA_RED,       (hx+4,  hy-8,  16, 10))
-            pygame.draw.rect(surface, WHITE,           (hx+2,  hy-1,  20,  4))
-            pygame.draw.circle(surface, WHITE, (hx+20, hy-8), 3)
-            pygame.draw.rect(surface, WHITE,   (hx+2,  hy+6,  20,  8))
-
-        cx_w, cy_w = self.rope_tip_world()
-        rp_top = camera.apply(pygame.Rect(int(self.wx + self.WIDTH//2), int(self.wy + self.HEIGHT), 1, 1))
-        rp_bot = camera.apply(pygame.Rect(cx_w, cy_w, 1, 1))
-
-        pygame.draw.line(surface, (180, 120, 60),
-                         (rp_top.x, rp_top.y), (rp_bot.x, rp_bot.y), 3)
-        pulse = int(4 + abs(math.sin(self.tick * 0.15)) * 4)
-        ring_col = (GOLD if self.state == "hovering" else
-                    (100, 220, 100) if self.state == "carrying" else RED)
-        pygame.draw.circle(surface, ring_col, (rp_bot.x, rp_bot.y), pulse + 4)
-        pygame.draw.circle(surface, WHITE,    (rp_bot.x, rp_bot.y), pulse + 4, 2)
-
-        if self.state == "hovering" and not self.player_grabbed:
-            f = pygame.font.SysFont("consolas", 13, bold=True)
-            t = f.render("JUMP TO GRAB ROPE!", True, GOLD)
-            surface.blit(t, (rp_bot.x - t.get_width()//2, rp_bot.y - 28))
-            if self.hover_tick > self.HOVER_TIMEOUT // 2:
-                ratio = 1 - self.hover_tick / self.HOVER_TIMEOUT
-                bx, by = sr.x, sr.y - 12
-                pygame.draw.rect(surface, DARK_GRAY, (bx, by, sr.width, 6))
-                pygame.draw.rect(surface, RED,       (bx, by, int(sr.width * ratio), 6))
-        elif self.state == "carrying":
-            f = pygame.font.SysFont("consolas", 13, bold=True)
-            t = f.render("JUMP to release at portal!", True, (100, 255, 100))
-            surface.blit(t, (rp_bot.x - t.get_width()//2, rp_bot.y - 28))
-        elif self.state == "kidnapping":
-            f = pygame.font.SysFont("consolas", 14, bold=True)
-            t = f.render("HO HO HO! BYE BYE!", True, RED)
-            surface.blit(t, (sr.centerx - t.get_width()//2, sr.y - 50))
 
 # ---------------------------------------------------------------------------
-# Spike Trap
+# Santa Boss
 # ---------------------------------------------------------------------------
-class SpikeTrap:
-    SPIKE_W=14; SPIKE_H=22
-    def __init__(self,x,y,count):
-        self.x=x; self.y=y; self.count=count
-        self.rect=pygame.Rect(x,y-self.SPIKE_H,count*self.SPIKE_W,self.SPIKE_H)
-    def check_kill(self,player): return player.alive and self.rect.colliderect(player.rect)
-    def draw(self,surface,camera):
-        for i in range(self.count):
-            sx=self.x+i*self.SPIKE_W
-            pos=camera.apply(pygame.Rect(sx,self.y-self.SPIKE_H,self.SPIKE_W,self.SPIKE_H))
-            tip=(pos.x+pos.width//2,pos.y)
-            pygame.draw.polygon(surface,SPIKE_GRAY,[tip,(pos.x,pos.bottom),(pos.right,pos.bottom)])
-            pygame.draw.polygon(surface,WHITE,[tip,(pos.x,pos.bottom),(pos.right,pos.bottom)],1)
-            pygame.draw.circle(surface,RED,tip,3)
+class SantaBoss:
+    WIDTH, HEIGHT = 80, 80
+    DAMAGE_STAGES = [10, 7, 5, 3, 1]  # hp thresholds for visual stages
 
-# ---------------------------------------------------------------------------
-# Balloon
-# ---------------------------------------------------------------------------
-class Balloon:
-    RADIUS=14; STRING_LEN=30
-    def __init__(self,x,y,launch_vx=9,launch_vy=-11,radius=14):
-        self.x=float(x); self.y=float(y)
-        self.RADIUS=radius
-        self.launch_vx=launch_vx; self.launch_vy=launch_vy
-        self.grabbed=False; self.rc=0; self.tick=0
-        self.rect=pygame.Rect(int(x)-self.RADIUS,int(y)-self.RADIUS,self.RADIUS*2,self.RADIUS*2)
-    def update(self):
-        self.tick+=1
-        if self.grabbed:
-            self.rc+=1
-            if self.rc>=360: self.grabbed=False; self.rc=0
-        self.rect.centery=int(self.y+math.sin(self.tick*0.06)*8)
-        self.rect.centerx=int(self.x)
-    def check_grab(self,player):
-        if self.grabbed or not player.alive: return False
-        if self.rect.colliderect(player.rect):
-            self.grabbed=True; self.rc=0
-            player.vel_x=self.launch_vx; player.vel_y=self.launch_vy
-            player.on_ground=False; return True
+    def __init__(self, x, y):
+        self.rect = pygame.Rect(x, y, self.WIDTH, self.HEIGHT)
+        self.hp = SANTA_MAX_HP
+        self.max_hp = SANTA_MAX_HP
+        self.alive = True
+        self.dead = False
+        self.death_timer = 0
+        self.explosion_timer = 0
+        self.invincibility = 0  # frames after being hit
+        self.balloon_cooldown = 0
+        self.tick = 0
+        # Movement
+        self.vx = 1.8
+        self.base_y = float(y)
+        self.descent = 0.0  # total descent over fight
+        self.appeared = False
+        self.appear_timer = 0
+        # Gift drop
+        self.gift_dropped = False
+        self.gift = None
+
+    def hit(self):
+        if self.invincibility > 0 or self.dead:
+            return False
+        self.hp -= 1
+        self.invincibility = 20
+        if self.hp <= 0:
+            self.dead = True
+            self.explosion_timer = 60
+            return True
         return False
-    def draw(self,surface,camera,tick):
-        if self.grabbed: return
-        bob=int(math.sin(self.tick*0.06)*8)
-        cx,cy=int(self.x),int(self.y)+bob
-        pos=camera.apply(pygame.Rect(cx,cy,1,1)); sx,sy=pos.x,pos.y
-        if sx<-40 or sx>SCREEN_WIDTH+40: return
-        r=self.RADIUS; pulse=abs(math.sin(self.tick*0.08))*0.5+0.5
-        pygame.draw.circle(surface,(80,10,20),(sx,sy),r+int(8*pulse),3)
-        pygame.draw.circle(surface,BALLOON_RED,(sx,sy),r)
-        pygame.draw.circle(surface,BALLOON_PINK,(sx-r//3,sy-r//3),r//3)
-        pygame.draw.circle(surface,CANDY_RED,(sx,sy+r),3)
-        pygame.draw.line(surface,GOLD,(sx,sy+r+3),(sx+int(math.sin(self.tick*0.04)*4),sy+r+self.STRING_LEN),1)
-        for k in range(4):
-            a=self.tick*0.08+k*math.pi/2
-            dx=int(math.cos(a)*(r+10)); dy=int(math.sin(a)*(r+10))
-            pygame.draw.rect(surface,rainbow_color(tick+k*20,0.2),(sx+dx-2,sy+dy-2,4,4))
+
+    def update(self, player_x, player_y, platforms, balloons):
+        if not self.alive:
+            return
+        self.tick += 1
+        if self.invincibility > 0:
+            self.invincibility -= 1
+
+        if self.dead:
+            self.explosion_timer -= 1
+            if self.explosion_timer <= 0:
+                self.alive = False
+                # Drop gift
+                if not self.gift_dropped:
+                    self.gift_dropped = True
+                    self.gift = GiftPickup(self.rect.centerx, self.rect.centery)
+            return
+
+        # Appear from right edge
+        if not self.appeared:
+            self.appear_timer += 1
+            self.rect.x -= 2
+            if self.rect.x < player_x + 300:
+                self.appeared = True
+            return
+
+        # Side-to-side movement
+        self.rect.x += int(self.vx)
+        # Bounce off world edges (wide range)
+        if self.rect.x > player_x + 500:
+            self.vx = -abs(self.vx)
+        elif self.rect.x < player_x - 300:
+            self.vx = abs(self.vx)
+
+        # Gradual descent: total 200px over full fight
+        progress = 1.0 - self.hp / self.max_hp
+        target_descent = progress * 200
+        if self.descent < target_descent:
+            self.descent += 0.4
+        self.rect.y = int(self.base_y + self.descent + math.sin(self.tick * 0.03) * 12)
+
+        # Throw balloons
+        self.balloon_cooldown -= 1
+        # Shoot faster as hp drops
+        interval = max(50, SANTA_BALLOON_INTERVAL - int((1.0 - progress) * 0) - int(progress * 60))
+        if self.balloon_cooldown <= 0 and self.appeared:
+            self.balloon_cooldown = interval
+            balloons.append(WaterBalloon(
+                self.rect.centerx, self.rect.bottom,
+                player_x, player_y))
+
+    def draw(self, surface, camera, tick):
+        if not self.alive:
+            return
+        sr = camera.apply(self.rect)
+        if sr.right < -20 or sr.left > SCREEN_WIDTH + 20:
+            return
+
+        # Explosion effect
+        if self.dead:
+            prog = 1.0 - self.explosion_timer / 60
+            for i in range(3):
+                er = int((40 + i * 30) * prog)
+                ec = [FIRE_ORANGE, FIRE_RED, FIRE_YELLOW][i]
+                ea = max(0, int(255 * (1 - prog)))
+                if er > 0:
+                    pygame.draw.circle(surface, tuple(max(0, min(255, int(c * ea / 255))) for c in ec),
+                                       (sr.centerx, sr.centery), er)
+            if self.explosion_timer > 30:
+                pygame.draw.circle(surface, WHITE, (sr.centerx, sr.centery), int(20 * prog))
+            return
+
+        # Damage stage: visual degradation
+        damage_stage = 0
+        for i, threshold in enumerate(self.DAMAGE_STAGES):
+            if self.hp <= threshold:
+                damage_stage = i + 1
+
+        # Invincibility flicker
+        if self.invincibility > 0 and (self.invincibility // 3) % 2 == 0:
+            return
+
+        cx, cy = sr.centerx, sr.centery
+
+        # ── Balloon vessel ──
+        # Balloon string
+        string_sway = int(math.sin(self.tick * 0.04) * 6)
+        balloon_cx = cx + string_sway
+        balloon_cy = cy - 40
+
+        # Balloon (gets more torn per stage)
+        balloon_r = 32
+        balloon_c = lerp_color(BALLOON_BLUE, (160, 80, 80), damage_stage / 5)
+        pygame.draw.circle(surface, balloon_c, (balloon_cx, balloon_cy), balloon_r)
+        pygame.draw.circle(surface, tuple(min(255, v + 40) for v in balloon_c),
+                           (balloon_cx - 8, balloon_cy - 10), 10)
+
+        # Damage cracks on balloon
+        if damage_stage >= 1:
+            for i in range(damage_stage * 2):
+                a = i * math.pi / damage_stage + self.tick * 0.01
+                x1 = balloon_cx + int(math.cos(a) * 18)
+                y1 = balloon_cy + int(math.sin(a) * 18)
+                x2 = balloon_cx + int(math.cos(a + 0.3) * (balloon_r - 2))
+                y2 = balloon_cy + int(math.sin(a + 0.3) * (balloon_r - 2))
+                pygame.draw.line(surface, (100, 60, 60), (x1, y1), (x2, y2), 1)
+
+        # String from balloon to Santa
+        for i in range(8):
+            t = i / 7
+            sx = balloon_cx + int((cx - balloon_cx) * t) + int(math.sin(t * math.pi + self.tick * 0.05) * 3)
+            sy = balloon_cy + int((cy - 28 - balloon_cy) * t)
+            pygame.draw.circle(surface, (180, 180, 200), (sx, sy), 1)
+
+        # ── Santa body ──
+        body_r = pygame.Rect(cx - 22, cy - 20, 44, 44)
+        santa_c = lerp_color(SANTA_RED, (120, 40, 40), damage_stage / 5)
+        pygame.draw.ellipse(surface, santa_c, body_r)
+
+        # Belt
+        pygame.draw.rect(surface, BLACK, (cx - 22, cy + 2, 44, 5))
+        pygame.draw.rect(surface, XMAS_GOLD, (cx - 6, cy, 12, 8))
+
+        # White trim
+        pygame.draw.ellipse(surface, SANTA_WHITE, (cx - 23, cy - 23, 46, 14))
+        pygame.draw.ellipse(surface, SANTA_WHITE, (cx - 24, cy + 18, 48, 12))
+
+        # Head
+        pygame.draw.circle(surface, (220, 180, 155), (cx, cy - 28), 14)
+        # Hat
+        pygame.draw.polygon(surface, santa_c,
+                            [(cx - 14, cy - 28), (cx + 14, cy - 28), (cx + 6, cy - 50), (cx - 4, cy - 50)])
+        pygame.draw.rect(surface, SANTA_WHITE, (cx - 15, cy - 32, 30, 7))
+        pygame.draw.circle(surface, SANTA_WHITE, (cx + 4, cy - 50), 4)
+
+        # Eyes (angry on low hp)
+        if damage_stage >= 3:
+            pygame.draw.line(surface, BLACK, (cx - 8, cy - 32), (cx - 4, cy - 30), 2)
+            pygame.draw.line(surface, BLACK, (cx + 8, cy - 32), (cx + 4, cy - 30), 2)
+        pygame.draw.circle(surface, BLACK, (cx - 5, cy - 28), 2)
+        pygame.draw.circle(surface, BLACK, (cx + 5, cy - 28), 2)
+
+        # Arms (holding a balloon sack)
+        pygame.draw.line(surface, santa_c, (cx - 22, cy - 4), (cx - 38, cy + 10), 5)
+        pygame.draw.line(surface, santa_c, (cx + 22, cy - 4), (cx + 38, cy + 10), 5)
+        pygame.draw.circle(surface, BALLOON_BLUE, (cx + 40, cy + 12), 8)
+
+        # HP bar above Santa
+        bar_w = 90
+        bar_x = cx - bar_w // 2
+        bar_y = sr.y - 26
+        pygame.draw.rect(surface, (40, 40, 40), (bar_x - 2, bar_y - 2, bar_w + 4, 14))
+        ratio = self.hp / self.max_hp
+        bar_c = lerp_color(FIRE_RED, GRASS_GREEN, ratio)
+        pygame.draw.rect(surface, bar_c, (bar_x, bar_y, int(bar_w * ratio), 10))
+        pygame.draw.rect(surface, WHITE, (bar_x, bar_y, bar_w, 10), 1)
+        hp_f = pygame.font.Font(TITLE_FONT_PATH,9)
+        hp_t = hp_f.render(f"SANTA {self.hp}/{self.max_hp}", True, WHITE)
+        surface.blit(hp_t, (cx - hp_t.get_width() // 2, bar_y - 1))
+
 
 # ---------------------------------------------------------------------------
-# Portal
+# Gift Power-up (dropped by Santa)
 # ---------------------------------------------------------------------------
-class Portal:
-    def __init__(self,x,y):
-        self.rect=pygame.Rect(x,y,56,80); self.pulse=0
-    def update(self): self.pulse=(self.pulse+3)%360
-    def check(self,player): return player.alive and player.rect.colliderect(self.rect)
-    def draw(self,surface,camera):
-        sr=camera.apply(self.rect)
-        p=abs(math.sin(math.radians(self.pulse)))
-        pygame.draw.ellipse(surface,lerp_color(PORTAL_BLUE,PORTAL_CYAN,p),sr.inflate(14,14),5)
-        pygame.draw.ellipse(surface,lerp_color((0,20,40),(0,60,80),p),sr.inflate(-8,-8))
-        for k in range(6):
-            ang=math.radians(self.pulse+k*60)
-            x1=sr.centerx+int(math.cos(ang)*10); y1=sr.centery+int(math.sin(ang)*10)
-            x2=sr.centerx+int(math.cos(ang)*24); y2=sr.centery+int(math.sin(ang)*24)
-            pygame.draw.line(surface,lerp_color(PORTAL_CYAN,WHITE,p),(x1,y1),(x2,y2),2)
-        f=pygame.font.SysFont("consolas",12,bold=True); lbl=f.render("PORTAL",True,WHITE)
-        surface.blit(lbl,(sr.x+sr.width//2-lbl.get_width()//2,sr.y-18))
+class GiftPickup:
+    def __init__(self, x, y):
+        self.x = float(x)
+        self.y = float(y)
+        self.vy = -3.0
+        self.on_ground = False
+        self.collected = False
+        self.tick = 0
+        self.rect = pygame.Rect(int(x) - 14, int(y) - 14, 28, 28)
+
+    def update(self, platforms):
+        self.tick += 1
+        if not self.on_ground:
+            self.vy += 0.3
+            self.y += self.vy
+            self.rect.y = int(self.y) - 14
+            for plat in platforms:
+                if plat.is_active() and self.rect.colliderect(plat.get_rect()):
+                    self.rect.bottom = plat.get_rect().top
+                    self.y = float(self.rect.y + 14)
+                    self.vy = 0
+                    self.on_ground = True
+                    break
+
+    def check(self, player):
+        if self.collected or not player.alive:
+            return False
+        if self.rect.colliderect(player.rect):
+            self.collected = True
+            return True
+        return False
+
+    def draw(self, surface, camera, tick):
+        if self.collected:
+            return
+        bob = math.sin(self.tick * 0.08) * 4 if self.on_ground else 0
+        sr = camera.apply(pygame.Rect(int(self.x) - 14, int(self.y - bob) - 14, 28, 28))
+        # Gift box
+        pygame.draw.rect(surface, GIFT_RED, sr, border_radius=3)
+        pygame.draw.rect(surface, GIFT_GREEN, (sr.x, sr.centery - 3, sr.width, 6))
+        pygame.draw.rect(surface, GIFT_GREEN, (sr.centerx - 3, sr.y, 6, sr.height))
+        # Bow
+        pygame.draw.circle(surface, GIFT_GOLD, (sr.centerx - 5, sr.y), 4)
+        pygame.draw.circle(surface, GIFT_GOLD, (sr.centerx + 5, sr.y), 4)
+        pygame.draw.circle(surface, WHITE, (sr.centerx, sr.y), 3)
+        # Glow
+        glow_a = int(abs(math.sin(self.tick * 0.1)) * 80 + 40)
+        gs = pygame.Surface((50, 50), pygame.SRCALPHA)
+        pygame.draw.circle(gs, (*HOLY_GOLD, glow_a), (25, 25), 25)
+        surface.blit(gs, (sr.centerx - 25, sr.centery - 25))
+        # Label
+        font = pygame.font.Font(TITLE_FONT_PATH,10)
+        lbl = font.render("POWER GIFT!", True, HOLY_GOLD)
+        surface.blit(lbl, (sr.centerx - lbl.get_width() // 2, sr.y - 16))
+
 
 # ---------------------------------------------------------------------------
-# Snowflake
-# ---------------------------------------------------------------------------
-class Snowflake:
-    def __init__(self): self.reset()
-    def reset(self):
-        self.x=random.randint(0,SCREEN_WIDTH); self.y=random.randint(-20,SCREEN_HEIGHT)
-        self.speed=random.uniform(0.5,2); self.drift=random.uniform(-0.3,0.3)
-        self.size=random.randint(2,5); self.alpha=random.randint(120,220)
-    def update(self):
-        self.y+=self.speed; self.x+=self.drift
-        if self.y>SCREEN_HEIGHT+10: self.reset(); self.y=-10
-    def draw(self,surf):
-        c=tuple(min(255,int(SNOW_WHITE[i]*self.alpha/255)) for i in range(3))
-        pygame.draw.circle(surf,c,(int(self.x),int(self.y)),self.size)
-
-# ---------------------------------------------------------------------------
-# Player
+# Player (Archer)
 # ---------------------------------------------------------------------------
 class Player:
     WIDTH, HEIGHT = 28, 36
 
-    def __init__(self, x, y, move_speed=MOVE_SPEED, jump_velocity=JUMP_VELOCITY):
-        self.rect=pygame.Rect(x,y,self.WIDTH,self.HEIGHT)
-        self.vel_x=self.vel_y=0.0; self.on_ground=False
-        self.spawn_x=x; self.spawn_y=y
-        self.alive=True; self.respawn_timer=0
-        self.facing_right=True; self.riding_platform=None
-        self.move_speed=move_speed; self.jump_velocity=jump_velocity
-        self.squash_timer=0; self.was_on_ground=False
-        init_player_sprite(self)
+    def __init__(self, x, y):
+        self.rect = pygame.Rect(x, y, self.WIDTH, self.HEIGHT)
+        self.vel_x = 0.0
+        self.vel_y = 0.0
+        self.on_ground = False
+        self.spawn_x = x
+        self.spawn_y = y
+        self.alive = True
+        self.respawn_timer = 0
+        self.facing_right = True
+        self.jump_count = 0
+        self.max_jumps = 2
+        self.hearts = PLAYER_MAX_HEARTS
+        self.invincibility = 0
+        self.death_count = 0
+        self.kill_count = 0
+        self.shoot_cooldown = 0
+        self.sprinting = False
+        self.was_on_ground = False
+        self.squash_timer = 0
+        self.has_gift_power = False
+        self.gift_power_timer = 0
+        self.riding_platform = None
+        # Sprite animation
+        if _SPRITES_AVAILABLE:
+            init_player_sprite(self)
+
+    def set_checkpoint(self, x, y):
+        self.spawn_x = x
+        self.spawn_y = y
+
+    def take_damage(self):
+        if self.invincibility > 0:
+            return False
+        self.hearts -= 1
+        self.invincibility = INVINCIBILITY_FRAMES
+        if self.hearts <= 0:
+            self.die()
+        return True
 
     def die(self):
-        self.alive=False; self.respawn_timer=9999
-        self._spr_state='death'; self._spr_frame=0; self._spr_tick=0; self._spr_death_done=False
+        self.alive = False
+        self.respawn_timer = 80
+        self.death_count += 1
+        if _SPRITES_AVAILABLE:
+            self._spr_state = 'death'; self._spr_frame = 0
+            self._spr_tick = 0; self._spr_death_done = False
 
     def respawn(self):
-        self.rect.topleft=(self.spawn_x,self.spawn_y)
-        self.vel_x=self.vel_y=0; self.alive=True
-        self.on_ground=False; self.riding_platform=None
+        self.rect.topleft = (self.spawn_x, self.spawn_y)
+        self.vel_x = self.vel_y = 0
+        self.alive = True
+        self.on_ground = False
+        self.hearts = PLAYER_MAX_HEARTS
+        self.invincibility = 0
+        self.jump_count = 0
 
     def update(self, keys, platforms):
         if not self.alive:
-            # Soul system handles respawn — just wait
+            self.respawn_timer -= 1
+            if self.respawn_timer <= 0:
+                self.respawn()
             return None
 
-        if self.riding_platform is not None and hasattr(self.riding_platform, 'dx'):
-            self.rect.x += self.riding_platform.dx
+        if self.shoot_cooldown > 0:
+            self.shoot_cooldown -= 1
+        if self.invincibility > 0:
+            self.invincibility -= 1
+        if self.gift_power_timer > 0:
+            self.gift_power_timer -= 1
+            if self.gift_power_timer <= 0:
+                self.has_gift_power = False
 
-        move=0.0
-        speed=SPRINT_SPEED if (keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]) else self.move_speed
-        if keys[pygame.K_LEFT]  or keys[pygame.K_a]: move-=speed; self.facing_right=False
-        if keys[pygame.K_RIGHT] or keys[pygame.K_d]: move+=speed; self.facing_right=True
-        self.vel_x = self.vel_x+(move-self.vel_x)*0.3 if move else self.vel_x*0.75
-        if abs(self.vel_x)<0.1: self.vel_x=0
+        # Movement
+        move = 0.0
+        self.sprinting = keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]
+        speed = SPRINT_SPEED if self.sprinting else MOVE_SPEED
+        if self.has_gift_power:
+            speed += 2
+        if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+            move -= speed
+            self.facing_right = False
+        if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+            move += speed
+            self.facing_right = True
 
-        self.vel_y=min(self.vel_y+GRAVITY,MAX_FALL_SPEED)
-        jumped=False
-        if self.on_ground and (keys[pygame.K_SPACE] or keys[pygame.K_UP] or keys[pygame.K_w]):
-            self.vel_y=self.jump_velocity; self.on_ground=False
-            self.riding_platform=None; jumped=True
+        friction = 0.28
+        if move:
+            self.vel_x += (move - self.vel_x) * friction
+        else:
+            self.vel_x *= 0.72
+        if abs(self.vel_x) < 0.1:
+            self.vel_x = 0
 
-        self.rect.x+=int(self.vel_x)
+        self.vel_y = min(self.vel_y + GRAVITY, MAX_FALL_SPEED)
+
+        jumped = False
+        if self.on_ground and self.jump_count == 0 and (
+                keys[pygame.K_SPACE] or keys[pygame.K_UP] or keys[pygame.K_w]):
+            self.vel_y = JUMP_VELOCITY
+            self.on_ground = False
+            self.riding_platform = None
+            jumped = True
+            self.jump_count = 1
+
+        # Horizontal collision
+        self.rect.x += int(self.vel_x)
         for plat in platforms:
-            if not plat.is_active(): continue
-            pr=plat.get_rect()
+            if not plat.is_active():
+                continue
+            pr = plat.get_rect()
             if self.rect.colliderect(pr):
-                if self.rect.bottom<=pr.top+6: continue
-                if self.vel_x>0: self.rect.right=pr.left
-                elif self.vel_x<0: self.rect.left=pr.right
-                self.vel_x=0
+                if self.rect.bottom <= pr.top + 6:
+                    continue
+                if self.vel_x > 0:
+                    self.rect.right = pr.left
+                elif self.vel_x < 0:
+                    self.rect.left = pr.right
+                self.vel_x = 0
 
-        self.was_on_ground=self.on_ground
-        self.on_ground=False; self.riding_platform=None
-        vy=int(self.vel_y)
-        if self.vel_y>0 and vy==0: vy=1
-        self.rect.y+=vy
+        self.was_on_ground = self.on_ground
+        self.on_ground = False
+        self.riding_platform = None
+
+        vy = int(self.vel_y)
+        if self.vel_y > 0 and vy == 0:
+            vy = 1
+        self.rect.y += vy
+
         for plat in platforms:
-            if not plat.is_active(): continue
-            pr=plat.get_rect()
+            if not plat.is_active():
+                continue
+            pr = plat.get_rect()
             if self.rect.colliderect(pr):
-                if self.vel_y>0:
-                    self.rect.bottom=pr.top; self.vel_y=0; self.on_ground=True
-                    self.riding_platform=plat
+                if self.vel_y > 0:
+                    self.rect.bottom = pr.top
+                    self.vel_y = 0
+                    self.on_ground = True
+                    self.jump_count = 0
                     plat.on_player_land(self)
-                elif self.vel_y<0:
-                    self.rect.top=pr.bottom; self.vel_y=0
+                elif self.vel_y < 0:
+                    self.rect.top = pr.bottom
+                    self.vel_y = 0
 
-        if self.rect.top > SCREEN_HEIGHT - SCREEN_HEIGHT // 10 and self.alive: self.die()
+        if self.rect.top > DEATH_Y:
+            self.alive = False; self.respawn_timer = 80; self.death_count += 1
+            if _SPRITES_AVAILABLE:
+                self._spr_state = 'death'; self._spr_frame = 0
+                self._spr_tick = 0; self._spr_death_done = False
+
         return "jump" if jumped else None
 
-    def draw(self,surface,camera,tick):
-        draw_player_sprite(self, surface, camera, tick)
+    def try_shoot_arrow(self, target_x, target_y):
+        if self.shoot_cooldown <= 0 and self.alive:
+            cd = ARROW_COOLDOWN
+            if self.has_gift_power:
+                cd = max(8, cd - 8)
+            self.shoot_cooldown = cd
+            sx = self.rect.right + 4 if self.facing_right else self.rect.left - 4
+            sy = self.rect.centery - 4
+            # Direction toward mouse
+            dx = target_x - sx
+            dy = target_y - sy
+            return Arrow(sx, sy, dx, dy)
+        return None
+
+    def activate_gift_power(self):
+        self.has_gift_power = True
+        self.gift_power_timer = 600  # 10 seconds
+
+    def draw(self, surface, camera, tick):
+        if not self.alive:
+            # Still draw death animation if sprites available
+            if _SPRITES_AVAILABLE:
+                draw_player_sprite(self, surface, camera, tick,
+                                   unreal_tint_fn=lambda t: (255, 220, 50))
+            return
+
+        if self.on_ground and not self.was_on_ground:
+            self.squash_timer = 6
+        if self.squash_timer > 0:
+            self.squash_timer -= 1
+
+        # Invincibility flicker
+        if self.invincibility > 0 and (self.invincibility // 4) % 2 == 0:
+            return
+
+        # Gift power glow (drawn before sprite)
+        if self.has_gift_power:
+            sr_glow = camera.apply(self.rect)
+            gp = abs(math.sin(tick * 0.12)) * 0.5 + 0.5
+            gs = pygame.Surface((sr_glow.width + 16, sr_glow.height + 16), pygame.SRCALPHA)
+            pygame.draw.rect(gs, (*HOLY_GOLD, int(60 * gp)), (0, 0, sr_glow.width + 16, sr_glow.height + 16), border_radius=4)
+            surface.blit(gs, (sr_glow.x - 8, sr_glow.y - 8))
+
+        # Use sprite sheet if available, otherwise fall back to drawn character
+        if _SPRITES_AVAILABLE:
+            draw_player_sprite(self, surface, camera, tick,
+                               unreal_tint_fn=lambda t: (255, 220, 50))
+            return
+
+        # ── Fallback: drawn archer character ──────────────────────────────
+        sr = camera.apply(self.rect)
+        if self.vel_y < -3 and not self.on_ground:
+            stretch = 4
+            sr = sr.inflate(-4, stretch * 2)
+            sr.bottom += stretch
+        elif self.squash_timer > 0:
+            sq = int(self.squash_timer * 0.8)
+            sr = sr.inflate(sq * 2, -sq * 2)
+            sr.bottom += sq
+
+        # Body (tunic)
+        pygame.draw.rect(surface, HERO_GREEN, sr)
+        belt_y = sr.y + sr.height - 14
+        pygame.draw.rect(surface, BROWN, (sr.x, belt_y, sr.width, 4))
+        pygame.draw.rect(surface, XMAS_GOLD, (sr.centerx - 4, belt_y - 1, 8, 6))
+        pygame.draw.polygon(surface, (40, 100, 40),
+                            [(sr.x, sr.bottom), (sr.x - 3, sr.bottom + 6),
+                             (sr.x + sr.width // 2, sr.bottom + 3),
+                             (sr.right + 3, sr.bottom + 6), (sr.right, sr.bottom)])
+        face_y = sr.y + 6
+        pygame.draw.rect(surface, (220, 185, 145), (sr.x + 4, face_y, sr.width - 8, 12))
+        pygame.draw.polygon(surface, HERO_BROWN,
+                            [(sr.x + 2, face_y + 2), (sr.x + sr.width - 2, face_y + 2),
+                             (sr.x + sr.width + 2, face_y - 5), (sr.x - 2, face_y - 5)])
+        ey = sr.y + 10
+        if self.facing_right:
+            pygame.draw.rect(surface, WHITE, (sr.x + 14, ey, 7, 5))
+            pygame.draw.rect(surface, BLACK, (sr.x + 17, ey + 1, 3, 3))
+        else:
+            pygame.draw.rect(surface, WHITE, (sr.x + 7, ey, 7, 5))
+            pygame.draw.rect(surface, BLACK, (sr.x + 7, ey + 1, 3, 3))
+        bow_x = sr.left - 6 if self.facing_right else sr.right + 6
+        bow_y = sr.centery
+        bow_arc_rect = pygame.Rect(bow_x - 5, bow_y - 12, 10, 24)
+        if self.facing_right:
+            pygame.draw.arc(surface, ARROW_BROWN, bow_arc_rect, math.pi / 2, 3 * math.pi / 2, 3)
+            pygame.draw.line(surface, (200, 200, 220), (bow_x - 5, bow_y - 12), (bow_x - 5, bow_y + 12), 1)
+        else:
+            pygame.draw.arc(surface, ARROW_BROWN, bow_arc_rect, -math.pi / 2, math.pi / 2, 3)
+            pygame.draw.line(surface, (200, 200, 220), (bow_x + 5, bow_y - 12), (bow_x + 5, bow_y + 12), 1)
+        nock_x = bow_x + (4 if self.facing_right else -4)
+        pygame.draw.line(surface, ARROW_BROWN, (nock_x, bow_y - 6),
+                         (nock_x + (10 if self.facing_right else -10), bow_y - 2), 1)
+
 
 # ---------------------------------------------------------------------------
-# Sound Manager
+# Level Builder
 # ---------------------------------------------------------------------------
-SOUND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "audio")
-SOUND_FILES= {"jump":"jump.wav","death":"death.wav","respawn":"respawn.wav",
-              "balloon":"powerup.wav","balloon_pop":"balloon_pop.wav",
-              "checkpoint":"checkpoint.wav","win":"win.wav",
-              "npc_talk":"npc_talk.wav",
-              "soul_rise":"soul_rise.wav","soul_land":"soul_land.wav"}
+def create_level():
+    platforms = []
+    checkpoints = []
+    mushrooms = []
+    npcs = []
 
-MUSIC_FILE = r"C:\Users\ilham\Documents\APU WORKS\YEAR 2 SEM 2\IMAGING & SE\GameAssignment\imaging-assignment\assets\audio\backgroundlevel2.mp3"
+    # ── Section 1: Ground intro (0 – 2200) ──
+    # Wide starting ground
+    platforms.append(IslandPlatform(0, 520, 500))
+    npcs.append(NPC(120, 520, "intro", "Seraphiel"))
+    platforms.append(IslandPlatform(650, 490, 160))
+    platforms.append(IslandPlatform(930, 450, 160))
+    platforms.append(IslandPlatform(1200, 490, 160))
+    platforms.append(IslandPlatform(1480, 450, 200))
+    platforms.append(IslandPlatform(1780, 490, 300))
+    mushrooms.append(MushroomEnemy(700, 464, 650, 790, speed=1.2))
+    mushrooms.append(MushroomEnemy(1800, 464, 1780, 2060, speed=1.3))
+    checkpoints.append(Checkpoint(1820, 490))
+    npcs.append(NPC(1870, 490, "cp1", "Lumen"))
 
-class SoundManager:
-    def __init__(self):
-        self.sounds={}; self.music_loaded=False
-        for name,fn in SOUND_FILES.items():
-            p=os.path.join(SOUND_DIR,fn)
-            if os.path.isfile(p):
-                try: self.sounds[name]=pygame.mixer.Sound(p)
-                except: self.sounds[name]=None
-            else:
-                self.sounds[name]=None
-        if os.path.isfile(MUSIC_FILE):
-            try: pygame.mixer.music.load(MUSIC_FILE); self.music_loaded=True
-            except: pass
-    def play(self,name):
-        s=self.sounds.get(name)
-        if s: s.play()
-    def start_music(self,loops=-1,volume=0.5):
-        if self.music_loaded:
-            pygame.mixer.music.set_volume(volume); pygame.mixer.music.play(loops)
-    def stop_music(self): pygame.mixer.music.stop()
+    # ── Section 2: Rising islands (2200 – 4800) ──
+    platforms.append(IslandPlatform(2200, 440, 150))
+    platforms.append(IslandPlatform(2480, 400, 140))
+    platforms.append(IslandPlatform(2760, 360, 140))
+    platforms.append(IslandPlatform(3060, 320, 140))
+    platforms.append(IslandPlatform(3340, 360, 140))
+    platforms.append(IslandPlatform(3640, 310, 140))
+    platforms.append(IslandPlatform(3930, 350, 160))
+    platforms.append(IslandPlatform(4220, 300, 140))
+    platforms.append(IslandPlatform(4520, 340, 180))
+    mushrooms.append(MushroomEnemy(2490, 374, 2480, 2600, speed=1.4))
+    mushrooms.append(MushroomEnemy(3350, 334, 3340, 3460, speed=1.5))
+    mushrooms.append(MushroomEnemy(4230, 274, 4220, 4340, speed=1.5))
+    checkpoints.append(Checkpoint(4540, 340))
+    npcs.append(NPC(4580, 340, "cp2", "Seraphiel"))
 
-# ---------------------------------------------------------------------------
-# Level layout  (unchanged, but NPCs injected at checkpoint positions)
-# ---------------------------------------------------------------------------
-PW_SAFE=250; PW_SHRINK=160; PW_FALL=140; PW_PHANTOM=110
+    # ── Section 3: Sky peaks (5000 – 8000) ──
+    platforms.append(IslandPlatform(5000, 280, 150))
+    platforms.append(IslandPlatform(5300, 240, 140))
+    platforms.append(IslandPlatform(5620, 200, 140))
+    platforms.append(IslandPlatform(5940, 240, 140))
+    platforms.append(IslandPlatform(6260, 200, 130))
+    platforms.append(IslandPlatform(6580, 240, 140))
+    platforms.append(IslandPlatform(6900, 200, 140))
+    platforms.append(IslandPlatform(7220, 240, 140))
+    platforms.append(IslandPlatform(7540, 220, 200))  # wide rest before boss
+    mushrooms.append(MushroomEnemy(5310, 214, 5300, 5420, speed=1.6))
+    mushrooms.append(MushroomEnemy(6270, 174, 6260, 6380, speed=1.6))
+    mushrooms.append(MushroomEnemy(7230, 214, 7220, 7360, speed=1.7))
+    checkpoints.append(Checkpoint(7560, 220))
+    npcs.append(NPC(7610, 220, "cp3", "Lumen"))
 
-def create_christmas_level(preset):
-    platforms=[]; section_checkpoints=[]
-    shrink_platforms=[]; fall_platforms=[]; phantom_platforms=[]
-    countdown_platforms=[]; spikes=[]
-    tram_platform=None; santa_sleigh=None; balloon=None
-    zigzag_section=None; countdown_platform_ref=None
-    npcs = []   # ← NEW: NPC list
+    # ── Section 4: Final approach (8200 – 10200) ──
+    platforms.append(IslandPlatform(8200, 240, 150))
+    platforms.append(IslandPlatform(8500, 200, 140))
+    platforms.append(IslandPlatform(8800, 240, 150))
+    platforms.append(IslandPlatform(9100, 200, 140))
+    platforms.append(IslandPlatform(9400, 240, 180))
+    platforms.append(IslandPlatform(9700, 200, 160))
+    platforms.append(IslandPlatform(10000, 240, 400))  # final wide platform
+    mushrooms.append(MushroomEnemy(8510, 174, 8500, 8620, speed=1.7))
+    mushrooms.append(MushroomEnemy(9410, 214, 9400, 9560, speed=1.8))
+    mushrooms.append(MushroomEnemy(10020, 214, 10000, 10360, speed=1.8))
 
-    def add(p): platforms.append(p); return p
+    exit_portal = ExitPortal(10310, 240)
 
-    # ── START — Snow Miser intro NPC ─────────────────────────────────────
-    add(Platform(0, BASE_Y, PW_SAFE, PH, PINE_GREEN))
-    npcs.append(NPC(80, BASE_Y, "intro", "Snow Miser"))   # intro dialogue
+    return platforms, checkpoints, mushrooms, npcs, exit_portal
 
-    # ── ICE shrink ───────────────────────────────────────────────────────
-    sp=preset["shrink_speed"]; sr_t=preset["shrink_respawn"]
-    for p in [ShrinkingPlatform(420,BASE_Y-30,PW_SHRINK,PH,sp,sr_t),
-              ShrinkingPlatform(660,BASE_Y-60,PW_SHRINK,PH,sp,sr_t)]:
-        add(p); shrink_platforms.append(p)
-
-    add(Platform(910,BASE_Y-40,PW_SAFE,PH,PINE_GREEN))
-    section_checkpoints.append(SectionCheckpoint(
-        trigger_x=960, spawn_x=920, spawn_y=BASE_Y-80,
-        float_y=BASE_Y-120, label="A"))
-    npcs.append(NPC(950, BASE_Y-40, "cp_a", "Snow Miser"))   # CP-A dialogue
-
-    # ── FALL platforms ───────────────────────────────────────────────────
-    fd=preset["fall_delay"]
-    for p in [FallingPlatform(1240,BASE_Y-20,PW_FALL,PH,fd),
-              FallingPlatform(1460,BASE_Y,PW_FALL,PH,fd)]:
-        add(p); fall_platforms.append(p)
-
-    add(Platform(1690,BASE_Y,100,PH,PINE_GREEN))
-    section_checkpoints.append(SectionCheckpoint(
-        trigger_x=1740, spawn_x=1700, spawn_y=BASE_Y-40,
-        float_y=BASE_Y-130, label="B"))
-    npcs.append(NPC(1730, BASE_Y, "cp_b", "Snow Miser"))     # CP-B dialogue
-
-    # ── SPIKES + BALLOON ─────────────────────────────────────────────────
-    sbx=1880; sby=BASE_Y+10
-    add(Platform(sbx,sby,140,PH,(60,60,70)))
-    spikes.append(SpikeTrap(sbx+6,sby,9))
-    balloon=Balloon(sbx+70,sby-90,preset["balloon_vx"],preset["balloon_vy"],preset["balloon_radius"])
-
-    add(Platform(2120,BASE_Y-20,PW_SAFE,PH,PINE_GREEN))
-    section_checkpoints.append(SectionCheckpoint(
-        trigger_x=2170, spawn_x=2130, spawn_y=BASE_Y-60,
-        float_y=BASE_Y-140, label="C"))
-    npcs.append(NPC(2160, BASE_Y-20, "cp_c", "Snow Miser")) # CP-C dialogue
-
-    # ── PHANTOM ──────────────────────────────────────────────────────────
-    pf=preset["phantom_frames"]; pw=preset["phantom_w"]
-    for p in [PhantomPlatform(2450,BASE_Y-50,pw,PH,pf),
-              PhantomPlatform(2640,BASE_Y-80,pw,PH,pf)]:
-        add(p); phantom_platforms.append(p)
-
-    add(Platform(2840,BASE_Y-60,PW_SAFE+50,PH,PINE_GREEN))
-    section_checkpoints.append(SectionCheckpoint(
-        trigger_x=2900, spawn_x=2850, spawn_y=BASE_Y-100,
-        float_y=BASE_Y-150, label="D"))
-    npcs.append(NPC(2890, BASE_Y-60, "cp_d", "Snow Miser")) # CP-D dialogue
-
-    # ── OBSTACLE 1: COUNTDOWN ────────────────────────────────────────────
-    add(Platform(3060,BASE_Y-60,120,PH,PINE_GREEN))
-
-    cnt_frames=preset["countdown_sec"]*FPS
-    cd_pad=CountdownPlatform(3240,BASE_Y-60,180,PH,
-                             countdown_frames=cnt_frames,
-                             grace_frames=preset["countdown_grace"])
-    add(cd_pad); countdown_platforms.append(cd_pad)
-    countdown_platform_ref=cd_pad
-
-    cd_target=CountdownTargetPlatform(3490,BASE_Y-60,PW_SAFE,PH,owner=cd_pad)
-    cd_pad.target=cd_target; add(cd_target)
-
-    cp_e=SectionCheckpoint(
-        trigger_x=9999999, spawn_x=3500, spawn_y=BASE_Y-100,
-        float_y=BASE_Y-150, label="E")
-    cd_target.section_cp=cp_e
-    section_checkpoints.append(cp_e)
-    npcs.append(NPC(3510, BASE_Y-60, "cp_e", "Snow Miser")) # CP-E dialogue
-
-    # ── OBSTACLE 2: ZIGZAG FLOATING LEDGES ───────────────────────────────
-    zz_base_x = 3820
-    zz_base_y = BASE_Y - 60
-
-    add(Platform(3720, zz_base_y, 90, PH, PINE_GREEN))
-
-    zz_plats, zz_climb, zz_exit = build_zigzag_section(zz_base_x, zz_base_y,
-                                                         preset["zigzag_ledge_w"])
-    for p in zz_plats: add(p)
-    zigzag_section = zz_climb
-
-    section_checkpoints.append(SectionCheckpoint(
-        trigger_x = zz_exit.rect.right,
-        spawn_x   = zz_exit.rect.x + 10,
-        spawn_y   = zz_exit.rect.y - 50,
-        float_y   = zz_exit.rect.y - 90,
-        label     = "F"))
-    # CP-F NPC placed just after the zigzag exit
-    npcs.append(NPC(zz_exit.rect.right + 30, zz_exit.rect.y, "cp_f", "Snow Miser"))
-
-    # ── OBSTACLE 3: TRAM + SANTA SLEIGH ──────────────────────────────────
-    bridge_x = zz_exit.rect.right + 60
-    bridge_y = zz_exit.rect.y
-    add(Platform(bridge_x, bridge_y, 160, PH, PINE_GREEN))
-
-    tram_x = bridge_x + 200
-    tram_y = bridge_y
-
-    SANTA_TRIGGER_DIST = 400
-    TRAM_VANISH_DIST   = preset["tram_vanish"]
-    PORTAL_DIST        = 1300
-
-    portal_x = tram_x + PORTAL_DIST
-    portal_y = tram_y - 80
-
-    vanish_x = tram_x + TRAM_VANISH_DIST
-
-    tram = TramPlatform(tram_x, tram_y, 180, PH,
-                        speed=preset["tram_speed"], vanish_x=vanish_x)
-    add(tram); tram_platform=tram
-
-    santa = SantaSleigh(
-        portal_x      = portal_x,
-        portal_y      = portal_y,
-        tram          = tram,
-        rope_len      = preset["rope_len"],
-        rope_grab_r   = preset["rope_grab_r"],
-        hover_timeout = preset["santa_timeout"],
-        kidnap_dist   = preset["kidnap_dist"],
-    )
-    santa_sleigh=santa
-    tram.santa_trigger_dist = SANTA_TRIGGER_DIST
-
-    portal_plat_x = portal_x - 220
-    add(Platform(portal_plat_x, tram_y, PW_SAFE + 200, PH, PINE_GREEN))
-    portal=Portal(portal_x, portal_y)
-
-    return dict(
-        platforms=platforms,
-        shrink_platforms=shrink_platforms,
-        fall_platforms=fall_platforms,
-        phantom_platforms=phantom_platforms,
-        countdown_platforms=countdown_platforms,
-        countdown_platform_ref=countdown_platform_ref,
-        zigzag_section=zigzag_section,
-        tram_platform=tram_platform,
-        santa_sleigh=santa_sleigh,
-        spikes=spikes, balloon=balloon,
-        portal=portal,
-        section_checkpoints=section_checkpoints,
-        npcs=npcs,          # ← returned
-    )
 
 # ---------------------------------------------------------------------------
 # Game
 # ---------------------------------------------------------------------------
 class Game:
-    DIFF_OPTIONS=["easy","medium","hard"]
-    DIFF_COLORS={"easy":(80,200,80),"medium":(255,200,50),"hard":(220,60,60)}
-
     def __init__(self):
-        self.screen=pygame.display.set_mode((SCREEN_WIDTH,SCREEN_HEIGHT))
-        pygame.display.set_caption("Glitch Claus - The Second Realm")
-        self.clock=pygame.time.Clock()
-        self.font      =pygame.font.SysFont("consolas",24)
-        self.small_font=pygame.font.SysFont("consolas",16)
-        self.big_font  =pygame.font.SysFont("consolas",48)
-        self.tiny_font =pygame.font.SysFont("consolas",12,bold=True)
-        self.cp_font   =pygame.font.SysFont("consolas",11,bold=True)
-        self.sfx=SoundManager()
-        self.diff_index=1; self.difficulty=self.DIFF_OPTIONS[1]
-        self.state="playing"; self.settings_cursor=0
-        self.music_volume=0.5; self.music_muted=False
-        self.tick=0; self.level_time=0; self.win_timer=0
-        self.camera=Camera(SCREEN_WIDTH,SCREEN_HEIGHT)
-        self.particles=[]; self.rings=[]; self.flashes=[]
-        self.snowflakes=[Snowflake() for _ in range(80)]
-        # Story
-        self.dialogue_box  = None
-        self.pending_state = None
-        # Soul death/respawn animation
-        self.soul_state=None; self.soul_x=0; self.soul_y=0
-        self.soul_target_y=0; self.soul_timer=0; self.soul_trail=[]
-        self.soul_pan_target_x=0; self.soul_pan_target_y=0
-        self.respawn_fade=0
-        self._load_level()
-        self.sfx.start_music(volume=self.music_volume)
+        self.screen = pygame.display.get_surface()
+        _fs = self.screen and (self.screen.get_flags() & pygame.FULLSCREEN)
+        if self.screen is None or self.screen.get_size() != (SCREEN_WIDTH, SCREEN_HEIGHT):
+            self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.FULLSCREEN if _fs else 0)
+        elif _fs:
+            self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.FULLSCREEN)
+        pygame.display.set_caption("The Endless Dream — Level 2 (The Second Realm)")
+        self.clock = pygame.time.Clock()
+        self.font = pygame.font.Font(TITLE_FONT_PATH, 24)
+        self.small_font = pygame.font.Font(TITLE_FONT_PATH, 16)
+        self.big_font = pygame.font.Font(TITLE_FONT_PATH, 48)
+        self.tiny_font = pygame.font.Font(TITLE_FONT_PATH, 12)
 
-    def _load_level(self):
-        preset=DIFFICULTY_PRESETS[self.difficulty]
-        d=create_christmas_level(preset)
-        self.platforms              =d["platforms"]
-        self.shrink_platforms       =d["shrink_platforms"]
-        self.fall_platforms         =d["fall_platforms"]
-        self.phantom_platforms      =d["phantom_platforms"]
-        self.countdown_platforms    =d["countdown_platforms"]
-        self.countdown_platform_ref =d["countdown_platform_ref"]
-        self.zigzag_section         =d["zigzag_section"]
-        self.tram_platform          =d["tram_platform"]
-        self.santa_sleigh           =d["santa_sleigh"]
-        self.spikes                 =d["spikes"]
-        self.balloon                =d["balloon"]
-        self.portal                 =d["portal"]
-        self.section_checkpoints    =d["section_checkpoints"]
-        self.npcs                   =d["npcs"]          # ← NEW
-        self.player=Player(80,BASE_Y-60,
-                           move_speed=preset["player_speed"],
-                           jump_velocity=preset["player_jump"])
-        self.camera=Camera(SCREEN_WIDTH,SCREEN_HEIGHT)
-        self.particles.clear(); self.rings.clear(); self.flashes.clear()
-        self.level_time=0; self.tick=0; self.win_timer=0
-        self._tram_started=False
-        self.dialogue_box  = None
+        self.sfx = SoundManager()
+        self.state = "playing"
+        self.tick = 0
+        self.level_time = 0
+        self.win_timer = 0
+        self.freeze_frames = 0
+        self.respawn_fade = 0
+        self.music_volume = 0.5
+        self.music_muted = False
+        self.settings_cursor = 0
+        self._settings_boxes = []
+        self._settings_vol_slider = pygame.Rect(0, 0, 0, 0)
+        self._last_mouse_pos = (0, 0)
+
+        self.camera = Camera(SCREEN_WIDTH, SCREEN_HEIGHT)
+        self.particles = []
+        self.rings = []
+        self.flashes = []
+        self.damage_flashes = []
+        self.score_popups = []
+        self.arrows = []
+        self.balloons = []
+        self.clouds = [Cloud() for _ in range(18)]
+
+        # Santa boss (spawns at section 3)
+        self.santa = None
+        self.santa_spawned = False
+        self.santa_spawn_x = 7800  # spawns when player reaches ~x=5000
+        self.santa_trigger_x = 5000
+
+        self.gift = None  # GiftPickup after Santa dies
+
+        self.dialogue_box = None
         self.pending_state = None
-        self.soul_state=None; self.soul_trail=[]
-        self.respawn_fade=0
+
+        # Death / resurrection state
+        self.soul_state = None  # None / "rising" / "panning" / "falling"
+        self.soul_x = 0.0
+        self.soul_y = 0.0
+        self.soul_target_y = 0.0
+        self.soul_timer = 0
+        self.soul_trail = []
+        self.fire_overlay_alpha = 0
+        self.sun_blaze = 0  # 0-255 for sun blaze effect
+
+        self.ending_shown = False
+
+        self.load_level()
+
+    # ------------------------------------------------------------------
+    def load_level(self):
+        self.platforms, self.checkpoints, self.mushrooms, self.npcs, self.exit_portal = create_level()
+        self.player = Player(100, 460)
+        self.camera = Camera(SCREEN_WIDTH, SCREEN_HEIGHT)
+        self.particles.clear()
+        self.rings.clear()
+        self.flashes.clear()
+        self.damage_flashes.clear()
+        self.score_popups.clear()
+        self.arrows.clear()
+        self.balloons.clear()
+        self.santa = None
+        self.santa_spawned = False
+        self.gift = None
+        self.dialogue_box = None
+        self.tick = 0
+        self.level_time = 0
+        self.win_timer = 0
+        self.freeze_frames = 0
+        self.respawn_fade = 0
+        self.soul_state = None
+        self.soul_trail = []
+        self.fire_overlay_alpha = 0
+        self.sun_blaze = 0
+        self.ending_shown = False
+
+    def _exit_to_menu(self):
+        self.sfx.stop_music()
+        self.running = False
+        pygame.event.clear()
 
     def _apply_volume(self):
         pygame.mixer.music.set_volume(0.0 if self.music_muted else self.music_volume)
 
-    def _exit_to_menu(self):
-        self.sfx.stop_music(); self.running=False
-
     def start_dialogue(self, key, return_state="playing"):
-        """Start a story dialogue by key, pausing the game."""
         if key in STORY_DIALOGUES:
-            self.dialogue_box  = DialogueBox(STORY_DIALOGUES[key])
+            self.dialogue_box = DialogueBox(STORY_DIALOGUES[key])
             self.pending_state = return_state
-            self.state         = "dialogue"
-            self.sfx.play("npc_talk")
+            self.state = "dialogue"
 
+    # ------------------------------------------------------------------
     def run(self):
-        self.running=True
+        self.running = True
         while self.running:
-            for ev in pygame.event.get():
-                if ev.type==pygame.QUIT: self._exit_to_menu(); return
-                if ev.type==pygame.KEYDOWN: self._handle_key(ev.key)
-            if not self.running: return
-            if self.state=="playing" and self.soul_state is not None:
-                self._update_soul(); self.tick += 1
-            elif self.state=="playing":   self._update()
-            elif self.state=="dialogue":
-                if self.dialogue_box: self.dialogue_box.update()
-                for sf in self.snowflakes: sf.update()
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self._exit_to_menu()
+                    return
+                if event.type == pygame.KEYDOWN:
+                    self._handle_key(event.key)
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if self.state == "settings":
+                        mpos = event.pos
+                        if self._settings_vol_slider.collidepoint(mpos):
+                            self.music_volume = max(0.0, min(1.0, round((mpos[0]-self._settings_vol_slider.x)/max(1,self._settings_vol_slider.width),2)))
+                            self._apply_volume(); self.settings_cursor = 0
+                        else:
+                            for i, rect in enumerate(self._settings_boxes):
+                                if rect.collidepoint(mpos):
+                                    self.settings_cursor = i
+                                    if i == 1: self.music_muted = not self.music_muted; self._apply_volume()
+                                    elif i == 2: pygame.display.toggle_fullscreen()
+                                    elif i == 3: self.state = "playing"
+                                    elif i == 4: self.load_level(); self.state = "playing"; self.sfx.start_music(volume=self.music_volume)
+                                    elif i == 5: self._exit_to_menu()
+                    else:
+                        self._handle_mouse_click(event.pos)
+            if not self.running:
+                return
+
+            if self.freeze_frames > 0:
+                self.freeze_frames -= 1
+            elif self.state == "playing" and self.soul_state is not None:
+                self._update_soul()
                 self.tick += 1
-            elif self.state=="win":     self.win_timer+=1
+                for c in self.clouds:
+                    c.update()
+            elif self.state == "playing":
+                self._update()
+            elif self.state == "win":
+                self.win_timer += 1
+                for c in self.clouds:
+                    c.update()
+            elif self.state in ("dialogue", "ending"):
+                if self.dialogue_box:
+                    self.dialogue_box.update()
+                for c in self.clouds:
+                    c.update()
+                self.tick += 1
+
+            if self.respawn_fade > 0:
+                self.respawn_fade -= 1
             self._draw()
             self.clock.tick(FPS)
 
+    # ------------------------------------------------------------------
+    def _handle_mouse_click(self, pos):
+        if self.state != "playing":
+            return
+        if not self.player.alive or self.soul_state is not None:
+            return
+        # Convert screen pos to world pos
+        wx = pos[0] + int(self.camera.offset_x) - self.camera.shake_x
+        wy = pos[1] + int(self.camera.offset_y) - self.camera.shake_y
+        arrow = self.player.try_shoot_arrow(wx, wy)
+        if arrow:
+            self.arrows.append(arrow)
+            self.sfx.play("shoot")
+            # Ice muzzle flash
+            for _ in range(6):
+                self.particles.append(Particle(
+                    self.player.rect.centerx, self.player.rect.centery - 4,
+                    random.choice([ICE_BLUE, ICE_WHITE, ICE_CORE, WHITE]),
+                    random.uniform(-2, 2), random.uniform(-2.5, 0.5), 12, random.randint(2, 4), 0.1))
+
+    # ------------------------------------------------------------------
     def _handle_key(self, key):
-        # ── Dialogue state ────────────────────────────────────────────────
-        if self.state == "dialogue":
+        if self.state in ("dialogue", "ending"):
             if key in (pygame.K_RETURN, pygame.K_SPACE, pygame.K_e):
                 if self.dialogue_box:
                     self.dialogue_box.advance()
                     if not self.dialogue_box.active:
                         self.dialogue_box = None
-                        self.state = self.pending_state or "playing"
+                        if self.state == "ending":
+                            self._exit_to_menu()
+                        else:
+                            self.state = self.pending_state or "playing"
             return
 
-        # ── Settings state ────────────────────────────────────────────────
-        if self.state=="settings":
-            if key==pygame.K_ESCAPE: self.state="playing"; return
-            nr=5
-            if key in (pygame.K_UP,pygame.K_w):    self.settings_cursor=(self.settings_cursor-1)%nr
-            elif key in (pygame.K_DOWN,pygame.K_s): self.settings_cursor=(self.settings_cursor+1)%nr
-            elif self.settings_cursor==0:
-                changed = False
-                if key in (pygame.K_LEFT,pygame.K_a):
-                    self.diff_index=(self.diff_index-1)%3
-                    self.difficulty=self.DIFF_OPTIONS[self.diff_index]; changed=True
-                elif key in (pygame.K_RIGHT,pygame.K_d,pygame.K_RETURN,pygame.K_SPACE):
-                    self.diff_index=(self.diff_index+1)%3
-                    self.difficulty=self.DIFF_OPTIONS[self.diff_index]; changed=True
-                if changed: self._load_level()
-            elif self.settings_cursor==1:
-                if key in (pygame.K_LEFT,pygame.K_a):    self.music_volume=max(0.0,round(self.music_volume-0.1,1)); self._apply_volume()
-                elif key in (pygame.K_RIGHT,pygame.K_d): self.music_volume=min(1.0,round(self.music_volume+0.1,1)); self._apply_volume()
-            elif self.settings_cursor==2:
-                if key in (pygame.K_RETURN,pygame.K_SPACE): self.music_muted=not self.music_muted; self._apply_volume()
-            elif self.settings_cursor==3:
-                if key in (pygame.K_RETURN,pygame.K_SPACE): self.state="playing"
-            elif self.settings_cursor==4:
-                if key in (pygame.K_RETURN,pygame.K_SPACE): self._exit_to_menu()
+        if self.state == "settings":
+            n_items = 6
+            if key == pygame.K_ESCAPE:
+                self.state = "playing"
+            elif key in (pygame.K_UP, pygame.K_w):
+                self.settings_cursor = (self.settings_cursor - 1) % n_items
+            elif key in (pygame.K_DOWN, pygame.K_s):
+                self.settings_cursor = (self.settings_cursor + 1) % n_items
+            elif key in (pygame.K_LEFT, pygame.K_a):
+                if self.settings_cursor == 0:
+                    self.music_volume = max(0.0, round(self.music_volume - 0.1, 1))
+                    self._apply_volume()
+            elif key in (pygame.K_RIGHT, pygame.K_d):
+                if self.settings_cursor == 0:
+                    self.music_volume = min(1.0, round(self.music_volume + 0.1, 1))
+                    self._apply_volume()
+            elif key in (pygame.K_RETURN, pygame.K_SPACE):
+                if self.settings_cursor == 1:
+                    self.music_muted = not self.music_muted
+                    self._apply_volume()
+                elif self.settings_cursor == 2:
+                    pygame.display.toggle_fullscreen()
+                elif self.settings_cursor == 3:
+                    self.state = "playing"
+                elif self.settings_cursor == 4:
+                    self.load_level()
+                    self.state = "playing"
+                    self.sfx.start_music(volume=self.music_volume)
+                elif self.settings_cursor == 5:
+                    self._exit_to_menu()
             return
 
-        # ── Win state ─────────────────────────────────────────────────────
-        if self.state=="win":
-            if key in (pygame.K_RETURN,pygame.K_SPACE,pygame.K_ESCAPE): self._exit_to_menu()
+        if self.state == "win":
+            if key in (pygame.K_RETURN, pygame.K_SPACE, pygame.K_ESCAPE):
+                if not self.ending_shown:
+                    self.ending_shown = True
+                    self.start_dialogue("ending", "ending_done")
+                    self.state = "ending"
+                    self.sfx.start_ending_music()
             return
 
-        # ── Playing state ─────────────────────────────────────────────────
-        if key==pygame.K_ESCAPE:
-            self.state="settings"; self.settings_cursor=3
-        elif key==pygame.K_r:
-            self._load_level()
-        elif key==pygame.K_e:
-            # Talk to nearest untouched NPC
+        # Playing
+        if key == pygame.K_ESCAPE:
+            self.state = "settings"
+            self.settings_cursor = 3
+        elif key == pygame.K_r:
+            self.player.hearts = 0
+            self.player.die()
+            self.sfx.play("death")
+        elif key in (pygame.K_SPACE, pygame.K_UP, pygame.K_w):
+            if self.player.alive and not self.player.on_ground and self.player.jump_count == 1:
+                self.player.vel_y = JUMP_VELOCITY * 0.85
+                self.player.jump_count = 2
+                self.sfx.play("jump")
+                for _ in range(4):
+                    self.particles.append(Particle(
+                        self.player.rect.centerx + random.randint(-6, 6),
+                        self.player.rect.bottom,
+                        random.choice([WHITE, SUN_YELLOW]),
+                        random.uniform(-1, 1), random.uniform(-0.5, 0.5), 12, 2, 0.08))
+        elif key == pygame.K_e:
             for npc in self.npcs:
                 if npc.check_proximity(self.player) and not npc.talked:
                     npc.talked = True
                     self.start_dialogue(npc.dialogue_key)
                     break
 
+    # ------------------------------------------------------------------
     def _update(self):
-        self.tick+=1; self.level_time+=1
-        keys=pygame.key.get_pressed()
+        self.tick += 1
+        keys = pygame.key.get_pressed()
 
-        for p in self.platforms: p.update()
+        for plat in self.platforms:
+            plat.update()
 
-        # NPC proximity display
+        result = self.player.update(keys, self.platforms)
+        if result == "jump":
+            self.sfx.play("jump")
+            for _ in range(5):
+                self.particles.append(Particle(
+                    self.player.rect.centerx + random.randint(-8, 8),
+                    self.player.rect.bottom,
+                    random.choice([WHITE, SUN_YELLOW, HOLY_GOLD]),
+                    random.uniform(-1.5, 1.5), random.uniform(-0.5, 0.5),
+                    15, random.randint(2, 4), 0.08))
+
+        if self.player.alive:
+            self.camera.update(self.player.rect)
+
+        # NPC proximity
         for npc in self.npcs:
             npc.proximity_shown = npc.check_proximity(self.player)
 
-        was_alive=self.player.alive
-        result=self.player.update(keys,self.platforms)
-        if result=="jump": self.sfx.play("jump")
-
-        # On death: reset countdown/tram/sleigh
-        if was_alive and not self.player.alive:
-            if self.countdown_platform_ref:
-                self.countdown_platform_ref.reset()
-            if self.tram_platform:
-                self.tram_platform.reset()
-            if self.santa_sleigh:
-                self.santa_sleigh.reset()
-            self._tram_started = False
-
-        # Tram + sleigh
-        if self.tram_platform and self.tram_platform.moving and not self._tram_started:
-            tram_travelled = self.tram_platform.rect.x - self.tram_platform.origin_x
-            trigger = getattr(self.tram_platform, "santa_trigger_dist", 200)
-            if tram_travelled >= trigger:
-                self._tram_started = True
-                if self.santa_sleigh:
-                    self.santa_sleigh.start(self.tram_platform.rect)
-        if self.santa_sleigh and self.santa_sleigh.state != "waiting":
-            sleigh_result = self.santa_sleigh.update(self.player)
-            if sleigh_result == "kill_player" and self.player.alive:
-                self._death_fx(); self.player.die(); self.sfx.play("death")
-        if (self.tram_platform and self.tram_platform.gone
-                and self.player.alive
-                and self.santa_sleigh
-                and not self.santa_sleigh.player_grabbed
-                and self.player.riding_platform is self.tram_platform):
-            self._death_fx(); self.player.die(); self.sfx.play("death")
-
-        # Section checkpoints
-        for sc in self.section_checkpoints:
-            was_active=sc.activated
-            sc.update()
-            just_activated=sc.check(self.player) or (sc.activated and not was_active)
-            if just_activated:
+        # Checkpoints
+        for cp in self.checkpoints:
+            cp.update()
+            if self.player.alive and cp.check(self.player):
                 self.sfx.play("checkpoint")
-                fx_x=(self.player.rect.centerx if sc.trigger_x>100000 else sc.trigger_x)
-                self._checkpoint_fx_at(fx_x, sc.float_y)
+                for _ in range(18):
+                    a = random.uniform(0, math.pi * 2)
+                    s = random.uniform(1, 4)
+                    self.particles.append(Particle(
+                        cp.rect.centerx, cp.rect.top,
+                        random.choice([HOLY_GOLD, WHITE, SUN_YELLOW]),
+                        math.cos(a) * s, math.sin(a) * s, 30, 3, 0.05))
 
-        if self.player.alive: self.camera.update(self.player.rect)
+        # Spawn Santa when player reaches trigger
+        if (not self.santa_spawned and self.player.alive
+                and self.player.rect.x >= self.santa_trigger_x):
+            self.santa_spawned = True
+            self.santa = SantaBoss(self.santa_spawn_x, -80)
 
-        for sp in self.spikes:
-            if sp.check_kill(self.player):
-                self._death_fx(); self.player.die(); self.sfx.play("death")
+        # Update Santa
+        if self.santa and self.santa.alive:
+            self.santa.update(
+                self.player.rect.centerx, self.player.rect.centery,
+                self.platforms, self.balloons)
+            # Gift from Santa
+            if self.santa.gift and not self.gift:
+                self.gift = self.santa.gift
 
-        self.balloon.update()
-        if self.balloon.check_grab(self.player):
-            self._balloon_fx()
-            self.sfx.play("balloon"); self.sfx.play("balloon_pop")
+        # Arrow vs Santa
+        for arrow in self.arrows:
+            if not arrow.alive:
+                continue
+            if (self.santa and self.santa.alive and not self.santa.dead
+                    and arrow.get_rect().colliderect(self.santa.rect)):
+                arrow.alive = False
+                killed = self.santa.hit()
+                self._arrow_hit_fx(int(arrow.x), int(arrow.y), big=killed)
+                if killed:
+                    self.sfx.play("santa_die")
+                    self.camera.add_shake(16)
+                    self.flashes.append(FlashOverlay(FIRE_ORANGE, 20, 160))
+                else:
+                    self.sfx.play("arrow_hit")
+                    self.camera.add_shake(4)
 
-        self.portal.update()
-        if self.player.alive and self.portal.check(self.player):
-            self.state="win"; self.win_timer=0
-            self.sfx.play("win"); self.sfx.stop_music()
+            # Arrow vs platforms
+            if not arrow.alive:
+                continue
+            ar = arrow.get_rect()
+            for plat in self.platforms:
+                if plat.is_active() and ar.colliderect(plat.get_rect()):
+                    arrow.alive = False
+                    for _ in range(6):
+                        self.particles.append(Particle(
+                            arrow.x, arrow.y,
+                            random.choice([ICE_BLUE, ICE_WHITE, ICE_CORE]),
+                            random.uniform(-2.5, 2.5), random.uniform(-2, 0.5),
+                            14, random.randint(2, 4), 0.08))
+                    break
 
-        # Trigger soul rise when death animation finishes (or immediately if fell off screen)
+        self.arrows = [a for a in self.arrows if a.update()]
+
+        # Balloon updates
+        for bal in self.balloons:
+            bal.update(self.platforms)
+            if not bal.splashing and bal.alive:
+                if bal.get_rect().colliderect(self.player.rect):
+                    if self.player.take_damage():
+                        bal.splashing = True
+                        bal.splash_timer = 18
+                        bal.splash_x = self.player.rect.centerx
+                        bal.splash_y = self.player.rect.top
+                        if self.player.alive:
+                            self.camera.add_shake(7)
+                            self.sfx.play("balloon_hit")
+                            self.damage_flashes.append(DamageFlash())
+                            # Knockback
+                            dx = self.player.rect.centerx - (
+                                self.santa.rect.centerx if self.santa else self.player.rect.centerx)
+                            self.player.vel_x = 6 * (1 if dx >= 0 else -1)
+                            self.player.vel_y = -5
+                        else:
+                            self._player_death_fx()
+                            self.sfx.play("death")
+        self.balloons = [b for b in self.balloons if b.alive or b.splashing]
+
+        # Gift pickup
+        if self.gift:
+            self.gift.update(self.platforms)
+            if self.gift.check(self.player):
+                self.player.activate_gift_power()
+                try:
+                    present_snd = pygame.mixer.Sound(PRESENT_MUSIC)
+                    present_snd.set_volume(0.8)
+                    present_snd.play()
+                except:
+                    self.sfx.play("powerup")
+                self._gift_fx(self.gift.x, self.gift.y)
+                self.score_popups.append((self.gift.x, self.gift.y - 20, "POWER GIFT!", 90, HOLY_GOLD))
+                self.gift = None
+
+        # Mushroom collisions
+        for mush in self.mushrooms:
+            mush.update()
+            coll = mush.check_collision(self.player)
+            if coll == "stomp":
+                self._stomp_fx(mush)
+                mush.stomp()
+                self.player.vel_y = -10
+                self.player.kill_count += 1
+                self.sfx.play("stomp")
+                self.freeze_frames = 3
+            elif coll == "kill_player":
+                if self.player.take_damage():
+                    if self.player.alive:
+                        self.camera.add_shake(8)
+                        self.sfx.play("death")
+                        self.damage_flashes.append(DamageFlash())
+                        dx = self.player.rect.centerx - mush.rect.centerx
+                        self.player.vel_x = 7 * (1 if dx >= 0 else -1)
+                        self.player.vel_y = -5
+                    else:
+                        self._player_death_fx()
+                        self.sfx.play("death")
+
+        self.mushrooms = [m for m in self.mushrooms
+                          if m.alive or (hasattr(m, 'squish_timer') and m.squish_timer > 0) or m.death_timer > 0]
+
+        # Exit portal
+        self.exit_portal.update()
+        if self.player.alive and self.exit_portal.check(self.player):
+            self.state = "win"
+            self.sfx.play("win")
+            self.sfx.stop_music()
+
+        # Particles
+        self.particles = [p for p in self.particles if p.update()]
+        self.rings = [r for r in self.rings if r.update()]
+        self.flashes = [f for f in self.flashes if f.update()]
+        self.damage_flashes = [d for d in self.damage_flashes if d.update()]
+        self.score_popups = [(x, y - 0.8, t, ti - 1, c) for x, y, t, ti, c in self.score_popups if ti > 0]
+
+        # Landing / footstep particles
+        if self.player.alive:
+            if self.player.on_ground and not self.player.was_on_ground:
+                for _ in range(7):
+                    self.particles.append(Particle(
+                        self.player.rect.centerx + random.randint(-10, 10),
+                        self.player.rect.bottom,
+                        random.choice([GRASS_GREEN, WHITE, SUN_YELLOW]),
+                        random.uniform(-2, 2), random.uniform(-1.5, 0), 16, 3, 0.1))
+            if self.player.on_ground and abs(self.player.vel_x) > 1 and self.tick % 6 == 0:
+                self.particles.append(Particle(
+                    self.player.rect.centerx + random.randint(-4, 4),
+                    self.player.rect.bottom,
+                    GRASS_GREEN,
+                    random.uniform(-0.5, 0.5), random.uniform(-1, -0.2), 12, 2, 0.06))
+
+        # Gift power sparkle trail
+        if self.player.alive and self.player.has_gift_power and self.tick % 3 == 0:
+            self.particles.append(Particle(
+                self.player.rect.centerx + random.randint(-8, 8),
+                self.player.rect.centery + random.randint(-10, 10),
+                random.choice([HOLY_GOLD, WHITE, SUN_YELLOW]),
+                random.uniform(-0.5, 0.5), random.uniform(-1.5, -0.3),
+                20, 3, 0.04))
+
+        # Clouds
+        for c in self.clouds:
+            c.update()
+
+        # Santa warning indicator
+        if self.santa and self.santa.alive and not self.santa.appeared:
+            if self.tick % 30 == 0:
+                self.score_popups.append((
+                    self.player.rect.x + 200, self.player.rect.y - 60,
+                    "⚠ SANTA INCOMING!", 60, FIRE_ORANGE))
+
+        # Soul death intercept
         if not self.player.alive and self.soul_state is None:
-            death_ready = getattr(self.player, '_spr_death_done', False)
-            fell_off = self.player.rect.top > SCREEN_HEIGHT
-            if death_ready or fell_off:
+            if self.player.respawn_timer <= 1:
                 self.player.respawn_timer = 9999
                 self.soul_x = float(self.player.rect.centerx)
-                self.soul_y = float(min(self.player.rect.centery, SCREEN_HEIGHT - 50))
-                self.soul_target_y = self.soul_y - 140
-                self.soul_timer = 0; self.soul_trail = []
-                self.soul_state = "rising"; self.sfx.play("soul_rise")
+                self.soul_y = float(self.player.rect.centery)
+                self.soul_target_y = self.player.rect.centery - 160
+                self.soul_timer = 0
+                self.soul_trail = []
+                self.soul_state = "rising"
+                self.fire_overlay_alpha = 255
+                self.sun_blaze = 0
+                self.sfx.play("soul_rise")
 
-        self.particles=[p for p in self.particles if p.update()]
-        self.rings    =[r for r in self.rings     if r.update()]
-        self.flashes  =[f for f in self.flashes   if f.update()]
-        for sf in self.snowflakes: sf.update()
-        self._spawn_ambient()
+        self.level_time += 1
 
-    def _death_fx(self):
-        cx,cy=self.player.rect.centerx,self.player.rect.centery
-        self.camera.add_shake(12); self.flashes.append(FlashOverlay(RED,18,110))
+    # ------------------------------------------------------------------
+    #  Effects
+    # ------------------------------------------------------------------
+    def _player_death_fx(self):
+        cx, cy = self.player.rect.centerx, self.player.rect.centery
+        self.camera.add_shake(16)
+        self.flashes.append(FlashOverlay(FIRE_ORANGE, 18, 140))
+        for _ in range(14):
+            a = random.uniform(0, math.pi * 2)
+            s = random.uniform(3, 9)
+            self.particles.append(Particle(
+                cx + random.randint(-6, 6), cy + random.randint(-8, 8),
+                random.choice([FIRE_ORANGE, FIRE_RED, FIRE_YELLOW]),
+                math.cos(a) * s, math.sin(a) * s - 2,
+                random.randint(35, 65), random.randint(4, 8), 0.3))
+
+    def _stomp_fx(self, mush):
+        cx, cy = mush.rect.centerx, mush.rect.bottom
+        self.camera.add_shake(5)
+        self.rings.append(RingEffect(cx, cy, WHITE, 45, 4, 2))
+        for _ in range(10):
+            a = random.uniform(-math.pi, 0)
+            s = random.uniform(1, 4)
+            self.particles.append(Particle(
+                cx, cy, random.choice([GRASS_GREEN, WHITE, SUN_YELLOW]),
+                math.cos(a) * s, math.sin(a) * s - 1, 20, 3, 0.12))
+        self.score_popups.append((cx, cy - 25, "+50", 50, WHITE))
+
+    def _arrow_hit_fx(self, x, y, big=False):
+        count = 20 if big else 10
+        for _ in range(count):
+            a = random.uniform(0, math.pi * 2)
+            s = random.uniform(2, 7 if big else 5)
+            self.particles.append(Particle(
+                x, y, random.choice([ICE_BLUE, ICE_WHITE, ICE_CORE, WHITE]),
+                math.cos(a) * s, math.sin(a) * s,
+                random.randint(20, 40), random.randint(2, 5 if big else 3), 0.05))
+        self.rings.append(RingEffect(x, y, ICE_BLUE, 60 if big else 35, 4, 2))
+        if big:
+            self.rings.append(RingEffect(x, y, ICE_WHITE, 90, 5, 3))
+            self.freeze_frames = 4
+        lbl = "CRITICAL!" if big else "HIT!"
+        self.score_popups.append((x, y - 22, lbl, 45, ICE_WHITE if big else ICE_BLUE))
+
+    def _gift_fx(self, x, y):
+        self.camera.add_shake(10)
+        self.flashes.append(FlashOverlay(HOLY_GOLD, 18, 140))
+        for i in range(3):
+            self.rings.append(RingEffect(int(x), int(y), HOLY_GOLD, 60 + i * 30, 3 + i, 3))
         for _ in range(30):
-            a=random.uniform(0,math.pi*2); s=random.uniform(2,6)
-            self.particles.append(Particle(cx,cy,random.choice([SNOW_WHITE,ICE_BLUE,CANDY_RED]),
-                                           math.cos(a)*s,math.sin(a)*s,random.randint(20,45),random.randint(3,6),0.18))
+            a = random.uniform(0, math.pi * 2)
+            s = random.uniform(2, 6)
+            self.particles.append(Particle(
+                x, y, random.choice([HOLY_GOLD, WHITE, SUN_YELLOW, GIFT_RED]),
+                math.cos(a) * s, math.sin(a) * s, 40, 4, 0.06))
 
-    def _balloon_fx(self):
-        cx,cy=self.balloon.rect.centerx,self.balloon.rect.centery
-        self.camera.add_shake(8); self.flashes.append(FlashOverlay(GOLD,12,90))
-        self.rings.append(RingEffect(cx,cy,BALLOON_PINK,70,5,3))
-        for _ in range(25):
-            a=random.uniform(0,math.pi*2); s=random.uniform(1,5)
-            self.particles.append(Particle(cx,cy,random.choice([BALLOON_RED,BALLOON_PINK,GOLD,WHITE]),
-                                           math.cos(a)*s,math.sin(a)*s,random.randint(20,40),random.randint(2,5),0.05))
-
-    def _checkpoint_fx_at(self,wx,wy):
-        self.rings.append(RingEffect(wx,wy,CP_GLOW,55,4,3))
-        self.flashes.append(FlashOverlay(CP_ACTIVE,10,60))
-        for _ in range(18):
-            a=random.uniform(0,math.pi*2); s=random.uniform(1,4)
-            self.particles.append(Particle(wx,wy,random.choice([CP_ACTIVE,CP_GLOW,WHITE,GOLD]),
-                                           math.cos(a)*s,math.sin(a)*s,random.randint(20,40),random.randint(2,5),0.06))
-
-    def _spawn_ambient(self):
-        for p in self.phantom_platforms:
-            if not p.gone and random.random()<0.15:
-                self.particles.append(Particle(p.rect.x+random.randint(0,p.rect.width),
-                    p.rect.y,PHANTOM_TEAL,random.uniform(-0.5,0.5),random.uniform(-1.5,-0.3),20,3,0.0))
-        for p in self.shrink_platforms:
-            if p.shrinking and not p.gone and random.random()<0.2:
-                self.particles.append(Particle(
-                    p.rect.x+random.randint(0,max(1,p.rect.width)),
-                    p.rect.y+random.randint(0,p.rect.height),
-                    ICE_BLUE,random.uniform(-1,1),random.uniform(-1.5,0),15,2,0.0))
-
-    # ── Drawing ───────────────────────────────────────────────────────────
+    # ------------------------------------------------------------------
+    #  Soul / resurrection animation
+    # ------------------------------------------------------------------
     def _update_soul(self):
         self.soul_timer += 1
-        # Sparkle particles around the soul (skip during panning)
+
+        # Fire overlay fades
+        if self.fire_overlay_alpha > 0:
+            self.fire_overlay_alpha = max(0, self.fire_overlay_alpha - 6)
+
+        # Sun blaze rises then falls
+        if self.soul_state in ("rising",):
+            self.sun_blaze = min(255, self.sun_blaze + 8)
+        else:
+            self.sun_blaze = max(0, self.sun_blaze - 4)
+
+        # Sparkle trail
         if self.soul_state != "panning":
-            for _ in range(random.randint(2, 3)):
-                a = random.uniform(0, math.pi*2); d = random.uniform(8, 20)
-                sx = self.soul_x + math.cos(a)*d; sy = self.soul_y + math.sin(a)*d
-                self.particles.append(Particle(sx, sy, (255, 210, 80),
-                    random.uniform(-0.5, 0.5), random.uniform(-1, 0),
-                    random.randint(12, 20), random.randint(1, 3), 0.02, fade=True))
+            for _ in range(2):
+                a = random.uniform(0, math.pi * 2)
+                d = random.uniform(6, 18)
+                self.particles.append(Particle(
+                    self.soul_x + math.cos(a) * d,
+                    self.soul_y + math.sin(a) * d,
+                    random.choice([HOLY_GOLD, WHITE, SUN_YELLOW]),
+                    random.uniform(-0.4, 0.4), random.uniform(-1.0, 0),
+                    random.randint(10, 20), 2, 0.02, fade=True))
+
         if self.soul_state == "rising":
-            t = min(1.0, self.soul_timer / 40)
+            t = min(1.0, self.soul_timer / 45)
             ease = t * t * (3 - 2 * t)
-            self.soul_y = self.player.rect.centery - ease * 140
-            self.soul_x = self.player.rect.centerx + math.sin(self.soul_timer * 0.15) * 12
+            self.soul_y = self.player.rect.centery - ease * 160
+            self.soul_x = self.player.rect.centerx + math.sin(self.soul_timer * 0.14) * 14
             self.soul_trail.append((self.soul_x, self.soul_y, 255))
-            if len(self.soul_trail) > 20: self.soul_trail.pop(0)
-            self.soul_trail = [(x, y, a-10) for x, y, a in self.soul_trail if a > 10]
-            if self.soul_timer >= 40:
-                self.soul_state = "panning"; self.soul_timer = 0; self.soul_trail = []
-                self.soul_pan_target_x = self.player.spawn_x + Player.WIDTH // 2 - self.camera.width // 3
-                self.soul_pan_target_y = self.player.spawn_y + Player.HEIGHT // 2 - self.camera.height // 2
+            if len(self.soul_trail) > 20:
+                self.soul_trail.pop(0)
+            self.soul_trail = [(x, y, a - 10) for x, y, a in self.soul_trail if a > 10]
+            if self.soul_timer >= 45:
+                self.soul_state = "panning"
+                self.soul_timer = 0
+                self.soul_trail = []
+                self.soul_pan_target_x = (self.player.spawn_x + Player.WIDTH // 2
+                                          - self.camera.width // 3)
+                self.soul_pan_target_y = (self.player.spawn_y + Player.HEIGHT // 2
+                                          - self.camera.height // 2)
+
         elif self.soul_state == "panning":
             dx = self.soul_pan_target_x - self.camera.offset_x
             dy = self.soul_pan_target_y - self.camera.offset_y
             self.camera.offset_x += dx * 0.12
             self.camera.offset_y += dy * 0.08
-            if self.soul_timer >= 20 and abs(dx) < 8 and abs(dy) < 8:
-                self.soul_state = "falling"; self.soul_timer = 0
+            close_enough = abs(dx) < 8 and abs(dy) < 8
+            if self.soul_timer >= 20 and close_enough:
+                self.soul_state = "falling"
+                self.soul_timer = 0
                 self.soul_x = float(self.player.spawn_x + Player.WIDTH // 2)
                 self.soul_y = self.camera.offset_y - 60
                 self.soul_target_y = float(self.player.spawn_y + Player.HEIGHT // 2)
-                self.soul_trail = []; self.sfx.play("soul_land")
+                self.soul_trail = []
+                self.sfx.play("soul_land")
+
         elif self.soul_state == "falling":
-            t = min(1.0, self.soul_timer / 35)
+            t = min(1.0, self.soul_timer / 38)
             ease = t * t * (3 - 2 * t)
             self.soul_y = -50 + (self.soul_target_y + 50) * ease
-            self.soul_x = (self.player.spawn_x + Player.WIDTH // 2) + math.sin(t * math.pi) * 30
+            self.soul_x = (self.player.spawn_x + Player.WIDTH // 2
+                           + math.sin(t * math.pi) * 28)
             self.soul_trail.append((self.soul_x, self.soul_y, 255))
-            if len(self.soul_trail) > 20: self.soul_trail.pop(0)
-            self.soul_trail = [(x, y, a-10) for x, y, a in self.soul_trail if a > 10]
-            if self.soul_timer >= 35:
-                self.player.respawn_timer = 0; self.player.respawn()
-                self.sfx.play("soul_land"); self.sfx.play("respawn")
+            if len(self.soul_trail) > 20:
+                self.soul_trail.pop(0)
+            self.soul_trail = [(x, y, a - 10) for x, y, a in self.soul_trail if a > 10]
+            if self.soul_timer >= 38:
+                self.player.respawn_timer = 0
+                self.player.respawn()
+                self.sfx.play("respawn")
                 self.respawn_fade = 20
-                self.flashes.append(FlashOverlay(WHITE, 12, 160))
-                for _ in range(25):
-                    a = random.uniform(0, math.pi*2); s = random.uniform(2, 7)
-                    self.particles.append(Particle(self.soul_x, self.soul_target_y,
-                        random.choice([WHITE, SNOW_WHITE, ICE_BLUE, XMAS_GOLD]),
-                        math.cos(a)*s, math.sin(a)*s, 30, random.randint(3, 7), 0.1))
-                self.rings.append(RingEffect(int(self.soul_x), int(self.soul_target_y), WHITE, 100, 6, 3))
-                self.soul_state = None; self.soul_trail = []
+                self.flashes.append(FlashOverlay(WHITE, 12, 200))
+                for _ in range(22):
+                    a = random.uniform(0, math.pi * 2)
+                    s = random.uniform(2, 7)
+                    self.particles.append(Particle(
+                        self.soul_x, self.soul_target_y,
+                        random.choice([WHITE, HOLY_GOLD, SUN_YELLOW, ANGEL_BLUE]),
+                        math.cos(a) * s, math.sin(a) * s, 30, 4, 0.1))
+                self.rings.append(RingEffect(
+                    int(self.soul_x), int(self.soul_target_y), HOLY_GOLD, 110, 6, 3))
+                self.soul_state = None
+                self.soul_trail = []
                 self.camera.update(self.player.rect)
+
         self.particles = [p for p in self.particles if p.update()]
         self.rings = [r for r in self.rings if r.update()]
         self.flashes = [f for f in self.flashes if f.update()]
 
     def _draw_soul(self):
-        if self.soul_state is None: return
-        # Pulsing dark overlay (same as level4)
-        dim_alpha = int(80 + 20 * math.sin(self.soul_timer * 0.12))
-        dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-        dim.fill((0, 0, 0, dim_alpha))
-        self.screen.blit(dim, (0, 0))
-        # During panning, only show the dark overlay — no soul orb
-        if self.soul_state == "panning": return
-        sp = self.camera.apply(pygame.Rect(int(self.soul_x), int(self.soul_y), 1, 1))
-        # Soul trail — fading circles
+        if self.soul_state is None:
+            return
+        # Fire overlay
+        if self.fire_overlay_alpha > 0:
+            fs = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            for row in range(SCREEN_HEIGHT):
+                t = row / SCREEN_HEIGHT
+                c = lerp_color(FIRE_YELLOW, FIRE_RED, t)
+                a = int(self.fire_overlay_alpha * (0.4 + 0.6 * (1 - t)))
+                fs.fill((*c, a), (0, row, SCREEN_WIDTH, 1))
+            self.screen.blit(fs, (0, 0))
+
+        # Sun blaze
+        if self.sun_blaze > 0:
+            ss = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            ss.fill((255, 230, 100, int(self.sun_blaze * 0.25)))
+            self.screen.blit(ss, (0, 0))
+
+        # Dark dimming overlay
+        if self.soul_state == "panning":
+            dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            dim.fill((0, 0, 0, 90))
+            self.screen.blit(dim, (0, 0))
+            return
+
+        # Soul trail
         for i, (sx, sy, sa) in enumerate(self.soul_trail):
             tp = self.camera.apply(pygame.Rect(int(sx), int(sy), 1, 1))
             frac = (i + 1) / max(1, len(self.soul_trail))
             r = max(2, int(10 * frac))
             al = max(0, min(255, int(sa * 0.4 * frac)))
-            ts = pygame.Surface((r*2, r*2), pygame.SRCALPHA)
-            pygame.draw.circle(ts, (255, 255, 255, al), (r, r), r)
+            ts = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
+            pygame.draw.circle(ts, (255, 240, 160, al), (r, r), r)
             self.screen.blit(ts, (tp.x - r, tp.y - r))
-        # Outer glow
-        for gr, ga in [(40, 40), (28, 80), (18, 160)]:
-            gs = pygame.Surface((gr*2, gr*2), pygame.SRCALPHA)
-            pygame.draw.circle(gs, (255, 255, 255, ga), (gr, gr), gr)
-            self.screen.blit(gs, (sp.x - gr, sp.y - gr))
-        # Core white orb
-        pygame.draw.circle(self.screen, WHITE, (sp.x, sp.y), 8)
-        pygame.draw.circle(self.screen, (240, 250, 255), (sp.x - 1, sp.y - 1), 4)
 
+        # Soul orb
+        sp = self.camera.apply(pygame.Rect(int(self.soul_x), int(self.soul_y), 1, 1))
+        for gr, ga in [(42, 35), (28, 70), (16, 160)]:
+            gs = pygame.Surface((gr * 2, gr * 2), pygame.SRCALPHA)
+            pygame.draw.circle(gs, (255, 230, 140, ga), (gr, gr), gr)
+            self.screen.blit(gs, (sp.x - gr, sp.y - gr))
+        pygame.draw.circle(self.screen, SUN_YELLOW, (sp.x, sp.y), 9)
+        pygame.draw.circle(self.screen, WHITE, (sp.x - 1, sp.y - 1), 4)
+
+    # ------------------------------------------------------------------
+    #  Drawing
+    # ------------------------------------------------------------------
     def _draw(self):
-        self.screen.fill(DARK_BG)
-        if self.state in ("playing","settings","dialogue"):
+        self.screen.fill(SKY_TOP)
+        if self.state == "playing":
             self._draw_game()
-        if self.state=="settings":
+        elif self.state == "settings":
+            self._draw_game()
             self._draw_settings()
-        elif self.state=="dialogue":
-            # Dim the game world during dialogue
-            dim = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-            dim.fill((0, 0, 0, 80))
-            self.screen.blit(dim, (0, 0))
+        elif self.state == "win":
+            self._draw_win()
+        elif self.state in ("dialogue", "ending"):
+            self._draw_game()
             if self.dialogue_box:
                 self.dialogue_box.draw(self.screen, self.tick)
-        elif self.state=="win":
-            self._draw_win()
         if self.respawn_fade > 0:
-            a = int(255*(1.0-abs(self.respawn_fade-10)/10.0))
-            if a > 0:
-                ov=pygame.Surface((SCREEN_WIDTH,SCREEN_HEIGHT)); ov.fill(BLACK)
-                ov.set_alpha(min(255,a)); self.screen.blit(ov,(0,0))
-            self.respawn_fade -= 1
+            alpha = int(255 * (1.0 - abs(self.respawn_fade - 10) / 10.0))
+            if alpha > 0:
+                overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+                overlay.fill(BLACK)
+                overlay.set_alpha(min(255, alpha))
+                self.screen.blit(overlay, (0, 0))
+
         pygame.display.flip()
 
     def _draw_background(self):
-        sky_top    = (8,  20,  55)
-        sky_mid    = (20, 45,  90)
-        sky_horz   = (50, 70, 110)
-        for y in range(SCREEN_HEIGHT):
+        # Sky gradient
+        for y in range(0, SCREEN_HEIGHT, 2):
             t = y / SCREEN_HEIGHT
-            if t < 0.6:
-                c = lerp_color(sky_top, sky_mid, t / 0.6)
-            else:
-                c = lerp_color(sky_mid, sky_horz, (t - 0.6) / 0.4)
-            pygame.draw.line(self.screen, c, (0, y), (SCREEN_WIDTH, y))
+            c = lerp_color(SKY_TOP, SKY_BOT, t)
+            self.screen.fill(c, (0, y, SCREEN_WIDTH, 2))
 
-        ox_slow = int(self.camera.offset_x * 0.05) % SCREEN_WIDTH
-        for i in range(80):
-            sx = (i * 173 + ox_slow) % SCREEN_WIDTH
-            sy = (i * 97)  % int(SCREEN_HEIGHT * 0.65)
-            brightness = 160 + int(50 * math.sin(self.tick * 0.03 + i))
-            r = 1 if i % 3 else 2
-            pygame.draw.circle(self.screen, (brightness, brightness, brightness), (sx, sy), r)
+        # Sun
+        mx, my = SCREEN_WIDTH - 130, 90
+        # Outer glow rings
+        for r2, a2 in [(80, 18), (60, 35), (45, 60), (32, 100)]:
+            gs = pygame.Surface((r2 * 2, r2 * 2), pygame.SRCALPHA)
+            pygame.draw.circle(gs, (*SUN_GOLD, a2), (r2, r2), r2)
+            self.screen.blit(gs, (mx - r2, my - r2))
+        pygame.draw.circle(self.screen, SUN_GOLD, (mx, my), 30)
+        pygame.draw.circle(self.screen, SUN_YELLOW, (mx, my), 24)
+        pygame.draw.circle(self.screen, WHITE, (mx, my), 14)
+        # Rays
+        for i in range(12):
+            a = math.radians(self.tick * 0.4 + i * 30)
+            x1 = mx + int(math.cos(a) * 34)
+            y1 = my + int(math.sin(a) * 34)
+            x2 = mx + int(math.cos(a) * (46 + int(math.sin(self.tick * 0.05 + i) * 5)))
+            y2 = my + int(math.sin(a) * (46 + int(math.sin(self.tick * 0.05 + i) * 5)))
+            pygame.draw.line(self.screen, SUN_GOLD, (x1, y1), (x2, y2), 2)
 
-        ox_far = int(self.camera.offset_x * 0.08) % SCREEN_WIDTH
-        far_col = (30, 50, 80)
-        far_pts = [(0, SCREEN_HEIGHT)]
-        for i in range(9):
-            px = int(SCREEN_WIDTH * i / 8)
-            heights = [380, 280, 340, 220, 300, 260, 360, 310, 380]
-            py = heights[i]
-            far_pts.append(((px - ox_far) % SCREEN_WIDTH, py))
-        far_pts.append((SCREEN_WIDTH, SCREEN_HEIGHT))
-        pygame.draw.polygon(self.screen, far_col, far_pts)
-        for i in range(1, len(far_pts) - 1):
-            px, py = far_pts[i]
-            if py < 310:
-                cap = [(px-18, py+20), (px, py-5), (px+18, py+20)]
-                pygame.draw.polygon(self.screen, (200, 215, 235), cap)
+        # Clouds (parallax with camera)
+        for cloud in self.clouds:
+            cloud.draw(self.screen)
 
-        ox_near = int(self.camera.offset_x * 0.18) % SCREEN_WIDTH
-        near_col = (15, 28, 52)
-        near_pts = [(0, SCREEN_HEIGHT)]
-        for i in range(7):
-            px = int(SCREEN_WIDTH * i / 6)
-            heights = [SCREEN_HEIGHT, 360, 250, 420, 180, 310, SCREEN_HEIGHT]
-            py = heights[i]
-            near_pts.append(((px - ox_near) % SCREEN_WIDTH, py))
-        near_pts.append((SCREEN_WIDTH, SCREEN_HEIGHT))
-        pygame.draw.polygon(self.screen, near_col, near_pts)
-        for i in range(1, len(near_pts) - 1):
-            px, py = near_pts[i]
-            if py < 300:
-                cap = [(px-25, py+30), (px, py-10), (px+25, py+30)]
-                pygame.draw.polygon(self.screen, (225, 235, 255), cap)
+        # ── Distant mountain scenery — 3 parallax layers, no twitching ──
+        world_ox = self.camera.offset_x * 0.15
+        base_y = SCREEN_HEIGHT - 30
 
-        pygame.draw.rect(self.screen, (200, 215, 235),
-                         (0, SCREEN_HEIGHT - 30, SCREEN_WIDTH, 30))
+        # Layer 1: Far hazy peaks
+        for wi in range(12):
+            world_mx = int((world_ox - 300) / 400) * 400 + wi * 400
+            screen_mx = int(world_mx - world_ox)
+            if screen_mx > SCREEN_WIDTH + 350: break
+            if screen_mx < -350: continue
+            rng = random.Random(int(world_mx) + 1111)
+            mh, mw = rng.randint(160, 260), rng.randint(180, 320)
+            pts = [(screen_mx - mw//2, base_y),(screen_mx - mw//6, base_y - mh*6//10),
+                   (screen_mx, base_y - mh),(screen_mx + mw//5, base_y - mh*7//10),(screen_mx + mw//2, base_y)]
+            pygame.draw.polygon(self.screen, (175, 200, 225), pts)
+            pygame.draw.polygon(self.screen, (190, 212, 232),
+                [(screen_mx - mw//6, base_y - mh*6//10),(screen_mx, base_y - mh),
+                 (screen_mx + mw//5, base_y - mh*7//10),(screen_mx, base_y - mh*3//10)])
+
+        # Layer 2: Mid rocky mountains
+        for wi in range(10):
+            world_mx = int((world_ox*1.05 - 300) / 500) * 500 + wi * 500
+            screen_mx = int(world_mx - world_ox * 1.05)
+            if screen_mx > SCREEN_WIDTH + 350: break
+            if screen_mx < -350: continue
+            rng = random.Random(int(world_mx) + 2222)
+            mh, mw = rng.randint(110, 190), rng.randint(150, 280)
+            pts = [(screen_mx - mw//2, base_y),(screen_mx - mw//8, base_y - mh*5//8),
+                   (screen_mx, base_y - mh),(screen_mx + mw//6, base_y - mh*7//10),(screen_mx + mw//2, base_y)]
+            pygame.draw.polygon(self.screen, (95, 120, 145), pts)
+            pygame.draw.polygon(self.screen, (125, 155, 175),
+                [(screen_mx - mw//8, base_y - mh*5//8),(screen_mx, base_y - mh),
+                 (screen_mx, base_y - mh*2//8),(screen_mx - mw//4, base_y)])
+            pygame.draw.polygon(self.screen, (150, 165, 178),
+                [(screen_mx - mw//12, base_y - mh + 4),(screen_mx, base_y - mh),(screen_mx + mw//14, base_y - mh + 6)])
+            if mh > 145:
+                pygame.draw.polygon(self.screen, (235, 242, 250),
+                    [(screen_mx - mw//9, base_y - mh + mh//5),(screen_mx, base_y - mh),(screen_mx + mw//10, base_y - mh + mh//5 - 4)])
+                pygame.draw.polygon(self.screen, (200, 215, 230),
+                    [(screen_mx, base_y - mh),(screen_mx + mw//10, base_y - mh + mh//5 - 4),(screen_mx + mw//8, base_y - mh + mh//5 + 2)])
+
+        # Layer 3: Foreground pine treeline ridge
+        for wi in range(14):
+            world_mx = int((world_ox*1.12 - 200) / 320) * 320 + wi * 320
+            screen_mx = int(world_mx - world_ox * 1.12)
+            if screen_mx > SCREEN_WIDTH + 250: break
+            if screen_mx < -250: continue
+            rng = random.Random(int(world_mx) + 3333)
+            cluster_w = rng.randint(80, 160)
+            ridge_h   = rng.randint(50, 95)
+            n_trees = rng.randint(4, 8)
+            for ti in range(n_trees):
+                tx = screen_mx - cluster_w//2 + int(ti * cluster_w / max(1, n_trees - 1))
+                th = rng.randint(ridge_h - 20, ridge_h + 20)
+                tw = rng.randint(14, 28)
+                ty = base_y - th
+                for tier in range(3):
+                    tier_y = ty + tier * (th // 4)
+                    tier_w = tw // 2 + tier * (tw // 3)
+                    c = (90, 140, 105) if tier == 0 else ((70, 110, 85) if tier == 1 else (55, 90, 70))
+                    pygame.draw.polygon(self.screen, c,
+                        [(tx - tier_w, tier_y + th//3),(tx, tier_y),(tx + tier_w, tier_y + th//3)])
+                pygame.draw.rect(self.screen, (50, 35, 20), (tx - 2, base_y - 12, 4, 12))
+
+        # Horizon haze
+        hz = pygame.Surface((SCREEN_WIDTH, 60), pygame.SRCALPHA)
+        for y in range(60):
+            a = int(80 * (1 - y / 60))
+            hz.fill((200, 230, 255, a), (0, y, SCREEN_WIDTH, 1))
+        self.screen.blit(hz, (0, SCREEN_HEIGHT - 60))
 
     def _draw_game(self):
         self._draw_background()
-        for sf in self.snowflakes: sf.draw(self.screen)
-        for p in self.platforms:   p.draw(self.screen,self.camera)
-        for sc in self.section_checkpoints: sc.draw_flag(self.screen,self.camera,self.cp_font)
-        for sp in self.spikes:     sp.draw(self.screen,self.camera)
-        self.balloon.draw(self.screen,self.camera,self.tick)
-        self.portal.draw(self.screen,self.camera)
-        if self.santa_sleigh:      self.santa_sleigh.draw(self.screen,self.camera)
-        for p in self.particles:   p.draw(self.screen,self.camera)
-        for r in self.rings:       r.draw(self.screen,self.camera)
-        # Draw NPCs
+
+        # Platforms
+        for plat in self.platforms:
+            plat.draw(self.screen, self.camera)
+
+        # Checkpoints
+        for cp in self.checkpoints:
+            cp.draw(self.screen, self.camera)
+
+        # Exit portal
+        self.exit_portal.draw(self.screen, self.camera, self.tick)
+
+        # NPCs
         for npc in self.npcs:
             npc.draw(self.screen, self.camera, self.tick)
-        self.player.draw(self.screen,self.camera,self.tick)
-        for f in self.flashes:     f.draw(self.screen)
 
-        # Zigzag progress hint
-        if self.zigzag_section and not self.zigzag_section.unlocked:
-            if self.zigzag_section.started:
-                hs=self.small_font.render(self.zigzag_section.progress_text(),True,CYAN)
-                self.screen.blit(hs,(SCREEN_WIDTH//2-hs.get_width()//2,SCREEN_HEIGHT-50))
+        # Mushrooms
+        for mush in self.mushrooms:
+            mush.draw(self.screen, self.camera, self.tick)
 
-        # HUD
-        self.screen.blit(self.small_font.render(f"Time: {self.level_time/FPS:.1f}s",True,SNOW_WHITE),
-                         (SCREEN_WIDTH-165,12))
-        total_sc=len(self.section_checkpoints)
-        reached_sc=sum(1 for sc in self.section_checkpoints if sc.activated)
-        cp_col=CP_ACTIVE if reached_sc==total_sc else SNOW_WHITE
-        self.screen.blit(self.small_font.render(f"CP  {reached_sc}/{total_sc}",True,cp_col),
-                         (SCREEN_WIDTH-165,34))
-        dc=self.DIFF_COLORS[self.difficulty]
-        ds=self.small_font.render(f"[ {self.difficulty.upper()} ]",True,dc)
-        self.screen.blit(ds,(SCREEN_WIDTH//2-ds.get_width()//2,10))
-        legend=[
-            (ICE_BLUE,     "Ice - shrinks"),
-            (FALLING_BROWN,"Wood - falls"),
-            (SPIKE_GRAY,   "Spikes - death"),
-            (BALLOON_RED,  "Balloon - fly"),
-            (PHANTOM_TEAL, "Teal - phantom"),
-            (COUNTDOWN_COL,"Blue - wait GO"),
-            (LEDGE_L_COL,  "Blue ledge - left"),
-            (LEDGE_R_COL,  "Gold ledge - right"),
-            (MOVING_COL,   "Gold tram - jump!"),
-            (CP_ACTIVE,    "Flag - checkpoint"),
-        ]
-        for li,(col,txt) in enumerate(legend):
-            pygame.draw.rect(self.screen,col,(12,12+li*17,10,10))
-            self.screen.blit(self.tiny_font.render(txt,True,(160,180,200)),(26,10+li*17))
-        self.screen.blit(self.tiny_font.render(
-            "SPACE/W-Jump  A/D-Move  E-Talk  R-Restart  ESC-Settings",True,(80,100,120)),
-            (10,SCREEN_HEIGHT-20))
+        # Santa
+        if self.santa:
+            self.santa.draw(self.screen, self.camera, self.tick)
+
+        # Water balloons
+        for bal in self.balloons:
+            bal.draw(self.screen, self.camera, self.tick)
+
+        # Gift
+        if self.gift:
+            self.gift.draw(self.screen, self.camera, self.tick)
+
+        # Arrows
+        for arrow in self.arrows:
+            arrow.draw(self.screen, self.camera, self.tick)
+
+        # Particles & effects
+        for p in self.particles:
+            p.draw(self.screen, self.camera)
+        for r in self.rings:
+            r.draw(self.screen, self.camera)
+        for f in self.flashes:
+            f.draw(self.screen)
+        for d in self.damage_flashes:
+            d.draw(self.screen)
+
+        # Player
+        self.player.draw(self.screen, self.camera, self.tick)
+
+        # Score popups
+        for x, y, text, timer, color in self.score_popups:
+            a = min(1.0, timer / 30)
+            c = tuple(max(0, min(255, int(v * a))) for v in color)
+            pos = self.camera.apply(pygame.Rect(int(x), int(y), 1, 1))
+            surf = self.small_font.render(text, True, c)
+            self.screen.blit(surf, surf.get_rect(center=(pos.x, pos.y)))
+
+        # ── HUD ──
+        hud_x, hud_y = 12, 10
+
+        def _hud_text(font, text, color, x, y):
+            self.screen.blit(font.render(text, True, BLACK), (x + 1, y + 1))
+            self.screen.blit(font.render(text, True, color), (x, y))
+
+        # Hearts
+        for i in range(PLAYER_MAX_HEARTS):
+            hx = hud_x + i * 26
+            c = XMAS_RED if i < self.player.hearts else (50, 50, 50)
+            hscale = 0
+            if i == 0 and self.player.hearts == 1 and self.player.alive:
+                hscale = int(abs(math.sin(self.tick * 0.12)) * 2)
+            for dx2, dy2, sc in [(1, 1, BLACK), (0, 0, c)]:
+                pygame.draw.circle(self.screen, sc, (hx + 5 + dx2, hud_y + dy2), 5 + hscale)
+                pygame.draw.circle(self.screen, sc, (hx + 13 + dx2, hud_y + dy2), 5 + hscale)
+                pygame.draw.polygon(self.screen, sc,
+                                    [(hx - hscale + dx2, hud_y + 2 + dy2),
+                                     (hx + 9 + dx2, hud_y + 11 + hscale + dy2),
+                                     (hx + 18 + hscale + dx2, hud_y + 2 + dy2)])
+            if i >= self.player.hearts:
+                pygame.draw.circle(self.screen, (30, 30, 30), (hx + 5, hud_y), 5, 1)
+                pygame.draw.circle(self.screen, (30, 30, 30), (hx + 13, hud_y), 5, 1)
+
+        # Kill count
+        if self.player.kill_count > 0:
+            _hud_text(self.tiny_font, f"Stomped: {self.player.kill_count}", HOLY_GOLD, hud_x, hud_y + 20)
+
+        # Gift power bar
+        if self.player.has_gift_power:
+            rem = self.player.gift_power_timer / FPS
+            bw, bh = 120, 12
+            bx2, by2 = hud_x, hud_y + 36
+            ratio = self.player.gift_power_timer / 600
+            pygame.draw.rect(self.screen, (40, 40, 40), (bx2 - 2, by2 - 2, bw + 4, bh + 4))
+            for px_i in range(int(bw * ratio)):
+                t = px_i / bw
+                bc = lerp_color(GIFT_RED, HOLY_GOLD, t)
+                self.screen.fill(bc, (bx2 + px_i, by2, 1, bh))
+            _hud_text(self.tiny_font, f"POWER  {rem:.0f}s", HOLY_GOLD, bx2 + 4, by2)
+
+        # Santa HP (top center, shown only when santa is alive)
+        if self.santa and self.santa.alive and not self.santa.dead:
+            pass  # Already drawn on Santa sprite
+
+        # Time / right side
+        t2 = self.level_time / FPS
+        _hud_text(self.tiny_font, f"Time: {t2:.1f}s", HOLY_WHITE, SCREEN_WIDTH - 120, 10)
+        _hud_text(self.tiny_font, "Level 2", ANGEL_BLUE, SCREEN_WIDTH - 120, 24)
+
+        # Bottom help
+        self.screen.blit(
+            self.tiny_font.render(
+                "LEFT CLICK to shoot arrow  |  SPACE=Jump  |  SHIFT=Sprint  |  E=Talk  |  ESC=Settings  |  R=Respawn",
+                True, (60, 70, 90)),
+            (10, SCREEN_HEIGHT - 16))
+
+        # Low health border
+        if self.player.hearts == 1 and self.player.alive:
+            pulse = abs(math.sin(self.tick * 0.08)) * 0.5
+            lh_s = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            for bi in range(5):
+                ia = max(0, int(35 * pulse) - bi * 6)
+                if ia > 0:
+                    pygame.draw.rect(lh_s, (220, 50, 50, ia),
+                                     (bi, bi, SCREEN_WIDTH - 2 * bi, SCREEN_HEIGHT - 2 * bi), 1)
+            self.screen.blit(lh_s, (0, 0))
+
+        if not self.player.alive and self.soul_state is None:
+            txt = self.font.render("Respawning...", True, FIRE_ORANGE)
+            self.screen.blit(txt, txt.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)))
+
         if self.soul_state is not None:
             self._draw_soul()
-        elif not self.player.alive:
-            t=self.font.render("Respawning...",True,RED)
-            self.screen.blit(t,t.get_rect(center=(SCREEN_WIDTH//2,SCREEN_HEIGHT//2)))
 
     def _draw_settings(self):
-        ov=pygame.Surface((SCREEN_WIDTH,SCREEN_HEIGHT)); ov.fill(BLACK); ov.set_alpha(170)
-        self.screen.blit(ov,(0,0))
-        tit=self.font.render("SETTINGS",True,CYAN)
-        self.screen.blit(tit,tit.get_rect(center=(SCREEN_WIDTH//2,130)))
-        dc=self.DIFF_COLORS[self.difficulty]
-        desc={"easy":"Slow shrink | long warning | generous balloon",
-              "medium":"Balanced experience",
-              "hard":"Fast shrink | instant drop | blink phantom"}
-        ds=self.tiny_font.render(desc[self.difficulty],True,dc)
-        self.screen.blit(ds,ds.get_rect(center=(SCREEN_WIDTH//2,168)))
-        items=[(f"Difficulty :  < {self.difficulty.upper()} >","Left/Right — restarts level instantly"),
-               (f"Music Volume :  < {int(self.music_volume*100)}% >","Left/Right"),
-               (f"Mute Music :  {'OFF' if self.music_muted else 'ON'}","Enter to toggle"),
-               ("Resume","Enter or ESC"),("Exit to Menu","Enter")]
-        for i,(label,hint) in enumerate(items):
-            y=205+i*58; sel=(i==self.settings_cursor)
-            if sel:
-                bar=pygame.Rect(SCREEN_WIDTH//2-240,y-4,480,30)
-                pygame.draw.rect(self.screen,(30,40,60),bar)
-                pygame.draw.rect(self.screen,CYAN,bar,1)
-                self.screen.blit(self.small_font.render(">",True,CYAN),(SCREEN_WIDTH//2-228,y))
-            rc=(dc if(i==0 and sel) else lerp_color(dc,GRAY,0.5) if i==0
-                else WHITE if sel else GRAY)
-            self.screen.blit(self.small_font.render(label,True,rc),(SCREEN_WIDTH//2-200,y))
-            if sel: self.screen.blit(self.tiny_font.render(hint,True,(100,120,140)),(SCREEN_WIDTH//2-200,y+22))
-        bx=SCREEN_WIDTH//2-100; by=205+58+33
-        pygame.draw.rect(self.screen,DARK_GRAY,(bx,by,200,6))
-        pygame.draw.rect(self.screen,RED if self.music_muted else CYAN,(bx,by,int(200*self.music_volume),6))
-        pygame.draw.rect(self.screen,WHITE,(bx,by,200,6),1)
-        ft=self.tiny_font.render("ESC to resume",True,(80,80,100))
-        self.screen.blit(ft,(SCREEN_WIDTH//2-ft.get_width()//2,SCREEN_HEIGHT-30))
+        panel_w, panel_h = 500, 450
+        panel_x = SCREEN_WIDTH // 2 - panel_w // 2
+        panel_y = 60
+        panel_rect = pygame.Rect(panel_x, panel_y, panel_w, panel_h)
+        draw_wooden_panel(self.screen, panel_rect, "SETTINGS", self.font)
+
+        is_fs = bool(pygame.display.get_surface().get_flags() & pygame.FULLSCREEN)
+        items = [
+            f"Music Volume:  < {int(self.music_volume * 100)}% >",
+            f"Mute Music:    {'ON' if self.music_muted else 'OFF'}",
+            f"Fullscreen:    {'ON' if is_fs else 'OFF'}",
+            "Resume Game",
+            "Restart Level",
+            "Exit to Main Menu",
+        ]
+        bar_w = 440
+        bar_h = 36
+        start_y = panel_y + 70
+
+        mouse_pos = pygame.mouse.get_pos()
+        mouse_moved = mouse_pos != self._last_mouse_pos
+        self._last_mouse_pos = mouse_pos
+        self._settings_boxes = []
+
+        for i, item in enumerate(items):
+            y = start_y + i * 50
+            bar = pygame.Rect(SCREEN_WIDTH // 2 - bar_w // 2, y, bar_w, bar_h)
+            self._settings_boxes.append(bar)
+            if mouse_moved and bar.collidepoint(mouse_pos):
+                self.settings_cursor = i
+            sel = (i == self.settings_cursor)
+            draw_wooden_bar(self.screen, bar, item, self.small_font, sel, self.tick)
+
+        # Music volume slider below item 0
+        slider_x = SCREEN_WIDTH // 2 - 100
+        slider_y = start_y + 0 * 50 + bar_h + 4
+        self._settings_vol_slider = draw_wooden_slider(self.screen, slider_x, slider_y, 200, self.music_volume, self.music_muted, self.tiny_font)
+
+        esc = self.small_font.render("ESC to resume", True, (150, 120, 80))
+        self.screen.blit(esc, esc.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 30)))
 
     def _draw_win(self):
         self._draw_background()
-        for sf in self.snowflakes: sf.draw(self.screen)
-        t=self.big_font.render("SECOND REALM CLEARED!",True,GOLD)
-        self.screen.blit(t,t.get_rect(center=(SCREEN_WIDTH//2,140)))
-        sm=self.font.render("Snow Miser tips his hat... reluctantly.",True,ICE_BLUE)
-        self.screen.blit(sm,sm.get_rect(center=(SCREEN_WIDTH//2,205)))
-        for lbl,col,y in [
-            ("You escaped the Second Realm!",ICE_BLUE,265),
-            (f"Time: {self.level_time/FPS:.1f} seconds",YELLOW,315),
-            (f"Checkpoints: {sum(1 for sc in self.section_checkpoints if sc.activated)}/{len(self.section_checkpoints)}",CP_ACTIVE,365),
-            (f"Difficulty: {self.difficulty.upper()}",self.DIFF_COLORS[self.difficulty],415),
-        ]:
-            t2=self.font.render(lbl,True,col)
-            self.screen.blit(t2,t2.get_rect(center=(SCREEN_WIDTH//2,y)))
-        h=self.small_font.render("Press ENTER or ESC to exit",True,WHITE)
-        self.screen.blit(h,h.get_rect(center=(SCREEN_WIDTH//2,480)))
+        for c in self.clouds:
+            c.update()
+            c.draw(self.screen)
 
-    # expose zigzag_section for HUD
-    @property
-    def zigzag_section(self):
-        return self._zigzag_section if hasattr(self, '_zigzag_section') else None
+        if self.win_timer % 8 == 0:
+            for _ in range(4):
+                self.particles.append(Particle(
+                    random.randint(200, SCREEN_WIDTH - 200),
+                    random.randint(50, 200),
+                    random.choice([HOLY_GOLD, SUN_YELLOW, WHITE, ANGEL_BLUE]),
+                    random.uniform(-2, 2), random.uniform(1, 3), 60, 4, 0.05))
+        for p in self.particles:
+            p.draw(self.screen, self.camera)
+        self.particles = [p for p in self.particles if p.update()]
 
-    def _load_level(self):
-        preset=DIFFICULTY_PRESETS[self.difficulty]
-        d=create_christmas_level(preset)
-        self.platforms              =d["platforms"]
-        self.shrink_platforms       =d["shrink_platforms"]
-        self.fall_platforms         =d["fall_platforms"]
-        self.phantom_platforms      =d["phantom_platforms"]
-        self.countdown_platforms    =d["countdown_platforms"]
-        self.countdown_platform_ref =d["countdown_platform_ref"]
-        self._zigzag_section        =d["zigzag_section"]
-        self.tram_platform          =d["tram_platform"]
-        self.santa_sleigh           =d["santa_sleigh"]
-        self.spikes                 =d["spikes"]
-        self.balloon                =d["balloon"]
-        self.portal                 =d["portal"]
-        self.section_checkpoints    =d["section_checkpoints"]
-        self.npcs                   =d["npcs"]
-        self.player=Player(80,BASE_Y-60,
-                           move_speed=preset["player_speed"],
-                           jump_velocity=preset["player_jump"])
-        self.camera=Camera(SCREEN_WIDTH,SCREEN_HEIGHT)
-        self.particles.clear(); self.rings.clear(); self.flashes.clear()
-        self.level_time=0; self.tick=0; self.win_timer=0
-        self._tram_started=False
-        self.dialogue_box  = None
-        self.pending_state = None
+        txt = self.big_font.render("SKY TRIAL COMPLETE!", True, SUN_YELLOW)
+        self.screen.blit(txt, txt.get_rect(center=(SCREEN_WIDTH // 2, 110)))
+        txt2 = self.font.render("THE SECOND REALM — CONQUERED", True, HOLY_GOLD)
+        self.screen.blit(txt2, txt2.get_rect(center=(SCREEN_WIDTH // 2, 170)))
+
+        t2 = self.level_time / FPS
+        stats = [
+            (f"Time: {t2:.1f}s", HOLY_WHITE),
+            (f"Deaths: {self.player.death_count}", FIRE_ORANGE),
+            (f"Mushrooms stomped: {self.player.kill_count}", GRASS_GREEN),
+            (f"Santa defeated: {'Yes' if self.santa_spawned else 'No'}", SANTA_RED),
+        ]
+        for i, (s, sc) in enumerate(stats):
+            surf = self.font.render(s, True, sc)
+            self.screen.blit(surf, surf.get_rect(center=(SCREEN_WIDTH // 2, 240 + i * 46)))
+
+        if t2 < 120:
+            rank, rc = "S", HOLY_GOLD
+        elif t2 < 200:
+            rank, rc = "A", GRASS_GREEN
+        elif t2 < 320:
+            rank, rc = "B", ANGEL_BLUE
+        else:
+            rank, rc = "C", GRAY
+        rs = self.big_font.render(f"Rank: {rank}", True, rc)
+        self.screen.blit(rs, rs.get_rect(center=(SCREEN_WIDTH // 2, 460)))
+
+        pulse = abs(math.sin(self.tick * 0.05)) * 0.5 + 0.5
+        hint = self.small_font.render("Press ENTER to continue to the ending...", True, HOLY_WHITE)
+        hint.set_alpha(int(128 + 127 * pulse))
+        self.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH // 2, 530)))
+        self.tick += 1
+
 
 
 # ---------------------------------------------------------------------------
-# Entry points
+# Entry point (mirrors Level 4 pattern)
 # ---------------------------------------------------------------------------
 def launch_game():
+    # Stop whatever main.py was playing
     pygame.mixer.music.stop()
-    game=Game(); game.run()
-    pygame.display.set_caption("Christmas Pixel Adventure")
-    try: pygame.mixer.music.load("assets/audio/backgroundlevel2.mp3"); pygame.mixer.music.play(-1)
-    except: pass
+    pygame.event.clear()
+    # Re-init mixer to clear any state issues
+    pygame.mixer.quit()
+    pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=512)
+    # Create game and start music before entering the loop
+    game = Game()
+    game.sfx.start_music(volume=game.music_volume)
+    game.run()
+    pygame.event.clear()
+    pygame.display.set_caption("The Endless Dream")
+    # Restore main menu music
+    try:
+        pygame.mixer.music.stop()
+        pygame.mixer.quit()
+        pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=512)
+        pygame.mixer.music.load(os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "assets", "audio", "BackgroundMusic.mp3"))
+        pygame.mixer.music.play(-1)
+    except:
+        pass
 
-if __name__=="__main__":
-    pygame.init(); pygame.mixer.init()
-    game=Game(); game.run()
+
+if __name__ == "__main__":
+    pygame.init()
+    pygame.mixer.init()
+    game = Game()
+    game.run()
     pygame.quit()

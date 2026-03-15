@@ -4,7 +4,12 @@ import math
 import random
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+_FONT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "fonts")
+TITLE_FONT_PATH = os.path.join(_FONT_DIR, "title_font.ttf")
+BTN_FONT_PATH = os.path.join(_FONT_DIR, "button_font.ttf")
 from player_sprites import init_player_sprite, draw_player_sprite
+from wood_ui import draw_wooden_bar, draw_wooden_panel, draw_wooden_slider
 
 SCREEN_WIDTH  = 1280
 SCREEN_HEIGHT = 720
@@ -473,7 +478,7 @@ class NPC:
         pygame.draw.circle(surface, lerp_color(XMAS_GOLD, WHITE, star_pulse), (bx+22, by+4), 2)
         # Name tag with shadow
         if not self.talked:
-            font = pygame.font.SysFont("consolas", 10, bold=True)
+            font = pygame.font.Font(TITLE_FONT_PATH,10)
             tag = font.render(self.name, True, XMAS_GOLD)
             tag_sh = font.render(self.name, True, (0,0,0))
             surface.blit(tag_sh, (bx + 12 - tag.get_width()//2 + 1, by - 13))
@@ -482,14 +487,14 @@ class NPC:
             exc_pulse = abs(math.sin(tick * 0.1)) * 0.5 + 0.5
             exc_c = lerp_color(XMAS_RED, (255,100,100), exc_pulse)
             exc_scale = int(exc_pulse * 2)
-            exc_font = pygame.font.SysFont("consolas", 12 + exc_scale, bold=True)
+            exc_font = pygame.font.Font(TITLE_FONT_PATH,12 + exc_scale)
             exc = exc_font.render("!", True, exc_c)
             exc_sh = exc_font.render("!", True, (0,0,0))
             surface.blit(exc_sh, (bx + 12 - exc.get_width()//2 + 1, by - 25))
             surface.blit(exc, (bx + 12 - exc.get_width()//2, by - 26))
         # Talk prompt with background pill
         if self.proximity_shown and not self.talked:
-            font2 = pygame.font.SysFont("consolas", 11)
+            font2 = pygame.font.Font(TITLE_FONT_PATH,11)
             prompt = font2.render("[E] Talk", True, SNOW_WHITE)
             pw, ph = prompt.get_width() + 8, prompt.get_height() + 4
             px2 = bx + 12 - pw // 2; py2 = by - 38
@@ -553,8 +558,8 @@ class DialogueBox:
             pygame.draw.circle(surface, XMAS_GOLD, (cx, cy), 3)
         # Speaker name - more prominent with underline
         speaker, text = self.dialogues[self.index]
-        font_name = pygame.font.SysFont("consolas", 17, bold=True)
-        font_text = pygame.font.SysFont("consolas", 14)
+        font_name = pygame.font.Font(TITLE_FONT_PATH,17)
+        font_text = pygame.font.Font(TITLE_FONT_PATH,14)
         if speaker:
             name_c = XMAS_GOLD if "Elder" in speaker else XMAS_GREEN if "Holly" in speaker else XMAS_RED
             # Shadow
@@ -593,7 +598,7 @@ class DialogueBox:
                     prompt = font_text.render("[ENTER] Close", True, GRAY)
                 surface.blit(prompt, (box_rect.right - prompt.get_width() - 16, box_rect.bottom - 22))
         # Page counter - subtle
-        pg_font = pygame.font.SysFont("consolas", 11)
+        pg_font = pygame.font.Font(TITLE_FONT_PATH,11)
         pg = pg_font.render(f"{self.index+1}/{len(self.dialogues)}", True, (60,60,70))
         surface.blit(pg, (box_rect.x + 16, box_rect.bottom - 18))
 
@@ -1172,7 +1177,7 @@ class ExitDoor:
             pygame.draw.circle(surface,rib,(gr2.centerx-2,gr2.y),2)
             pygame.draw.circle(surface,rib,(gr2.centerx+2,gr2.y),2)
         # Text above
-        font=pygame.font.SysFont("consolas",11,bold=True)
+        font=pygame.font.Font(TITLE_FONT_PATH,11)
         if has_enough:
             lbl=font.render("The way home...",True,XMAS_GOLD)
         else:
@@ -1471,7 +1476,7 @@ class BombMonster:
             pygame.draw.line(surface, DARK_GRAY, (cx+2,cy-2), (cx-1,cy+5), 2)
 
         if self.state == "ticking" and self.fuse_timer < 60 and (tick//20)%2==0:
-            font = pygame.font.SysFont("consolas", 9, bold=True)
+            font = pygame.font.Font(TITLE_FONT_PATH,9)
             hint = font.render(f"SHOOT x{self.hits_to_kill - self.hits}!", True, FUSE_RED)
             surface.blit(hint, (cx - hint.get_width()//2, cy - br - 22))
 
@@ -2431,14 +2436,14 @@ def _get_cr_fonts():
     global _cr_fonts_cache
     if _cr_fonts_cache is None:
         _cr_fonts_cache = {
-            "heading":    pygame.font.SysFont("consolas", 42, bold=True),
-            "subheading": pygame.font.SysFont("consolas", 30, bold=True),
-            "name":       pygame.font.SysFont("consolas", 36, bold=True),
-            "role":       pygame.font.SysFont("consolas", 16),
-            "body":       pygame.font.SysFont("consolas", 20),
-            "small":      pygame.font.SysFont("consolas", 14),
-            "big_title":  pygame.font.SysFont("consolas", 56, bold=True),
-            "subtitle":   pygame.font.SysFont("consolas", 18),
+            "heading":    pygame.font.Font(TITLE_FONT_PATH, 42),
+            "subheading": pygame.font.Font(TITLE_FONT_PATH, 30),
+            "name":       pygame.font.Font(TITLE_FONT_PATH, 36),
+            "role":       pygame.font.Font(TITLE_FONT_PATH,16),
+            "body":       pygame.font.Font(TITLE_FONT_PATH,20),
+            "small":      pygame.font.Font(TITLE_FONT_PATH,14),
+            "big_title":  pygame.font.Font(TITLE_FONT_PATH, 56),
+            "subtitle":   pygame.font.Font(TITLE_FONT_PATH,18),
         }
     return _cr_fonts_cache
 
@@ -2455,80 +2460,82 @@ _CR_PINK      = (180, 100, 150)
 _CR_GOLD      = (180, 140, 30)
 
 CREDITS_DATA = [
-    ("", "body", _CR_WHITE, 80),
-    ("WAS IT ALL A DREAM?", "big_title", _CR_HEADER, 10),
-    ("A Frozen Realm  -  The Final Chapter", "body", _CR_BLUE, 6),
-    ("A Christmas-themed platformer adventure", "small", _CR_DIM, 30),
-    ("", "body", _CR_WHITE, 30),
-    ("The Team", "heading", _CR_HEADER, 12),
-    ("Muqeet", "name", _CR_RED, 2),
-    ("Developer  -  Level 4  -  The Final Realm", "role", _CR_DIM, 22),
-    ("Omar", "name", _CR_GREEN, 2),
-    ("Developer  -  Level 1  -  The First Realm", "role", _CR_DIM, 22),
-    ("John", "name", _CR_BLUE, 2),
-    ("Developer  -  Level 3  -  The Third Realm", "role", _CR_DIM, 22),
-    ("Danial", "name", _CR_PINK, 2),
-    ("Developer  -  Level 2  -  The Second Realm", "role", _CR_DIM, 22),
-    ("", "body", _CR_WHITE, 30),
-    ("Game Design", "subheading", _CR_SUBHEADER, 4),
-    ("Muqeet  /  Omar  /  John  /  Danial", "role", _CR_BODY, 14),
-    ("Art & Visuals", "subheading", _CR_SUBHEADER, 4),
-    ("Muqeet  /  Omar  /  John  /  Danial", "role", _CR_BODY, 14),
-    ("Music & Sound", "subheading", _CR_SUBHEADER, 4),
-    ("Muqeet  /  Omar  /  John  /  Danial", "role", _CR_BODY, 14),
-    ("Level Design", "subheading", _CR_SUBHEADER, 4),
-    ("Muqeet  /  Omar  /  John  /  Danial", "role", _CR_BODY, 14),
-    ("Story & Narrative", "subheading", _CR_SUBHEADER, 4),
-    ("Muqeet  /  Omar  /  John  /  Danial", "role", _CR_BODY, 14),
-    ("QA & Playtesting", "subheading", _CR_SUBHEADER, 4),
-    ("Muqeet  /  Omar  /  John  /  Danial", "role", _CR_BODY, 14),
-    ("", "body", _CR_WHITE, 30),
-    ("Music Credits", "heading", _CR_HEADER, 12),
-    ("\"Running Up That Hill\"", "body", _CR_WHITE, 2),
-    ("by Kate Bush", "role", _CR_DIM, 20),
-    ("\"Civilian\"", "body", _CR_WHITE, 2),
-    ("by Wye Oak", "role", _CR_DIM, 20),
-    ("\"City of Tears\"", "body", _CR_WHITE, 2),
-    ("from Hollow Knight  -  by Christopher Larkin", "role", _CR_DIM, 20),
-    ("", "body", _CR_WHITE, 30),
-    ("Built With", "heading", _CR_HEADER, 12),
-    ("Python 3  /  Pygame", "role", _CR_BODY, 4),
-    ("Pixel Art  /  Retro Sound Design", "role", _CR_BODY, 4),
-    ("Passion  /  Sleepless Nights  /  Coffee", "role", _CR_BODY, 14),
-    ("", "body", _CR_WHITE, 30),
-    ("Special Thanks", "heading", _CR_HEADER, 12),
-    ("Mary Ting", "body", _CR_WHITE, 2),
-    ("For the guidance and inspiration", "role", _CR_DIM, 20),
-    ("Our Classmates", "body", _CR_WHITE, 2),
-    ("For the feedback, support, and laughs", "role", _CR_DIM, 20),
-    ("The Pygame Community", "body", _CR_WHITE, 2),
-    ("For the tools that made this possible", "role", _CR_DIM, 20),
-    ("Every Playtester", "body", _CR_WHITE, 2),
-    ("Who found the bugs we missed", "role", _CR_DIM, 20),
-    ("Open-Source Creators", "body", _CR_WHITE, 2),
-    ("Whose sprites, fonts, and sounds", "role", _CR_DIM, 2),
-    ("brought this world to life", "role", _CR_DIM, 20),
-    ("Our Families", "body", _CR_WHITE, 2),
-    ("For putting up with us during crunch", "role", _CR_DIM, 20),
-    ("", "body", _CR_WHITE, 30),
-    ("A Note to the Player", "heading", _CR_HEADER, 12),
-    ("You braved the four realms.", "body", _CR_BLUE, 4),
-    ("You faced every monster, every trap,", "role", _CR_BODY, 2),
-    ("every impossible jump.", "role", _CR_BODY, 14),
-    ("You refused to give up.", "body", _CR_GREEN, 14),
-    ("The dream is over now.", "role", _CR_BODY, 2),
-    ("You can finally wake up.", "role", _CR_BODY, 14),
-    ("But we hope a little piece", "role", _CR_DIM, 2),
-    ("of this adventure stays with you.", "role", _CR_DIM, 14),
-    ("", "body", _CR_WHITE, 30),
-    ("Thank You for Playing", "heading", _CR_HEADER, 12),
-    ("This game was made with heart.", "body", _CR_BODY, 4),
-    ("We hope it made you smile.", "body", _CR_BODY, 14),
-    ("Every snowflake, every light, every pixel", "role", _CR_BLUE, 2),
-    ("was crafted in the spirit of Christmas.", "role", _CR_BLUE, 14),
-    ("", "body", _CR_WHITE, 120),
-    ("WAS IT ALL A DREAM?", "big_title", _CR_HEADER, 8),
-    ("Imaging Assignment  -  2026", "subtitle", _CR_DIM, 40),
+    ("", "body", _CR_WHITE, 100),
+    ("WAS IT ALL A DREAM?", "big_title", _CR_HEADER, 14),
+    ("A Frozen Realm - The Final Chapter", "body", _CR_BLUE, 8),
+    ("A Christmas-themed platformer adventure", "small", _CR_DIM, 50),
+    ("", "body", _CR_WHITE, 40),
+    ("The Team", "heading", _CR_HEADER, 18),
+    ("Muqeet", "name", _CR_RED, 4),
+    ("Developer - Level 4 - The Final Realm", "role", _CR_DIM, 30),
+    ("Omar", "name", _CR_GREEN, 4),
+    ("Developer - Level 3 - The Third Realm", "role", _CR_DIM, 30),
+    ("John", "name", _CR_BLUE, 4),
+    ("Developer - Level 2 - The Second Realm", "role", _CR_DIM, 30),
+    ("Danial", "name", _CR_PINK, 4),
+    ("Developer - Level 1 - The First Realm", "role", _CR_DIM, 30),
+    ("", "body", _CR_WHITE, 40),
+    ("Game Design", "subheading", _CR_SUBHEADER, 6),
+    ("Muqeet / Omar / John / Danial", "role", _CR_BODY, 22),
+    ("Art & Visuals", "subheading", _CR_SUBHEADER, 6),
+    ("Muqeet / Omar / John / Danial", "role", _CR_BODY, 22),
+    ("Music & Sound", "subheading", _CR_SUBHEADER, 6),
+    ("Muqeet / Omar / John / Danial", "role", _CR_BODY, 22),
+    ("Level Design", "subheading", _CR_SUBHEADER, 6),
+    ("Muqeet / Omar / John / Danial", "role", _CR_BODY, 22),
+    ("Story & Narrative", "subheading", _CR_SUBHEADER, 6),
+    ("Muqeet / Omar / John / Danial", "role", _CR_BODY, 22),
+    ("QA & Playtesting", "subheading", _CR_SUBHEADER, 6),
+    ("Muqeet / Omar / John / Danial", "role", _CR_BODY, 22),
+    ("", "body", _CR_WHITE, 40),
+    ("Music Credits", "heading", _CR_HEADER, 18),
+    ("\"Running Up That Hill\"", "body", _CR_WHITE, 4),
+    ("by Kate Bush", "role", _CR_DIM, 28),
+    ("\"Civilian\"", "body", _CR_WHITE, 4),
+    ("by Wye Oak", "role", _CR_DIM, 28),
+    ("\"City of Tears\"", "body", _CR_WHITE, 4),
+    ("from Hollow Knight - by Christopher Larkin", "role", _CR_DIM, 28),
+    ("\"Maestro\"", "body", _CR_WHITE, 4),
+    ("from The Holiday - by Hans Zimmer", "role", _CR_DIM, 28),
+    ("", "body", _CR_WHITE, 40),
+    ("Built With", "heading", _CR_HEADER, 18),
+    ("Python 3 / Pygame", "role", _CR_BODY, 6),
+    ("Pixel Art / Retro Sound Design", "role", _CR_BODY, 6),
+    ("Passion / Sleepless Nights / Coffee", "role", _CR_BODY, 22),
+    ("", "body", _CR_WHITE, 40),
+    ("Special Thanks", "heading", _CR_HEADER, 18),
+    ("Mary Ting", "body", _CR_WHITE, 4),
+    ("For the guidance and inspiration", "role", _CR_DIM, 28),
+    ("Our Classmates", "body", _CR_WHITE, 4),
+    ("For the feedback, support, and laughs", "role", _CR_DIM, 28),
+    ("The Pygame Community", "body", _CR_WHITE, 4),
+    ("For the tools that made this possible", "role", _CR_DIM, 28),
+    ("Every Playtester", "body", _CR_WHITE, 4),
+    ("Who found the bugs we missed", "role", _CR_DIM, 28),
+    ("Open-Source Creators", "body", _CR_WHITE, 4),
+    ("Whose sprites, fonts, and sounds", "role", _CR_DIM, 4),
+    ("brought this world to life", "role", _CR_DIM, 28),
+    ("Our Families", "body", _CR_WHITE, 4),
+    ("For putting up with us during crunch", "role", _CR_DIM, 28),
+    ("", "body", _CR_WHITE, 40),
+    ("A Note to the Player", "heading", _CR_HEADER, 18),
+    ("You braved the four realms.", "body", _CR_BLUE, 6),
+    ("You faced every monster, every trap,", "role", _CR_BODY, 4),
+    ("every impossible jump.", "role", _CR_BODY, 22),
+    ("You refused to give up.", "body", _CR_GREEN, 22),
+    ("The dream is over now.", "role", _CR_BODY, 4),
+    ("You can finally wake up.", "role", _CR_BODY, 22),
+    ("But we hope a little piece", "role", _CR_DIM, 4),
+    ("of this adventure stays with you.", "role", _CR_DIM, 22),
+    ("", "body", _CR_WHITE, 40),
+    ("Thank You for Playing", "heading", _CR_HEADER, 18),
+    ("This game was made with heart.", "body", _CR_BODY, 6),
+    ("We hope it made you smile.", "body", _CR_BODY, 22),
+    ("Every snowflake, every light, every pixel", "role", _CR_BLUE, 4),
+    ("was crafted in the spirit of Christmas.", "role", _CR_BLUE, 22),
+    ("", "body", _CR_WHITE, 140),
+    ("WAS IT ALL A DREAM?", "big_title", _CR_HEADER, 12),
+    ("Imaging Assignment - 2026", "subtitle", _CR_DIM, 50),
 ]
 
 def get_credits_max_scroll():
@@ -2622,15 +2629,18 @@ def draw_credits_screen(surface, scroll, tick, max_scroll=None):
 class Game:
     def __init__(self):
         self.screen = pygame.display.get_surface()
+        _fs = self.screen and (self.screen.get_flags() & pygame.FULLSCREEN)
         if self.screen is None or self.screen.get_size() != (SCREEN_WIDTH, SCREEN_HEIGHT):
-            self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+            self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.FULLSCREEN if _fs else 0)
+        elif _fs:
+            self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.FULLSCREEN)
         pygame.display.set_caption("Was It All A Dream? - The Final Realm")
         self.clock = pygame.time.Clock()
-        self.font = pygame.font.SysFont("consolas", 24)
-        self.small_font = pygame.font.SysFont("consolas", 16)
-        self.big_font = pygame.font.SysFont("consolas", 48)
-        self.tiny_font = pygame.font.SysFont("consolas", 12, bold=True)
-        self.title_font = pygame.font.SysFont("consolas", 36, bold=True)
+        self.font = pygame.font.Font(TITLE_FONT_PATH, 24)
+        self.small_font = pygame.font.Font(TITLE_FONT_PATH, 16)
+        self.big_font = pygame.font.Font(TITLE_FONT_PATH, 48)
+        self.tiny_font = pygame.font.Font(TITLE_FONT_PATH, 12)
+        self.title_font = pygame.font.Font(TITLE_FONT_PATH, 36)
         self.sfx = SoundManager()
         self.state = "playing"  # playing / settings / win / dialogue / ending / stats
         self.current_level = 0; self.level_time = 0; self.tick = 0; self.win_timer = 0
@@ -2736,7 +2746,7 @@ class Game:
                     if self.state == "playing":
                         mx, my = event.pos
                         if mx >= SCREEN_WIDTH - 50 and my <= 50:
-                            self.state = "settings"; self.settings_cursor = 4
+                            self.state = "settings"; self.settings_cursor = 5
                     elif self.state == "settings":
                         mpos = event.pos
                         # Volume slider clicks
@@ -2759,11 +2769,13 @@ class Game:
                                         idx = diffs.index(self.difficulty)
                                         self.difficulty = diffs[(idx + 1) % 3]
                                     elif i == 4:
-                                        self.state = "playing"
+                                        pygame.display.toggle_fullscreen()
                                     elif i == 5:
+                                        self.state = "playing"
+                                    elif i == 6:
                                         self.load_level(); self.state = "playing"
                                         self.sfx.start_music(volume=self.music_volume)
-                                    elif i == 6:
+                                    elif i == 7:
                                         self._exit_to_menu()
             if not self.running: return
             # Update music crossfade system
@@ -2900,7 +2912,7 @@ class Game:
             return
         # Settings
         if self.state == "settings":
-            n_items = 7
+            n_items = 8
             if key == pygame.K_ESCAPE: self.state = "playing"
             elif key in (pygame.K_UP, pygame.K_w): self.settings_cursor = (self.settings_cursor - 1) % n_items
             elif key in (pygame.K_DOWN, pygame.K_s): self.settings_cursor = (self.settings_cursor + 1) % n_items
@@ -2927,11 +2939,12 @@ class Game:
                     self.music_muted = not self.music_muted; self._apply_volume()
                 elif self.settings_cursor == 3:
                     pass  # use arrows
-                elif self.settings_cursor == 4: self.state = "playing"
-                elif self.settings_cursor == 5:
+                elif self.settings_cursor == 4: pygame.display.toggle_fullscreen()
+                elif self.settings_cursor == 5: self.state = "playing"
+                elif self.settings_cursor == 6:
                     self.load_level(); self.state = "playing"
                     self.sfx.start_music(volume=self.music_volume)
-                elif self.settings_cursor == 6:
+                elif self.settings_cursor == 7:
                     self._exit_to_menu()
             return
         # Stats screen
@@ -2969,7 +2982,7 @@ class Game:
             return
         # Playing
         if key == pygame.K_ESCAPE:
-            self.state = "settings"; self.settings_cursor = 4
+            self.state = "settings"; self.settings_cursor = 5
         elif key == pygame.K_r:
             self.player.unreal_timer = 0; self.player.hearts = 0; self.player.die(); self.sfx.play("death")
         elif key in (pygame.K_f, pygame.K_x):
@@ -4009,7 +4022,7 @@ class Game:
         er = self.camera.apply(self.exit_door.rect)
         if self.ORNAMENT_GATE > 0 and self.player.ornament_count < self.ORNAMENT_GATE:
             if 0 < er.centerx < SCREEN_WIDTH:
-                gf2 = pygame.font.SysFont("consolas", 13, bold=True)
+                gf2 = pygame.font.Font(TITLE_FONT_PATH,13)
                 gate_txt = f"{self.player.ornament_count}/{self.ORNAMENT_GATE} ornaments needed"
                 gt = gf2.render(gate_txt, True, XMAS_RED)
                 tbg = pygame.Surface((gt.get_width()+12, gt.get_height()+6), pygame.SRCALPHA)
@@ -4038,7 +4051,7 @@ class Game:
             sz = min(28, 16 + cnt * 2)
             c = lerp_color(XMAS_GOLD, WHITE, min(1.0, cnt / 8))
             c = tuple(max(0, min(255, int(v * a))) for v in c)
-            f = pygame.font.SysFont("consolas", sz, bold=True)
+            f = pygame.font.Font(TITLE_FONT_PATH,sz)
             txt = f.render(f"x{cnt}!", True, c)
             pos = self.camera.apply(pygame.Rect(int(x), int(y), 1, 1))
             self.screen.blit(txt, txt.get_rect(center=(pos.x, pos.y)))
@@ -4123,7 +4136,7 @@ class Game:
             csz = min(36, 22 + self.combo_count * 2)
             cc = lerp_color(XMAS_GOLD, WHITE, min(1.0, self.combo_count / 8))
             cc_s = tuple(max(0, min(255, int(v * combo_a))) for v in cc)
-            cf = pygame.font.SysFont("consolas", csz, bold=True)
+            cf = pygame.font.Font(TITLE_FONT_PATH,csz)
             combo_text = f"COMBO x{self.combo_count}!"
             combo_surf = cf.render(combo_text, True, cc_s)
             combo_rect = combo_surf.get_rect(center=(SCREEN_WIDTH // 2, 42))
@@ -4230,8 +4243,8 @@ class Game:
         self.screen.blit(esc_label, esc_label.get_rect(center=(SCREEN_WIDTH - 26, 42)))
         # --- Bottom help bar (pill-shaped, semi-transparent) ---
         help_items = [
-            ("\u2190\u2192 Move", (160, 170, 190)),
-            ("\u2191 Jump", (160, 170, 190)),
+            ("AD Move", (160, 170, 190)),
+            ("W Jump", (160, 170, 190)),
             ("SHIFT Dash", (160, 170, 190)),
             ("F/X Shoot", (160, 170, 190)),
             ("E Talk", (160, 170, 190)),
@@ -4264,56 +4277,29 @@ class Game:
             self._draw_soul()
 
     def _draw_settings(self):
-        # Frosted glass overlay - dark semi-transparent panel
-        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-        overlay.fill((15, 15, 25, 210))
-        self.screen.blit(overlay, (0, 0))
-
-        # Subtle floating snowflakes (low alpha)
-        for i in range(12):
-            sx2 = (100 + i * 105 + int(math.sin(self.tick * 0.02 + i * 1.3) * 30)) % SCREEN_WIDTH
-            sy2 = (60 + i * 50 + int(math.sin(self.tick * 0.015 + i * 0.7) * 20)) % SCREEN_HEIGHT
-            sz = 2 + int(abs(math.sin(self.tick * 0.03 + i)) * 2)
-            sf_s = pygame.Surface((sz * 2 + 2, sz * 2 + 2), pygame.SRCALPHA)
-            pygame.draw.circle(sf_s, (255, 255, 255, 40), (sz + 1, sz + 1), sz)
-            self.screen.blit(sf_s, (sx2 - sz, sy2 - sz))
-
-        # Main panel
-        panel_w, panel_h = 500, 530
+        panel_w, panel_h = 500, 575
         panel_x = SCREEN_WIDTH // 2 - panel_w // 2
-        panel_y = 60
-        panel_surf = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
-        pygame.draw.rect(panel_surf, (25, 25, 40, 200), (0, 0, panel_w, panel_h), border_radius=16)
-        pygame.draw.rect(panel_surf, (80, 80, 100, 120), (0, 0, panel_w, panel_h), 2, border_radius=16)
-        self.screen.blit(panel_surf, (panel_x, panel_y))
+        panel_y = 40
+        panel_rect = pygame.Rect(panel_x, panel_y, panel_w, panel_h)
+        draw_wooden_panel(self.screen, panel_rect, "PAUSED", self.title_font)
 
-        # Title "PAUSED" with warm glow
-        title_text = "PAUSED"
-        title_surf = self.title_font.render(title_text, True, XMAS_GOLD)
-        title_rect = title_surf.get_rect(center=(SCREEN_WIDTH // 2, panel_y + 40))
-        # Glow behind title
-        glow_s = pygame.Surface((title_rect.width + 40, title_rect.height + 20), pygame.SRCALPHA)
-        glow_a = int(abs(math.sin(self.tick * 0.04)) * 30) + 25
-        pygame.draw.rect(glow_s, (255, 200, 50, glow_a), (0, 0, glow_s.get_width(), glow_s.get_height()), border_radius=12)
-        self.screen.blit(glow_s, (title_rect.x - 20, title_rect.y - 10))
-        self.screen.blit(title_surf, title_rect)
-
-        # Menu items with icons
+        # Menu items
+        is_fs = bool(pygame.display.get_surface().get_flags() & pygame.FULLSCREEN)
         items = [
             f"Music:  < {int(self.music_volume * 100)}% >",
             f"SFX:  < {int(self.sfx_volume * 100)}% >",
             f"Mute:  {'ON' if self.music_muted else 'OFF'}",
             f"Difficulty:  < {self.difficulty.upper()} >",
+            f"Fullscreen:  {'ON' if is_fs else 'OFF'}",
             "Resume",
             "Restart Level",
             "Exit to Menu",
         ]
-        item_colors = [SNOW_WHITE, SNOW_WHITE, SNOW_WHITE, SNOW_WHITE, XMAS_GREEN, XMAS_GOLD, XMAS_RED]
 
         start_y = panel_y + 75
         bar_w = 420
         bar_h = 36
-        slider_gap = 16  # extra space for slider below volume items
+        slider_gap = 16
 
         mouse_pos = pygame.mouse.get_pos()
         mouse_moved = mouse_pos != self._last_mouse_pos
@@ -4322,7 +4308,6 @@ class Game:
 
         _item_y_positions = []
         for i, item in enumerate(items):
-            # Items 0,1 have sliders below them so items after get extra offset
             if i <= 1:
                 y = start_y + i * (bar_h + slider_gap + 6)
             else:
@@ -4334,106 +4319,19 @@ class Game:
             if mouse_moved and bar.collidepoint(mouse_pos):
                 self.settings_cursor = i
             sel = (i == self.settings_cursor)
+            draw_wooden_bar(self.screen, bar, item, self.font, sel, self.tick)
 
-            # Bar background
-            bar_surf = pygame.Surface((bar_w, bar_h), pygame.SRCALPHA)
-            if sel:
-                pygame.draw.rect(bar_surf, (50, 45, 30, 180), (0, 0, bar_w, bar_h), border_radius=8)
-                self.screen.blit(bar_surf, bar.topleft)
-                pygame.draw.rect(self.screen, (220, 180, 60), bar, 2, border_radius=8)
-                color = item_colors[i]
-            else:
-                pygame.draw.rect(bar_surf, (35, 35, 50, 140), (0, 0, bar_w, bar_h), border_radius=8)
-                self.screen.blit(bar_surf, bar.topleft)
-                pygame.draw.rect(self.screen, (70, 70, 90, 80), bar, 1, border_radius=8)
-                color = (180, 180, 195)
-
-            # Draw icon for each item
-            icon_x = bar_x + 18
-            icon_cy = y + bar_h // 2
-            if i == 0:
-                # Music note icon
-                pygame.draw.circle(self.screen, color, (icon_x + 4, icon_cy + 3), 4)
-                pygame.draw.line(self.screen, color, (icon_x + 8, icon_cy + 3), (icon_x + 8, icon_cy - 8), 2)
-                pygame.draw.line(self.screen, color, (icon_x + 8, icon_cy - 8), (icon_x + 14, icon_cy - 6), 2)
-            elif i == 1:
-                # Speaker icon for SFX
-                pygame.draw.rect(self.screen, color, (icon_x, icon_cy - 4, 6, 8))
-                pygame.draw.polygon(self.screen, color, [(icon_x + 6, icon_cy - 4), (icon_x + 12, icon_cy - 8), (icon_x + 12, icon_cy + 8), (icon_x + 6, icon_cy + 4)])
-                for sw in range(2):
-                    arc_r = 5 + sw * 4
-                    pygame.draw.arc(self.screen, color, (icon_x + 13, icon_cy - arc_r, arc_r * 2, arc_r * 2), -0.6, 0.6, 1)
-            elif i == 2:
-                # Speaker with X for mute
-                pygame.draw.rect(self.screen, color, (icon_x, icon_cy - 4, 6, 8))
-                pygame.draw.polygon(self.screen, color, [(icon_x + 6, icon_cy - 4), (icon_x + 12, icon_cy - 8), (icon_x + 12, icon_cy + 8), (icon_x + 6, icon_cy + 4)])
-                if self.music_muted:
-                    pygame.draw.line(self.screen, XMAS_RED, (icon_x + 15, icon_cy - 5), (icon_x + 22, icon_cy + 5), 2)
-                    pygame.draw.line(self.screen, XMAS_RED, (icon_x + 22, icon_cy - 5), (icon_x + 15, icon_cy + 5), 2)
-            elif i == 3:
-                # Gear icon for difficulty
-                pygame.draw.circle(self.screen, color, (icon_x + 8, icon_cy), 7, 2)
-                pygame.draw.circle(self.screen, color, (icon_x + 8, icon_cy), 3)
-                for gi in range(6):
-                    ga = gi * math.pi / 3 + self.tick * 0.02
-                    gx = icon_x + 8 + int(9 * math.cos(ga))
-                    gy = icon_cy + int(9 * math.sin(ga))
-                    pygame.draw.circle(self.screen, color, (gx, gy), 2)
-            elif i == 4:
-                # Play triangle for resume
-                pygame.draw.polygon(self.screen, color, [(icon_x + 3, icon_cy - 7), (icon_x + 3, icon_cy + 7), (icon_x + 15, icon_cy)])
-            elif i == 5:
-                # Restart arrow
-                pygame.draw.arc(self.screen, color, (icon_x + 2, icon_cy - 7, 14, 14), 0.5, 5.5, 2)
-                pygame.draw.polygon(self.screen, color, [(icon_x + 14, icon_cy - 7), (icon_x + 14, icon_cy + 1), (icon_x + 19, icon_cy - 3)])
-            elif i == 6:
-                # X for exit
-                pygame.draw.line(self.screen, color, (icon_x + 3, icon_cy - 5), (icon_x + 13, icon_cy + 5), 2)
-                pygame.draw.line(self.screen, color, (icon_x + 13, icon_cy - 5), (icon_x + 3, icon_cy + 5), 2)
-
-            # Item text
-            txt = self.font.render(item, True, color)
-            self.screen.blit(txt, (bar_x + 42, y + (bar_h - txt.get_height()) // 2))
-
-        # Helper to draw a volume slider
-        def _draw_slider(sy, volume, muted, slider_idx):
-            sx = SCREEN_WIDTH // 2 - 150
-            sw = 300; sh = 8
-            slider_rect = pygame.Rect(sx, sy - 4, sw, sh + 8)
-            pygame.draw.rect(self.screen, (40, 40, 55), (sx - 2, sy - 2, sw + 4, sh + 4), border_radius=5)
-            fill_w = int(sw * volume)
-            for px in range(fill_w):
-                t2 = px / sw
-                vc = lerp_color(XMAS_GREEN, XMAS_RED, t2) if not muted else (80, 30, 30)
-                pygame.draw.line(self.screen, vc, (sx + px, sy), (sx + px, sy + sh - 1))
-            pygame.draw.rect(self.screen, (100, 100, 120), (sx, sy, sw, sh), 1, border_radius=4)
-            kx = sx + fill_w
-            pygame.draw.circle(self.screen, WHITE, (kx, sy + sh // 2), 7)
-            pygame.draw.circle(self.screen, XMAS_GOLD, (kx, sy + sh // 2), 4)
-            pct = self.small_font.render(f"{int(volume * 100)}%", True, (160, 160, 180))
-            self.screen.blit(pct, (sx + sw + 14, sy - 2))
-            return slider_rect
-
-        # Music volume slider (below item 0)
-        self._settings_vol_slider = _draw_slider(_item_y_positions[0] + bar_h + 2, self.music_volume, self.music_muted, 0)
-
-        # SFX volume slider (below item 1)
-        self._settings_sfx_slider = _draw_slider(_item_y_positions[1] + bar_h + 2, self.sfx_volume, self.music_muted, 1)
-
-        # Difficulty description (below item 3)
-        desc = {"easy": "Relaxed: Slower enemies, bombs need 1 hit, longer fuse",
-                "medium": "Balanced: Moderate speed, bombs need 2 hits",
-                "hard": "Intense: Fast aggressive enemies, bombs need 2 hits, short fuse"}
-        dc = XMAS_GREEN if self.difficulty == "easy" else XMAS_GOLD if self.difficulty == "medium" else XMAS_RED
-        dt = self.small_font.render(desc[self.difficulty], True, dc)
-        self.screen.blit(dt, dt.get_rect(center=(SCREEN_WIDTH // 2, _item_y_positions[3] + bar_h + 4)))
+        # Volume sliders using wooden style
+        slider_x = SCREEN_WIDTH // 2 - 150
+        slider_w = 300
+        self._settings_vol_slider = draw_wooden_slider(self.screen, slider_x, _item_y_positions[0] + bar_h + 4, slider_w, self.music_volume, self.music_muted, self.small_font)
+        self._settings_sfx_slider = draw_wooden_slider(self.screen, slider_x, _item_y_positions[1] + bar_h + 4, slider_w, self.sfx_volume, self.music_muted, self.small_font)
 
         # Footer controls bar
         footer_y = panel_y + panel_h - 10
-        footer_text = "\u2191\u2193 Navigate    \u2190\u2192 Adjust    ENTER Select    ESC Resume"
-        ft_surf = self.small_font.render(footer_text, True, (110, 110, 130))
+        footer_text = "UP/DOWN Navigate    LEFT/RIGHT Adjust    ENTER Select    ESC Resume"
+        ft_surf = self.small_font.render(footer_text, True, (150, 120, 80))
         ft_rect = ft_surf.get_rect(center=(SCREEN_WIDTH // 2, footer_y))
-        # Subtle background bar
         fb_surf = pygame.Surface((ft_rect.width + 30, ft_rect.height + 10), pygame.SRCALPHA)
         pygame.draw.rect(fb_surf, (0, 0, 0, 80), (0, 0, fb_surf.get_width(), fb_surf.get_height()), border_radius=10)
         self.screen.blit(fb_surf, (ft_rect.x - 15, ft_rect.y - 5))
@@ -4462,7 +4360,7 @@ class Game:
         if timer < 30:
             t_scale = 0.5 + 0.5 * title_ease
             t_size = max(16, int(48 * t_scale))
-            tf = pygame.font.SysFont("consolas", t_size, bold=True)
+            tf = pygame.font.Font(TITLE_FONT_PATH,t_size)
         else:
             tf = self.big_font
         title = tf.render("REALM CONQUERED!", True, XMAS_GREEN)
@@ -4527,7 +4425,7 @@ class Game:
             from_dir = -1 if i % 2 == 0 else 1
             offset_x = int((1.0 - ease) * 400 * from_dir)
             font_size = int(22 * min(1.0, 0.8 + 0.2 * min(1.0, line_timer / 20)))
-            f = pygame.font.SysFont("consolas", font_size, bold=True)
+            f = pygame.font.Font(TITLE_FONT_PATH,font_size)
             if line_timer < 8:
                 flash = 1.0 - line_timer / 8
                 rc = tuple(min(255, int(c + (255 - c) * flash * 0.6)) for c in color)
@@ -4545,7 +4443,7 @@ class Game:
             sp2 = min(1.0, score_timer / 15)
             se = sp2 * sp2 * (3 - 2 * sp2)
             s_size = int(26 * (0.5 + 0.5 * se))
-            sf = pygame.font.SysFont("consolas", s_size, bold=True)
+            sf = pygame.font.Font(TITLE_FONT_PATH,s_size)
             score_surf = sf.render(f"Score: {score}", True, SNOW_WHITE)
             score_sh = sf.render(f"Score: {score}", True, (0, 0, 0))
             self.screen.blit(score_sh, score_sh.get_rect(center=(cx + 2, sy + 12)))
@@ -4557,7 +4455,7 @@ class Game:
             rp = min(1.0, rank_timer / 20)
             r_ease = rp * rp * (3 - 2 * rp)
             r_size = int(52 * (0.3 + 0.7 * r_ease))
-            rf = pygame.font.SysFont("consolas", r_size, bold=True)
+            rf = pygame.font.Font(TITLE_FONT_PATH,r_size)
             rank_text = f"Rank: {rank}"
             rank_y = sy + 55
             if rank_timer < 30:
@@ -4773,7 +4671,7 @@ class Game:
         pygame.draw.circle(self.screen, (120, 90, 60), (ns2_x + 25, ns_y + 35), 3)
         # Alarm clock
         pygame.draw.rect(self.screen, (50, 50, 55), (ns2_x + 10, ns_y - 12, 22, 14), border_radius=2)
-        time_font = pygame.font.SysFont("consolas", 9)
+        time_font = pygame.font.Font(TITLE_FONT_PATH,9)
         time_surf = time_font.render("7:00", True, (100, 255, 100))
         self.screen.blit(time_surf, (ns2_x + 13, ns_y - 10))
         # Book on nightstand
@@ -4958,7 +4856,7 @@ class Game:
             if scale_pop and item_timer < 20:
                 sc = 0.5 + 0.5 * ease
                 sz = max(12, int(f.get_height() * sc / f.get_height() * 48))
-                f = pygame.font.SysFont("consolas", sz, bold=True)
+                f = pygame.font.Font(TITLE_FONT_PATH,sz)
             # Flash white on reveal
             if item_timer < 10:
                 flash = 1.0 - item_timer / 10
