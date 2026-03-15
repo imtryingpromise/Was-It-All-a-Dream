@@ -72,6 +72,24 @@ DASH_SPEED            = 18
 DASH_DURATION         = 8
 DASH_COOLDOWN         = 45
 
+# Snowball (mouse-aimed arc)
+SNOWBALL_SPEED    = 11
+SNOWBALL_GRAVITY  = 0.28
+SNOWBALL_LIFETIME = 110
+SNOWBALL_COOLDOWN = 22
+
+# Coyote time + jump buffer
+COYOTE_FRAMES      = 8
+JUMP_BUFFER_FRAMES = 8
+
+# Mini boss hits to kill (scales with difficulty)
+BOSS_HITS   = {"easy": 3, "medium": 6, "hard": 9}
+# Mini boss shot cooldown in frames
+BOSS_SHOT_CD = {"easy": 180, "medium": 120, "hard": 60}
+
+# Combo system
+COMBO_EXPIRE = 90
+
 DIFFICULTY = {
     # collapse_delay: frames before a landed-on platform falls
     #   easy=120f (2s), medium=60f (1s), hard=30f (0.5s)
@@ -144,6 +162,9 @@ SOUND_FILES = {
     "soul_land":  "soul_land.wav",
     "crumble":    "crumble.wav",
     "npc_talk":   "npc_talk.wav",
+    "shoot":      "shoot.wav",
+    "boss_hit":   "stomp.wav",
+    "boss_die":   "win.wav",
 }
 
 # Per-sound volume levels — keeps SFX under the music
@@ -151,7 +172,8 @@ SFX_VOLUMES = {
     "jump": 0.6, "death": 1.0, "hit": 0.8, "stomp": 0.7,
     "respawn": 0.7, "checkpoint": 1.0, "win": 1.0,
     "star": 0.35, "soul_rise": 0.7, "soul_land": 0.7,
-    "dble": 0.8, "npc_talk": 1.0,
+    "crumble": 0.8, "npc_talk": 1.0,
+    "shoot": 0.5, "boss_hit": 0.8, "boss_die": 1.0,
 }
 
 class SoundManager:
@@ -819,6 +841,484 @@ class StompMonster:
                 pygame.draw.line(surface, (255,80,80), (bx2+2,by2-2), (bx2-2,by2+2), 2)
 
 
+# ── Snowball (mouse-aimed arc) ────────────────────────────────────────────
+class Snowball:
+    RADIUS = 5
+    def __init__(self, x, y, vx, vy):
+        self.x = float(x); self.y = float(y)
+        self.vx = vx; self.vy = vy
+        self.lifetime = SNOWBALL_LIFETIME; self.alive = True
+        self.trail = []
+    def update(self):
+        if not self.alive: return False
+        self.trail.append((self.x, self.y))
+        if len(self.trail) > 7: self.trail.pop(0)
+        self.x += self.vx; self.y += self.vy
+        self.vy += SNOWBALL_GRAVITY
+        self.lifetime -= 1
+        if self.lifetime <= 0: self.alive = False
+        return self.alive
+    def get_rect(self):
+        return pygame.Rect(int(self.x)-self.RADIUS, int(self.y)-self.RADIUS,
+                           self.RADIUS*2, self.RADIUS*2)
+    def draw(self, surface, camera, tick):
+        if not self.alive: return
+        # Trail
+        for i, (tx, ty) in enumerate(self.trail):
+            tp = camera.apply(pygame.Rect(int(tx), int(ty), 1, 1))
+            a = int(120 * (i+1) / len(self.trail))
+            ts = pygame.Surface((8,8), pygame.SRCALPHA)
+            pygame.draw.circle(ts, (200, 230, 255, a), (4,4), 3)
+            surface.blit(ts, (tp.x-4, tp.y-4))
+        p = camera.apply(self.get_rect())
+        # Glow
+        gs = pygame.Surface((22,22), pygame.SRCALPHA)
+        pygame.draw.circle(gs, (180, 220, 255, 70), (11,11), 10)
+        surface.blit(gs, (p.x-5, p.y-5))
+        pygame.draw.circle(surface, SNOW_WHITE, (p.centerx, p.centery), self.RADIUS)
+        pygame.draw.circle(surface, WHITE, (p.centerx-1, p.centery-1), 2)
+
+
+# ── Mini Boss Projectile ──────────────────────────────────────────────────
+class MiniBossProjectile:
+    RADIUS = 5
+    def __init__(self, x, y, vx, vy, color=(140,210,255)):
+        self.x=float(x); self.y=float(y)
+        self.vx=vx; self.vy=vy
+        self.color=color; self.alive=True; self.lifetime=120
+    def update(self):
+        self.x+=self.vx; self.y+=self.vy; self.lifetime-=1
+        if self.lifetime<=0: self.alive=False
+        return self.alive
+    def get_rect(self):
+        return pygame.Rect(int(self.x)-self.RADIUS, int(self.y)-self.RADIUS,
+                           self.RADIUS*2, self.RADIUS*2)
+    def check_hit(self, player):
+        return self.alive and player.alive and self.get_rect().colliderect(player.rect)
+    def draw(self, surface, camera, tick):
+        if not self.alive: return
+        p = camera.apply(self.get_rect())
+        pulse = abs(math.sin(tick*0.2))*0.4+0.6
+        gs = pygame.Surface((18,18), pygame.SRCALPHA)
+        pygame.draw.circle(gs, (*self.color, int(80*pulse)), (9,9), 8)
+        surface.blit(gs, (p.x-4, p.y-4))
+        pygame.draw.circle(surface, self.color, (p.centerx, p.centery), self.RADIUS)
+        pygame.draw.circle(surface, WHITE, (p.centerx-1, p.centery-1), 2)
+
+
+# ── Mini Boss base ────────────────────────────────────────────────────────
+class MiniBoss:
+    """Flying mini boss that spawns above its checkpoint and follows the player."""
+    def __init__(self, spawn_x, spawn_y, hp, shot_cd):
+        self.spawn_x = spawn_x
+        self.cx = float(spawn_x)
+        self.cy = float(spawn_y - 120)   # start 120px above checkpoint
+        self.hp = hp; self.max_hp = hp
+        self.shot_cd = shot_cd; self.shot_timer = random.randint(0, shot_cd)
+        self.alive = True; self.death_timer = 0; self.tick = random.randint(0,120)
+        self.hit_flash = 0
+        self.projectiles = []
+        self.phase = "descend"   # descend → active → dead
+        self.target_y = float(spawn_y - 80)
+        self.vel_x = 0.0; self.vel_y = 0.0
+        self.W = 48; self.H = 48
+
+    @property
+    def rect(self):
+        return pygame.Rect(int(self.cx)-self.W//2, int(self.cy)-self.H//2, self.W, self.H)
+
+    def update(self, player):
+        if not self.alive:
+            self.death_timer -= 1
+            for p in self.projectiles: p.update()
+            self.projectiles = [p for p in self.projectiles if p.alive]
+            return
+        self.tick += 1
+        if self.hit_flash > 0: self.hit_flash -= 1
+
+        if self.phase == "descend":
+            # Glide down to target_y
+            self.cy += (self.target_y - self.cy) * 0.06
+            self.cx += (player.rect.centerx - self.cx) * 0.02
+            if abs(self.cy - self.target_y) < 5:
+                self.phase = "active"
+
+        elif self.phase == "active" and player.alive:
+            # Smooth follow with slight sine wobble
+            dx = player.rect.centerx - self.cx
+            dy = (player.rect.centery - 90) - self.cy
+            self.cx += dx * 0.025 + math.sin(self.tick * 0.04) * 0.8
+            self.cy += dy * 0.025 + math.cos(self.tick * 0.035) * 0.6
+
+            # Shooting
+            self.shot_timer -= 1
+            if self.shot_timer <= 0:
+                self.shot_timer = self.shot_cd
+                self._shoot(player)
+
+        for p in self.projectiles: p.update()
+        self.projectiles = [p for p in self.projectiles if p.alive]
+
+    def _shoot(self, player):
+        """Override per boss type. Default: straight shot at player."""
+        dx = player.rect.centerx - self.cx
+        dy = player.rect.centery  - self.cy
+        dist = max(1, math.sqrt(dx*dx+dy*dy))
+        spd = 4.5
+        self.projectiles.append(MiniBossProjectile(
+            self.cx, self.cy, dx/dist*spd, dy/dist*spd))
+
+    def hit(self):
+        """Returns True if boss died."""
+        self.hp -= 1; self.hit_flash = 10
+        if self.hp <= 0:
+            self.alive = False; self.death_timer = 40
+            self.phase = "dead"
+            return True
+        return False
+
+    def check_projectile_hits(self, player):
+        for p in self.projectiles:
+            if p.check_hit(player):
+                p.alive = False
+                return True
+        return False
+
+    def check_body_hit(self, player):
+        return self.alive and self.rect.colliderect(player.rect)
+
+    def draw(self, surface, camera, tick):
+        # Draw projectiles
+        for p in self.projectiles: p.draw(surface, camera, tick)
+        # Subclasses implement their own visual
+        self._draw_body(surface, camera, tick)
+        if not self.alive: return
+        # HP bar
+        sr = camera.apply(self.rect)
+        if sr.right < -60 or sr.left > SCREEN_WIDTH + 60: return
+        bar_w = 60; bar_h = 6
+        bx = sr.centerx - bar_w//2; by = sr.y - 14
+        pygame.draw.rect(surface, (50,20,20), (bx-1, by-1, bar_w+2, bar_h+2), border_radius=3)
+        ratio = max(0, self.hp/self.max_hp)
+        fc = lerp_color((220,50,50),(50,220,80), ratio)
+        if int(bar_w*ratio) > 0:
+            pygame.draw.rect(surface, fc, (bx, by, int(bar_w*ratio), bar_h), border_radius=3)
+        # Hit flash ring
+        if self.hit_flash > 0:
+            hs = pygame.Surface((80,80), pygame.SRCALPHA)
+            pygame.draw.circle(hs, (255,255,255, int(180*self.hit_flash/10)), (40,40), 36, 3)
+            surface.blit(hs, (sr.centerx-40, sr.centery-40))
+
+    def _draw_body(self, surface, camera, tick):
+        pass  # override in subclasses
+
+
+# ── 1. Snowman Boss ───────────────────────────────────────────────────────
+class SnowmanBoss(MiniBoss):
+    def __init__(self, spawn_x, spawn_y, hp, shot_cd):
+        super().__init__(spawn_x, spawn_y, hp, shot_cd)
+        self.W = 44; self.H = 56
+    def _shoot(self, player):
+        # Spread of 3 snowballs in a cone
+        dx = player.rect.centerx - self.cx
+        dy = player.rect.centery  - self.cy
+        dist = max(1, math.sqrt(dx*dx+dy*dy))
+        base_angle = math.atan2(dy, dx)
+        for spread in [-0.25, 0, 0.25]:
+            a = base_angle + spread
+            spd = 4.0
+            self.projectiles.append(MiniBossProjectile(
+                self.cx, self.cy, math.cos(a)*spd, math.sin(a)*spd,
+                color=(200, 235, 255)))
+    def _draw_body(self, surface, camera, tick):
+        sr = camera.apply(self.rect)
+        if sr.right < -60 or sr.left > SCREEN_WIDTH+60: return
+        cx, cy = sr.centerx, sr.centery
+        alpha = 255 if self.alive else max(0, int(255*self.death_timer/40))
+        bob = int(math.sin(self.tick*0.06)*4)
+        # Body (lower ball)
+        bs = pygame.Surface((50,50), pygame.SRCALPHA)
+        pygame.draw.circle(bs, (230,245,255,alpha), (25,25), 22)
+        pygame.draw.circle(bs, (200,225,245,alpha), (25,25), 22, 2)
+        # Buttons
+        for by2 in [18,25,32]:
+            pygame.draw.circle(bs, (60,80,100,alpha), (25,by2), 3)
+        surface.blit(bs, (cx-25, cy+bob))
+        # Head (upper ball)
+        hs = pygame.Surface((40,40), pygame.SRCALPHA)
+        pygame.draw.circle(hs, (235,248,255,alpha), (20,20), 17)
+        pygame.draw.circle(hs, (200,225,245,alpha), (20,20), 17, 2)
+        # Eyes
+        pygame.draw.circle(hs, (30,40,60,alpha), (14,16), 3)
+        pygame.draw.circle(hs, (30,40,60,alpha), (26,16), 3)
+        # Carrot nose
+        pygame.draw.polygon(hs, (255,140,30), [(20,20),(16,22),(24,22)])
+        surface.blit(hs, (cx-20, cy-32+bob))
+        # Hat
+        pygame.draw.rect(surface, (30,30,30), (cx-16, cy-56+bob, 32, 6))  # brim
+        pygame.draw.rect(surface, (30,30,30), (cx-10, cy-72+bob, 20, 22)) # top
+        pygame.draw.rect(surface, XMAS_RED,   (cx-10, cy-58+bob, 20, 5))  # band
+        # Scarf
+        pygame.draw.rect(surface, XMAS_RED, (cx-18, cy-14+bob, 36, 7), border_radius=3)
+        # Arms (twig-like)
+        pygame.draw.line(surface, (100,70,40), (cx-22, cy+bob+5), (cx-36, cy-10+bob), 3)
+        pygame.draw.line(surface, (100,70,40), (cx+22, cy+bob+5), (cx+36, cy-10+bob), 3)
+
+
+# ── 2. Evil Elf Boss ──────────────────────────────────────────────────────
+class EvilElfBoss(MiniBoss):
+    def __init__(self, spawn_x, spawn_y, hp, shot_cd):
+        super().__init__(spawn_x, spawn_y, hp, shot_cd)
+        self.W = 32; self.H = 44
+    def _shoot(self, player):
+        # Fast straight shot
+        dx = player.rect.centerx - self.cx
+        dy = player.rect.centery  - self.cy
+        dist = max(1, math.sqrt(dx*dx+dy*dy))
+        spd = 6.0
+        self.projectiles.append(MiniBossProjectile(
+            self.cx, self.cy, dx/dist*spd, dy/dist*spd,
+            color=(50, 200, 80)))
+    def _draw_body(self, surface, camera, tick):
+        sr = camera.apply(self.rect)
+        if sr.right < -60 or sr.left > SCREEN_WIDTH+60: return
+        cx, cy = sr.centerx, sr.centery
+        alpha = 255 if self.alive else max(0, int(255*self.death_timer/40))
+        bob = int(math.sin(self.tick*0.09)*5)
+        # Body
+        bs = pygame.Surface((34,44), pygame.SRCALPHA)
+        pygame.draw.polygon(bs, (*XMAS_RED,alpha), [(4,44),(30,44),(28,18),(6,18)])
+        pygame.draw.polygon(bs, (*XMAS_GREEN,alpha), [(0,44),(34,44),(30,30),(4,30)])
+        # Belt
+        pygame.draw.rect(bs, (*XMAS_GOLD,alpha), (2,28,30,5))
+        pygame.draw.rect(bs, (*DARK_BROWN,alpha), (13,26,8,7), border_radius=1)
+        surface.blit(bs, (cx-17, cy-6+bob))
+        # Head
+        hs = pygame.Surface((28,28), pygame.SRCALPHA)
+        pygame.draw.circle(hs, (220,185,155,alpha), (14,14), 12)
+        # Evil eyes (narrow red)
+        pygame.draw.ellipse(hs, (200,30,30,alpha), (4,9,8,5))
+        pygame.draw.ellipse(hs, (200,30,30,alpha), (16,9,8,5))
+        pygame.draw.circle(hs, (10,0,0,alpha), (8,11), 2)
+        pygame.draw.circle(hs, (10,0,0,alpha), (20,11), 2)
+        # Evil grin
+        pygame.draw.arc(hs, (80,30,20,alpha), (5,15,18,8), math.pi, 2*math.pi, 2)
+        surface.blit(hs, (cx-14, cy-32+bob))
+        # Hat (pointed elf hat)
+        hat_pts = [(cx-12,cy-32+bob),(cx+12,cy-32+bob),(cx,cy-56+bob)]
+        pygame.draw.polygon(surface, XMAS_GREEN, hat_pts)
+        pygame.draw.circle(surface, XMAS_GOLD, (cx, cy-56+bob), 4)
+        # Wings (sparkly)
+        wing_pulse = abs(math.sin(self.tick*0.15))*3
+        for side in [-1,1]:
+            wx = cx + side*20
+            ws = pygame.Surface((28,20),pygame.SRCALPHA)
+            pygame.draw.ellipse(ws, (180,255,180,int(160+wing_pulse*10)), (0,0,28,20))
+            surface.blit(ws, (wx-14 if side<0 else wx-14, cy-10+bob))
+
+
+# ── 3. Frost Wraith Boss ──────────────────────────────────────────────────
+class FrostWraithBoss(MiniBoss):
+    def __init__(self, spawn_x, spawn_y, hp, shot_cd):
+        super().__init__(spawn_x, spawn_y, hp, shot_cd)
+        self.W = 40; self.H = 56; self.phase_offset = random.uniform(0, math.pi*2)
+    def _shoot(self, player):
+        # Spread of 5 icicle shards in wide cone
+        dx = player.rect.centerx - self.cx
+        dy = player.rect.centery  - self.cy
+        base_angle = math.atan2(dy, dx)
+        for i in range(5):
+            spread = -0.5 + i * 0.25
+            a = base_angle + spread
+            spd = 3.5 + abs(spread)*1.5
+            self.projectiles.append(MiniBossProjectile(
+                self.cx, self.cy, math.cos(a)*spd, math.sin(a)*spd,
+                color=(160, 220, 255)))
+    def _draw_body(self, surface, camera, tick):
+        sr = camera.apply(self.rect)
+        if sr.right < -60 or sr.left > SCREEN_WIDTH+60: return
+        cx, cy = sr.centerx, sr.centery
+        alpha = 255 if self.alive else max(0, int(255*self.death_timer/40))
+        float_off = int(math.sin(self.tick*0.05 + self.phase_offset)*8)
+        # Ghostly robe (semi-transparent wisp)
+        for r2, a2 in [(28,int(60*alpha/255)),(22,int(100*alpha/255)),(16,int(alpha*0.7))]:
+            gs2 = pygame.Surface((r2*2,r2*2),pygame.SRCALPHA)
+            pygame.draw.ellipse(gs2, (160,220,255,a2), (0,0,r2*2,r2*2))
+            surface.blit(gs2, (cx-r2, cy-10+float_off-r2+r2))
+        # Robe tail wisps
+        for i in range(3):
+            wx = cx + (i-1)*12
+            wy = cy + 18 + float_off + int(math.sin(tick*0.08+i)*6)
+            ws = pygame.Surface((10,20),pygame.SRCALPHA)
+            pygame.draw.ellipse(ws, (160,220,255,int(80*alpha/255)), (0,0,10,20))
+            surface.blit(ws, (wx-5, wy))
+        # Face (hollow dark)
+        hs = pygame.Surface((30,30),pygame.SRCALPHA)
+        pygame.draw.circle(hs, (180,230,255,alpha), (15,15), 13)
+        # Hollow eyes
+        pygame.draw.circle(hs, (20,40,80,alpha), (9,12), 4)
+        pygame.draw.circle(hs, (20,40,80,alpha), (21,12), 4)
+        # Glowing pupils
+        pygame.draw.circle(hs, (100,200,255,alpha), (9,12), 2)
+        pygame.draw.circle(hs, (100,200,255,alpha), (21,12), 2)
+        # Wail mouth
+        pygame.draw.ellipse(hs, (10,20,50,alpha), (8,18,14,7))
+        surface.blit(hs, (cx-15, cy-28+float_off))
+        # Ice crown
+        for i in range(5):
+            a = math.radians(-90 + i*45)
+            px2 = cx + int(math.cos(a)*14)
+            py2 = cy - 40 + float_off + int(math.sin(a)*4)
+            pygame.draw.polygon(surface, (200,240,255),
+                [(px2-3,py2+6),(px2+3,py2+6),(px2,py2-8)])
+
+
+# ── 4. Gift Golem Boss ────────────────────────────────────────────────────
+class GiftGolemBoss(MiniBoss):
+    def __init__(self, spawn_x, spawn_y, hp, shot_cd):
+        super().__init__(spawn_x, spawn_y, hp, shot_cd)
+        self.W = 56; self.H = 56
+    def _shoot(self, player):
+        # Straight aimed shot + 2 side shots
+        dx = player.rect.centerx - self.cx
+        dy = player.rect.centery  - self.cy
+        dist = max(1, math.sqrt(dx*dx+dy*dy))
+        base_angle = math.atan2(dy, dx)
+        for spread in [-0.3, 0, 0.3]:
+            a = base_angle + spread
+            spd = 4.5
+            self.projectiles.append(MiniBossProjectile(
+                self.cx, self.cy, math.cos(a)*spd, math.sin(a)*spd,
+                color=(255, 180, 60)))
+    def _draw_body(self, surface, camera, tick):
+        sr = camera.apply(self.rect)
+        if sr.right < -60 or sr.left > SCREEN_WIDTH+60: return
+        cx, cy = sr.centerx, sr.centery
+        alpha = 255 if self.alive else max(0, int(255*self.death_timer/40))
+        bob = int(math.sin(self.tick*0.05)*4)
+        # Main box body
+        box_cols = [(220,50,50),(50,180,80),(60,100,220),(255,200,50)]
+        bc = box_cols[(self.tick//60) % len(box_cols)]
+        bs = pygame.Surface((56,50),pygame.SRCALPHA)
+        pygame.draw.rect(bs, (*bc,alpha), (0,0,56,50), border_radius=4)
+        # Ribbon vertical
+        pygame.draw.rect(bs, (255,255,255,alpha), (24,0,8,50))
+        # Ribbon horizontal
+        pygame.draw.rect(bs, (255,255,255,alpha), (0,20,56,8))
+        # Bow at top
+        pygame.draw.circle(bs, (255,255,255,alpha), (28,0), 7)
+        pygame.draw.circle(bs, (255,255,255,alpha), (18,0), 5)
+        pygame.draw.circle(bs, (255,255,255,alpha), (38,0), 5)
+        surface.blit(bs, (cx-28, cy-2+bob))
+        # Stubby arms (flaps)
+        for side in [-1,1]:
+            ax = cx + side*34
+            pygame.draw.ellipse(surface, (*bc,alpha), (ax-8 if side<0 else ax-8, cy+bob, 16,12))
+        # Face on top half of box
+        pygame.draw.circle(surface, (240,200,160), (cx, cy-16+bob), 14)
+        # Angry brows
+        pygame.draw.line(surface, (60,30,20), (cx-12,cy-24+bob),(cx-4,cy-20+bob),3)
+        pygame.draw.line(surface, (60,30,20), (cx+4,cy-20+bob),(cx+12,cy-24+bob),3)
+        # Eyes
+        pygame.draw.circle(surface, BLACK, (cx-6,cy-15+bob), 3)
+        pygame.draw.circle(surface, BLACK, (cx+6,cy-15+bob), 3)
+        # Mean mouth
+        pygame.draw.arc(surface, (140,40,40),
+            (cx-8,cy-8+bob,16,8), math.pi, 2*math.pi, 2)
+        # Propeller on top (spinning)
+        pa = self.tick * 0.12
+        for i in range(3):
+            a = pa + i*2*math.pi/3
+            px2 = cx + int(math.cos(a)*12)
+            py2 = cy - 30 + bob + int(math.sin(a)*5)
+            pygame.draw.ellipse(surface, (*bc,alpha), (px2-5,py2-3,10,6))
+        pygame.draw.circle(surface, (80,60,40), (cx,cy-30+bob), 4)
+
+
+# ── 5. Huge Bird Boss ─────────────────────────────────────────────────────
+class HugeBirdBoss(MiniBoss):
+    def __init__(self, spawn_x, spawn_y, hp, shot_cd):
+        super().__init__(spawn_x, spawn_y, hp, shot_cd)
+        self.W = 64; self.H = 52
+        self.wing_phase = 0.0
+    def _shoot(self, player):
+        # Straight shot + random spread on hard
+        dx = player.rect.centerx - self.cx
+        dy = player.rect.centery  - self.cy
+        dist = max(1, math.sqrt(dx*dx+dy*dy))
+        base_angle = math.atan2(dy, dx)
+        spreads = [-0.2, 0, 0.2] if self.max_hp >= 9 else [0]
+        for spread in spreads:
+            a = base_angle + spread
+            spd = 5.0
+            self.projectiles.append(MiniBossProjectile(
+                self.cx, self.cy, math.cos(a)*spd, math.sin(a)*spd,
+                color=(255, 220, 100)))
+    def update(self, player):
+        self.wing_phase += 0.15
+        super().update(player)
+    def _draw_body(self, surface, camera, tick):
+        sr = camera.apply(self.rect)
+        if sr.right < -60 or sr.left > SCREEN_WIDTH+60: return
+        cx, cy = sr.centerx, sr.centery
+        alpha = 255 if self.alive else max(0, int(255*self.death_timer/40))
+        flap = int(math.sin(self.wing_phase)*18)
+        # Wings
+        for side in [-1,1]:
+            wx = cx + side*20
+            wy = cy - 8
+            pts = [(cx, wy),(wx+side*30, wy+flap),(wx+side*40, wy+flap+14),(cx, wy+20)]
+            ws = pygame.Surface((100,60),pygame.SRCALPHA)
+            adjusted = [(p[0]-cx+50, p[1]-wy+10) for p in pts]
+            if len(adjusted) >= 3:
+                pygame.draw.polygon(ws, (200,160,80,alpha), adjusted)
+                pygame.draw.polygon(ws, (170,130,60,alpha), adjusted, 2)
+            surface.blit(ws, (cx-50, wy-10))
+        # Body
+        body_s = pygame.Surface((52,40),pygame.SRCALPHA)
+        pygame.draw.ellipse(body_s, (210,170,80,alpha), (0,4,52,36))
+        pygame.draw.ellipse(body_s, (230,190,100,alpha), (4,8,44,24))
+        # Belly
+        pygame.draw.ellipse(body_s, (240,220,180,alpha), (12,14,28,16))
+        surface.blit(body_s, (cx-26, cy-8))
+        # Head
+        hs = pygame.Surface((36,34),pygame.SRCALPHA)
+        pygame.draw.circle(hs, (210,170,80,alpha), (18,16), 14)
+        # Crown feathers
+        for i in range(5):
+            fa = math.radians(-110 + i*28)
+            fx = 18+int(math.cos(fa)*16); fy = 16+int(math.sin(fa)*14)
+            pygame.draw.line(hs, (255,200,50,alpha), (18,16),(fx,fy), 3)
+            pygame.draw.circle(hs, (255,230,80,alpha), (fx,fy), 3)
+        # Eyes (big angry)
+        pygame.draw.circle(hs, (255,255,200,alpha), (11,13), 5)
+        pygame.draw.circle(hs, (255,255,200,alpha), (25,13), 5)
+        pygame.draw.circle(hs, (200,50,50,alpha), (11,14), 3)
+        pygame.draw.circle(hs, (200,50,50,alpha), (25,14), 3)
+        pygame.draw.circle(hs, (20,0,0,alpha),   (11,14), 1)
+        pygame.draw.circle(hs, (20,0,0,alpha),   (25,14), 1)
+        # Beak
+        pygame.draw.polygon(hs, (255,160,30,alpha), [(14,21),(22,21),(18,28)])
+        surface.blit(hs, (cx-18, cy-32))
+        # Talons
+        for side in [-1,1]:
+            tx = cx + side*12
+            ty = cy + 20
+            pygame.draw.line(surface, (180,140,50), (tx,ty),(tx+side*8,ty+10), 3)
+            pygame.draw.line(surface, (180,140,50), (tx,ty),(tx,ty+12), 3)
+            pygame.draw.line(surface, (180,140,50), (tx,ty),(tx-side*6,ty+10), 3)
+
+
+# ── Boss factory ──────────────────────────────────────────────────────────
+BOSS_TYPES = [SnowmanBoss, EvilElfBoss, FrostWraithBoss, GiftGolemBoss, HugeBirdBoss]
+
+def make_boss(cp_index, spawn_x, spawn_y, difficulty):
+    cls = BOSS_TYPES[cp_index % len(BOSS_TYPES)]
+    hp = BOSS_HITS[difficulty]
+    shot_cd = BOSS_SHOT_CD[difficulty]
+    return cls(spawn_x, spawn_y, hp, shot_cd)
+
+
 class StarRing:
     def __init__(self, x, y):
         self.x,self.y=x,y; self.rect=pygame.Rect(x-10,y-10,20,20)
@@ -926,6 +1426,14 @@ class Player:
         self.wall_sliding = False; self.wall_side = 0
         self.squash_timer = 0; self.sprinting = False
         self.star_count = 0
+        # Coyote time + jump buffer
+        self.coyote_timer = 0
+        self.jump_buffer  = 0
+        # Snowball
+        self.snowball_cooldown = 0
+        # Combo
+        self.combo_count = 0
+        self.combo_timer = 0
         # Sprite animation state (mirrors level4 fields so player_sprites.py works)
         if _SPRITES_AVAILABLE:
             init_player_sprite(self)
@@ -964,6 +1472,13 @@ class Player:
             return None
         if self.invincibility > 0: self.invincibility -= 1
         if self.dash_cooldown > 0: self.dash_cooldown -= 1
+        if self.snowball_cooldown > 0: self.snowball_cooldown -= 1
+        if self.combo_timer > 0:
+            self.combo_timer -= 1
+            if self.combo_timer <= 0: self.combo_count = 0
+
+        # Jump buffer: count down each frame a jump was requested
+        if self.jump_buffer > 0: self.jump_buffer -= 1
 
         # ── Spatial culling: only check platforms near the player ──────────
         nearby = [p for p in platforms
@@ -997,12 +1512,26 @@ class Player:
         self.vel_x = (self.vel_x+(move-self.vel_x)*accel) if move else (self.vel_x*fric)
         if abs(self.vel_x) < 0.1: self.vel_x = 0
         self.vel_y = min(self.vel_y+GRAVITY, MAX_FALL_SPEED)
+
+        # Coyote time: allow jump for a few frames after walking off edge
+        was_on_ground_before = self.on_ground
         jumped = False
-        if self.on_ground and self.jump_count == 0 and (
+
+        # Consume jump buffer: if we just landed and buffer is active, jump immediately
+        can_jump = (self.on_ground or self.coyote_timer > 0) and self.jump_count == 0
+        if can_jump and self.jump_buffer > 0:
+            self.vel_y = JUMP_VELOCITY
+            self.on_ground = False; self.riding_platform = None
+            self.jump_count = 1; jumped = True
+            self.jump_buffer = 0; self.coyote_timer = 0
+
+        # Normal jump key
+        if not jumped and can_jump and (
                 keys[pygame.K_SPACE] or keys[pygame.K_UP] or keys[pygame.K_w]):
             self.vel_y = JUMP_VELOCITY
             self.on_ground = False; self.riding_platform = None
             self.jump_count = 1; jumped = True
+            self.coyote_timer = 0
         self.on_ice = False
         self.rect.x += int(self.vel_x)
         touching_wall = 0
@@ -1015,6 +1544,7 @@ class Player:
                 elif self.vel_x < 0: self.rect.left  = pr.right; touching_wall = -1
                 self.vel_x = 0
         self.was_on_ground = self.on_ground
+        prev_on_ground = self.on_ground
         self.on_ground = False; self.riding_platform = None
         vy = int(self.vel_y)
         if self.vel_y > 0 and vy == 0: vy = 1
@@ -1026,11 +1556,24 @@ class Player:
                 if self.vel_y > 0:
                     self.rect.bottom = pr.top; self.vel_y = 0
                     self.on_ground = True; self.jump_count = 0
+                    self.coyote_timer = 0
                     if isinstance(plat, MovingPlatform): self.riding_platform = plat
                     if isinstance(plat, IcePlatform):    self.on_ice = True
                     plat.on_player_land(self)
                 elif self.vel_y < 0:
                     self.rect.top = pr.bottom; self.vel_y = 0
+
+        # Variable jump height: cut velocity if jump key released early
+        if not (keys[pygame.K_SPACE] or keys[pygame.K_UP] or keys[pygame.K_w]):
+            if self.vel_y < -5: self.vel_y = max(self.vel_y * 0.75, -5)
+
+        # Coyote time: if we just left the ground (not jumped), start coyote window
+        if prev_on_ground and not self.on_ground and not jumped:
+            self.coyote_timer = COYOTE_FRAMES
+        elif self.on_ground:
+            self.coyote_timer = 0
+        elif self.coyote_timer > 0:
+            self.coyote_timer -= 1
         pressing_into = ((touching_wall==1  and (keys[pygame.K_RIGHT] or keys[pygame.K_d])) or
                          (touching_wall==-1 and (keys[pygame.K_LEFT]  or keys[pygame.K_a])))
         if not self.on_ground and self.vel_y > 0 and pressing_into and touching_wall != 0:
@@ -1289,6 +1832,7 @@ class Game:
         if self.screen is None or self.screen.get_size() != (SCREEN_WIDTH, SCREEN_HEIGHT):
             self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("Sky Climber — Level 1 (Christmas Morning)")
+        pygame.mouse.set_visible(False)   # use custom crosshair cursor
         self.clock      = pygame.time.Clock()
         self.font       = pygame.font.SysFont("consolas", 24)
         self.small_font = pygame.font.SysFont("consolas", 16)
@@ -1315,6 +1859,9 @@ class Game:
         self.frost_puffs = []
         self.stomp_monsters = []
         self.monster_defs   = []
+        self.snowballs      = []
+        self.mini_bosses    = []   # active flying mini bosses
+        self.combo_popups   = []   # (x, y, count, timer)
         self.player       = Player(100, 504)
         self.dialogue_box = None; self.pending_state = None
         self.soul_state = None; self.soul_x = 0; self.soul_y = 0
@@ -1340,12 +1887,24 @@ class Game:
         self.freeze_frames = 0; self.respawn_fade = 0
         self.ending_shown = False; self.dialogue_box = None
         self.soul_state = None; self.soul_trail = []
+        self.snowballs.clear() if hasattr(self,'snowballs') else None
+        self.mini_bosses = []
+        self.combo_popups = []
 
     def _rebuild_monsters(self):
         self.stomp_monsters = [
             StompMonster(d['x'], d['y'], d['x1'], d['x2'], d['spd'])
             for d in self.monster_defs
         ]
+        # Re-spawn mini bosses for any already-activated checkpoints
+        active_indices = {getattr(b, '_cp_index', None) for b in self.mini_bosses}
+        new_bosses = []
+        for i, cp in enumerate(self.checkpoints):
+            if cp.activated and i not in active_indices:
+                b = make_boss(i, cp.spawn_x, cp.spawn_y, self.difficulty)
+                b._cp_index = i
+                new_bosses.append(b)
+        self.mini_bosses = new_bosses
 
     def _exit_to_menu(self):
         self.sfx.stop_music(); self.running = False; pygame.event.clear()
@@ -1380,24 +1939,47 @@ class Game:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT: self._exit_to_menu(); return
                 if event.type == pygame.KEYDOWN: self._handle_key(event.key)
-                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.state == "settings":
-                    mpos = event.pos
-                    if self._settings_vol_slider.collidepoint(mpos):
-                        self.music_volume = max(0.0, min(1.0, round((mpos[0]-self._settings_vol_slider.x)/max(1,self._settings_vol_slider.width),2)))
-                        self._apply_volume(); self.settings_cursor = 0
-                    elif self._settings_sfx_slider.collidepoint(mpos):
-                        self.sfx_volume = max(0.0, min(1.0, round((mpos[0]-self._settings_sfx_slider.x)/max(1,self._settings_sfx_slider.width),2)))
-                        self._apply_volume(); self.settings_cursor = 1
-                    else:
-                        for i, rect in enumerate(self._settings_boxes):
-                            if rect.collidepoint(mpos):
-                                self.settings_cursor = i
-                                if i == 2: self.music_muted = not self.music_muted; self._apply_volume()
-                                elif i == 3:
-                                    dl=["easy","medium","hard"]; self.difficulty=dl[(dl.index(self.difficulty)+1)%3]
-                                    self._apply_difficulty()
-                                elif i == 4: self.state = "playing"
-                                elif i == 5: self.load_level(); self.state="playing"; self.sfx.start_music(volume=self.music_volume)
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if self.state == "playing" and self.player.alive and self.player.snowball_cooldown <= 0:
+                        # Aim toward mouse cursor in world space
+                        mx, my = event.pos
+                        # Convert screen pos to world pos
+                        wx2 = mx + self.camera.offset_x - self.camera.shake_x
+                        wy2 = my + self.camera.offset_y - self.camera.shake_y
+                        dx = wx2 - self.player.rect.centerx
+                        dy = wy2 - self.player.rect.centery
+                        dist = max(1, math.sqrt(dx*dx + dy*dy))
+                        vx = dx/dist * SNOWBALL_SPEED
+                        vy = dy/dist * SNOWBALL_SPEED
+                        sb = Snowball(self.player.rect.centerx, self.player.rect.centery, vx, vy)
+                        self.snowballs.append(sb)
+                        self.player.snowball_cooldown = SNOWBALL_COOLDOWN
+                        self.sfx.play("shoot")
+                        # Muzzle flash particles
+                        for _ in range(5):
+                            self.particles.append(Particle(
+                                self.player.rect.centerx, self.player.rect.centery,
+                                random.choice([WHITE, SNOW_WHITE, ICE_BLUE]),
+                                vx*0.3+random.uniform(-1,1), vy*0.3+random.uniform(-1,1),
+                                12, 3, 0.05))
+                    elif self.state == "settings":
+                        mpos = event.pos
+                        if self._settings_vol_slider.collidepoint(mpos):
+                            self.music_volume = max(0.0, min(1.0, round((mpos[0]-self._settings_vol_slider.x)/max(1,self._settings_vol_slider.width),2)))
+                            self._apply_volume(); self.settings_cursor = 0
+                        elif self._settings_sfx_slider.collidepoint(mpos):
+                            self.sfx_volume = max(0.0, min(1.0, round((mpos[0]-self._settings_sfx_slider.x)/max(1,self._settings_sfx_slider.width),2)))
+                            self._apply_volume(); self.settings_cursor = 1
+                        else:
+                            for i, rect in enumerate(self._settings_boxes):
+                                if rect.collidepoint(mpos):
+                                    self.settings_cursor = i
+                                    if i == 2: self.music_muted = not self.music_muted; self._apply_volume()
+                                    elif i == 3:
+                                        dl=["easy","medium","hard"]; self.difficulty=dl[(dl.index(self.difficulty)+1)%3]
+                                        self._apply_difficulty()
+                                    elif i == 4: self.state = "playing"
+                                    elif i == 5: self.load_level(); self.state="playing"; self.sfx.start_music(volume=self.music_volume)
             if not self.running: return
             # Settings mouse clicks
             if self.state == "settings":
@@ -1490,6 +2072,9 @@ class Game:
                             random.choice([WHITE, ICE_BLUE, SNOW_WHITE]),
                             -self.player.wall_side * random.uniform(1, 3),
                             random.uniform(-2, 1), 15, 3, 0.1))
+                else:
+                    # Set jump buffer so ground landing within buffer window auto-jumps
+                    self.player.jump_buffer = JUMP_BUFFER_FRAMES
 
     def _update(self):
         self.tick += 1
@@ -1558,12 +2143,85 @@ class Game:
             cp.update()
             if self.player.alive and cp.check(self.player):
                 self.sfx.play("checkpoint"); self._cp_fx(cp)
+                # Spawn mini boss for this checkpoint if not already active
+                cp_idx = self.checkpoints.index(cp)
+                already = any(getattr(b, '_cp_index', None) == cp_idx for b in self.mini_bosses)
+                if not already:
+                    b = make_boss(cp_idx, cp.spawn_x, cp.spawn_y, self.difficulty)
+                    b._cp_index = cp_idx
+                    self.mini_bosses.append(b)
         for npc in self.npcs:
             npc.proximity_shown = npc.check_proximity(self.player)
         for st in self.stars_list:
             if st.check(self.player):
                 self.player.star_count += 1; self.sfx.play("star"); self._star_fx(st)
                 self.score_popups.append((st.x, st.y-20, f"+STAR x{self.player.star_count}", 55, STAR_GOLD))
+
+        # ── Snowballs: update + check boss hits ────────────────────────────
+        self.snowballs = [sb for sb in self.snowballs if sb.update()]
+        for sb in list(self.snowballs):
+            if not sb.alive: continue
+            # Platform collision (snowball disappears on wall)
+            sbr = sb.get_rect()
+            for plat in self.platforms:
+                if plat.is_active() and sbr.colliderect(plat.get_rect()):
+                    sb.alive = False
+                    for _ in range(4):
+                        self.particles.append(Particle(sb.x, sb.y, SNOW_WHITE,
+                            random.uniform(-2,2), random.uniform(-2,0), 10, 2, 0.1))
+                    break
+            if not sb.alive: continue
+            # Boss hit
+            for boss in self.mini_bosses:
+                if boss.alive and sb.alive and sb.get_rect().colliderect(boss.rect):
+                    sb.alive = False
+                    died = boss.hit()
+                    if died:
+                        self.sfx.play("boss_die")
+                        self.camera.add_shake(12)
+                        self.flashes.append(FlashOverlay(XMAS_GOLD, 12, 140))
+                        for _ in range(28):
+                            a = random.uniform(0, math.pi*2); s = random.uniform(2,7)
+                            self.particles.append(Particle(boss.cx, boss.cy,
+                                random.choice([XMAS_GOLD, WHITE, XMAS_RED, XMAS_GREEN]),
+                                math.cos(a)*s, math.sin(a)*s, 45, random.randint(3,7), 0.1))
+                        self.rings.append(RingEffect(int(boss.cx), int(boss.cy), XMAS_GOLD, 110, 5, 3))
+                        # Bonus stars
+                        bonus = 8
+                        self.player.star_count += bonus
+                        self.score_popups.append((boss.cx, boss.cy-35,
+                            f"BOSS DOWN! +{bonus} STARS", 90, XMAS_GOLD))
+                        # Combo
+                        self.player.combo_count += 1
+                        self.player.combo_timer  = COMBO_EXPIRE
+                        if self.player.combo_count >= 2:
+                            self.combo_popups.append((boss.cx, boss.cy-60,
+                                self.player.combo_count, 55))
+                        self.freeze_frames = 6
+                    else:
+                        self.sfx.play("boss_hit")
+                        self.camera.add_shake(4)
+                        for _ in range(8):
+                            a = random.uniform(0, math.pi*2); s = random.uniform(1,3)
+                            self.particles.append(Particle(boss.cx, boss.cy,
+                                ICE_BLUE, math.cos(a)*s, math.sin(a)*s, 18, 3, 0.1))
+                        self.score_popups.append((boss.cx, boss.cy-20,
+                            f"HIT! {boss.hp}/{boss.max_hp}", 45, ICE_BLUE))
+                    break
+
+        # ── Mini bosses: update + damage player ────────────────────────────
+        for boss in self.mini_bosses:
+            boss.update(self.player)
+            if boss.alive:
+                # Projectile hits
+                if boss.check_projectile_hits(self.player):
+                    _do_damage()
+                # Body contact
+                if boss.check_body_hit(self.player):
+                    _do_damage()
+        self.mini_bosses = [b for b in self.mini_bosses if b.alive or b.death_timer > 0]
+        # Combo popup decay
+        self.combo_popups = [(x, y-1.0, cnt, t-1) for x, y, cnt, t in self.combo_popups if t > 0]
 
         self.exit_door.update()
         if self.player.alive and self.exit_door.check(self.player):
@@ -1723,6 +2381,8 @@ class Game:
         pygame.draw.circle(self.screen, (240,250,255), (sp.x-1,sp.y-1), 4)
 
     def _draw(self):
+        # Show system cursor only in settings/pause so mouse clicks are visible
+        pygame.mouse.set_visible(self.state in ("settings",))
         self.screen.fill(DARK_BG)
         if self.state in ("playing","settings","dialogue","ending"):
             self._draw_game()
@@ -1760,10 +2420,20 @@ class Game:
         for kn in self.kunais:   kn.draw(self.screen, self.camera, self.tick)
         for fp in self.frost_puffs: fp.draw(self.screen, self.camera, self.tick)
         for sm in self.stomp_monsters: sm.draw(self.screen, self.camera, self.tick)
+        # Mini bosses (behind player so projectiles visible over boss)
+        for boss in self.mini_bosses: boss.draw(self.screen, self.camera, self.tick)
+        # Player snowballs
+        for sb2 in self.snowballs: sb2.draw(self.screen, self.camera, self.tick)
         self.exit_door.draw(self.screen, self.camera)
         for p in self.particles: p.draw(self.screen, self.camera)
         for r in self.rings:     r.draw(self.screen, self.camera)
         self.player.draw(self.screen, self.camera, self.tick)
+        # Wall-slide particles
+        if self.player.wall_sliding and self.player.alive and self.tick % 2 == 0:
+            wx2 = self.player.rect.left if self.player.wall_side == -1 else self.player.rect.right
+            self.particles.append(Particle(wx2, self.player.rect.centery + random.randint(-5,10),
+                random.choice([WHITE, SNOW_WHITE, ICE_BLUE]),
+                -self.player.wall_side * random.uniform(0.5,1.5), random.uniform(-1,0.5), 10, 2, 0.05))
         for f in self.flashes:        f.draw(self.screen)
         for d in self.damage_flashes: d.draw(self.screen)
         for x,y,text,timer,color in self.score_popups:
@@ -1771,6 +2441,33 @@ class Game:
             pos=self.camera.apply(pygame.Rect(int(x),int(y),1,1))
             surf=self.small_font.render(text,True,c)
             self.screen.blit(surf,surf.get_rect(center=(pos.x,pos.y)))
+        # Combo popups
+        for x, y, cnt, timer in self.combo_popups:
+            a = min(1.0, timer/20)
+            sz = min(30, 16 + cnt*2)
+            cf = pygame.font.SysFont("consolas", sz, bold=True)
+            cc = lerp_color(XMAS_GOLD, WHITE, min(1.0, cnt/6))
+            cs = tuple(max(0, min(255, int(v*a))) for v in cc)
+            combo_surf = cf.render(f"x{cnt} COMBO!", True, cs)
+            pos = self.camera.apply(pygame.Rect(int(x), int(y), 1, 1))
+            self.screen.blit(combo_surf, combo_surf.get_rect(center=(pos.x, pos.y)))
+        # Snowball crosshair cursor
+        if self.player.alive and self.state == "playing":
+            mx, my = pygame.mouse.get_pos()
+            cd_ratio = self.player.snowball_cooldown / SNOWBALL_COOLDOWN
+            r_outer = 14; r_inner = 5
+            col = lerp_color((80, 200, 255), (255, 100, 100), cd_ratio)
+            pygame.draw.circle(self.screen, col, (mx, my), r_outer, 2)
+            pygame.draw.circle(self.screen, col, (mx, my), r_inner, 2)
+            gap = 6
+            for dx2, dy2 in [(0,-1),(0,1),(-1,0),(1,0)]:
+                x1 = mx + dx2*(r_inner+gap); y1 = my + dy2*(r_inner+gap)
+                x2 = mx + dx2*(r_outer-2);   y2 = my + dy2*(r_outer-2)
+                pygame.draw.line(self.screen, col, (x1,y1), (x2,y2), 2)
+            if cd_ratio > 0:
+                arc_rect = pygame.Rect(mx-r_outer, my-r_outer, r_outer*2, r_outer*2)
+                pygame.draw.arc(self.screen, (255,220,80), arc_rect,
+                    math.pi/2, math.pi/2 + (1-cd_ratio)*2*math.pi, 3)
         self._draw_hud()
         if self.soul_state is not None: self._draw_soul()
 
@@ -1779,6 +2476,7 @@ class Game:
             self.screen.blit(font.render(text,True,(0,0,0)),(x+1,y+1))
             self.screen.blit(font.render(text,True,color),(x,y))
         hud_x, hud_y = 12, 10
+        # Hearts
         for i in range(PLAYER_MAX_HEARTS):
             hx=hud_x+i*26; hy=hud_y; filled=i<self.player.hearts
             c=XMAS_RED if filled else (50,50,50)
@@ -1787,6 +2485,17 @@ class Game:
                 pygame.draw.circle(self.screen,sc,(hx+5+dx,hy+dy),5+ps)
                 pygame.draw.circle(self.screen,sc,(hx+13+dx,hy+dy),5+ps)
                 pygame.draw.polygon(self.screen,sc,[(hx-ps+dx,hy+2+dy),(hx+9+dx,hy+11+ps+dy),(hx+18+ps+dx,hy+2+dy)])
+        # Low health red border
+        if self.player.hearts == 1 and self.player.alive:
+            pulse = abs(math.sin(self.tick*0.08))*0.7
+            lh_s = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            for bi in range(8):
+                ia = max(0, int(60*pulse - bi*8))
+                if ia > 0:
+                    pygame.draw.rect(lh_s, (220,30,30,ia),
+                        (bi,bi,SCREEN_WIDTH-2*bi,SCREEN_HEIGHT-2*bi), 2)
+            self.screen.blit(lh_s, (0,0))
+        # Dash bar
         dash_y=hud_y+18; dash_bw=60; dash_bh=5
         if self.player.dash_cooldown > 0:
             ratio=1.0-self.player.dash_cooldown/DASH_COOLDOWN
@@ -1796,21 +2505,44 @@ class Game:
             pygame.draw.rect(self.screen,CYAN,(hud_x,dash_y,dash_bw,dash_bh))
         _hud_text(pygame.font.SysFont("consolas",9),"DASH",
                   (160,220,230) if self.player.dash_cooldown<=0 else (80,80,90), hud_x+dash_bw+4, dash_y-2)
+        # Snowball cooldown bar
+        sb_bw=60; sb_y=dash_y+10
+        if self.player.snowball_cooldown > 0:
+            ratio2=1.0-self.player.snowball_cooldown/SNOWBALL_COOLDOWN
+            pygame.draw.rect(self.screen,(30,30,40),(hud_x,sb_y,sb_bw,sb_bh:=5))
+            pygame.draw.rect(self.screen,(80,200,255),(hud_x,sb_y,int(sb_bw*ratio2),5))
+        else:
+            pygame.draw.rect(self.screen,(80,200,255),(hud_x,sb_y,sb_bw,5))
+        _hud_text(pygame.font.SysFont("consolas",9),"BALL",
+                  (160,220,230) if self.player.snowball_cooldown<=0 else (80,80,90), hud_x+sb_bw+4, sb_y-2)
+        # Progress bar
         alt=self._altitude(); ab_w,ab_h=160,8; ab_x=SCREEN_WIDTH//2-ab_w//2; ab_y=10
         pygame.draw.rect(self.screen,(40,50,70),(ab_x-1,ab_y-1,ab_w+2,ab_h+2))
         for pi in range(int(ab_w*alt)):
             t=pi/ab_w; fc=lerp_color((255,180,50),(80,150,220),t)
             pygame.draw.line(self.screen,fc,(ab_x+pi,ab_y),(ab_x+pi,ab_y+ab_h))
         _hud_text(pygame.font.SysFont("consolas",8),"progress",(180,200,220),ab_x+ab_w+4,ab_y)
+        # Top-right info
         _hud_text(self.tiny_font,f"Time: {self.level_time/FPS:.1f}s",SNOW_WHITE,SCREEN_WIDTH-145,10)
         _hud_text(self.tiny_font,f"Stars: {self.player.star_count}",STAR_GOLD,SCREEN_WIDTH-145,26)
         dc=((100,220,150) if self.difficulty=="easy" else (255,210,60) if self.difficulty=="medium" else (255,100,100))
         _hud_text(self.tiny_font,self.difficulty.upper(),dc,SCREEN_WIDTH-145,42)
+        # Active boss indicator (top-right corner)
+        alive_bosses = [b for b in self.mini_bosses if b.alive]
+        if alive_bosses:
+            boss_names = ["Snowman","Evil Elf","Frost Wraith","Gift Golem","Huge Bird"]
+            bx3 = SCREEN_WIDTH - 200; by3 = 62
+            for bi2, boss in enumerate(alive_bosses[:3]):
+                name = boss_names[getattr(boss,'_cp_index',0) % len(boss_names)]
+                pulse2 = abs(math.sin(self.tick*0.1+bi2))*0.4+0.6
+                bc2 = tuple(int(v*pulse2) for v in XMAS_RED)
+                _hud_text(self.tiny_font, f"⚠ {name} {boss.hp}/{boss.max_hp}", bc2,
+                          bx3, by3 + bi2*14)
         if not self.player.alive and self.soul_state is None:
             txt=self.font.render("Respawning...",True,XMAS_RED)
             self.screen.blit(txt,txt.get_rect(center=(SCREEN_WIDTH//2,SCREEN_HEIGHT//2)))
         self.screen.blit(self.tiny_font.render(
-            "R-Respawn  ESC-Settings  E-Talk  SHIFT-Dash(air)  SPACE-Jump  Wall:slide+jump",
+            "SPACE-Jump  SHIFT-Dash  LEFT CLICK-Snowball  E-Talk  R-Respawn  ESC-Menu",
             True,(80,100,130)),(10,SCREEN_HEIGHT-16))
 
     def _draw_settings(self):
