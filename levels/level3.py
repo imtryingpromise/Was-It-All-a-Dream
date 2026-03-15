@@ -77,8 +77,8 @@ BALLOON_LIFETIME = 90
 STORY_DIALOGUES = {
     "intro": [
         ("Seraphiel", "...Can you hear me, Dreamer?"),
-        ("Seraphiel", "You fell. The darkness of the second realm took you down."),
-        ("Seraphiel", "But the sun is not done with you yet."),
+        ("Seraphiel", "You fell once again! endless realm took you down."),
+        ("Seraphiel", "But the sun is not done with you yet, Fear no more the heat o' the sun."),
         ("Seraphiel", "I am Seraphiel — guardian of this sky realm. The third of the four."),
         ("Seraphiel", "I channeled the light of the sun and called your spirit back."),
         ("Seraphiel", "You were a spark of light drifting through the cold. Now you are here."),
@@ -126,18 +126,18 @@ STORY_DIALOGUES = {
         ("Lumen", "I watched the whole thing! You shot Santa out of the sky!"),
         ("Lumen", "I was hiding behind a cloud the entire time, but STILL. Amazing."),
         ("Seraphiel", "The gift you claimed holds a fragment of the sun's power."),
-        ("Seraphiel", "Carry it forward into the fourth realm. The cold cannot touch it."),
-        ("Seraphiel", "The fourth realm is the hardest. But you have climbed the sky now."),
+        ("Seraphiel", "Carry it forward. The cold cannot touch it."),
+        ("Seraphiel", "The final realm is the hardest. But you have climbed the sky now."),
         ("Seraphiel", "You have faced fire, shadow, and the sky trial."),
         ("Seraphiel", "You are almost home."),
         ("Lumen", "Hey. When you wake up... look at the sky for me, will you?"),
         ("Lumen", "Even a dreaming sky is beautiful. The real one must be amazing."),
-        ("Seraphiel", "Step through the portal, Dreamer. Christmas morning is waiting."),
+        ("Seraphiel", "Step through the portal, Dreamer. Christmas celebration is waiting."),
         ("", "The portal blazes with warmth. You step through."),
         ("", "The sky dissolves into golden light."),
-        ("", "The fourth realm waits. But for a moment — just a moment —"),
+        ("", "The frozen christmas realm waits. But for a moment — just a moment —"),
         ("", "you feel the sun on your face. Real sunlight. Warm and certain."),
-        ("", "One realm left."),
+        ("", "One realm left, Good Luck!"),
     ],
 }
 
@@ -145,25 +145,26 @@ STORY_DIALOGUES = {
 # level3.py lives in levels/, audio lives in ../assets/audio/
 _LEVELS_DIR = os.path.dirname(os.path.abspath(__file__))
 _BASE = os.path.dirname(_LEVELS_DIR)
-SOUND_DIR    = os.path.join(_BASE, "sounds")
+SOUND_DIR    = os.path.join(_BASE, "assets", "audio")
 MUSIC_FILE   = os.path.join(_BASE, "assets", "audio", "Level3Music.mp3")
 ENDING_MUSIC = os.path.join(_BASE, "assets", "audio", "soundsending.mp3")
+PRESENT_MUSIC = os.path.join(_BASE, "assets", "audio", "captured_present.mp3")
 
 SOUND_FILES = {
-    "jump": "jump.wav",
-    "death": "death.wav",
-    "respawn": "respawn.wav",
-    "stomp": "stomp.wav",
+    "jump":         "jump.wav",
+    "death":        "death.wav",
+    "respawn":      "hit.wav",           # no respawn.wav, reuse hit
+    "stomp":        "stomp.wav",
     "monster_kill": "monster_kill.wav",
-    "powerup": "powerup.wav",
-    "checkpoint": "checkpoint.wav",
-    "win": "win.wav",
-    "shoot": "shoot.wav",
-    "arrow_hit": "stomp.wav",
-    "santa_die": "bomb_explode.wav",
-    "balloon_hit": "death.wav",
-    "soul_rise": "soul_rise.wav",
-    "soul_land": "soul_land.wav",
+    "powerup":      "powerup.wav",
+    "checkpoint":   "checkpoint.wav",
+    "win":          "powerup.wav",       # no win.wav, reuse powerup
+    "shoot":        "shoot.wav",
+    "arrow_hit":    "hit.wav",           # use hit.wav for arrow impacts
+    "santa_die":    "bomb_explode.wav",
+    "balloon_hit":  "death.wav",
+    "soul_rise":    "hit.wav",           # no soul_rise.wav, fallback
+    "soul_land":    "stomp.wav",         # no soul_land.wav, fallback
 }
 
 
@@ -171,18 +172,24 @@ class SoundManager:
     def __init__(self):
         self.sounds = {}
         self.music_loaded = False
+        print(f"[AUDIO] Sound dir: {SOUND_DIR}")
+        print(f"[AUDIO] Music file exists: {os.path.isfile(MUSIC_FILE)} -> {MUSIC_FILE}")
         for name, fn in SOUND_FILES.items():
             path = os.path.join(SOUND_DIR, fn)
+            exists = os.path.isfile(path)
+            print(f"[AUDIO] {name}: {'OK' if exists else 'MISSING'} -> {path}")
             try:
-                self.sounds[name] = pygame.mixer.Sound(path) if os.path.isfile(path) else None
-            except:
+                self.sounds[name] = pygame.mixer.Sound(path) if exists else None
+            except Exception as e:
+                print(f"[AUDIO] ERROR loading {name}: {e}")
                 self.sounds[name] = None
         if os.path.isfile(MUSIC_FILE):
             try:
                 pygame.mixer.music.load(MUSIC_FILE)
                 self.music_loaded = True
-            except:
-                pass
+                print("[AUDIO] Music loaded OK")
+            except Exception as e:
+                print(f"[AUDIO] Music load ERROR: {e}")
 
     def play(self, n):
         s = self.sounds.get(n)
@@ -1892,7 +1899,12 @@ class Game:
             self.gift.update(self.platforms)
             if self.gift.check(self.player):
                 self.player.activate_gift_power()
-                self.sfx.play("powerup")
+                try:
+                    present_snd = pygame.mixer.Sound(PRESENT_MUSIC)
+                    present_snd.set_volume(0.8)
+                    present_snd.play()
+                except:
+                    self.sfx.play("powerup")
                 self._gift_fx(self.gift.x, self.gift.y)
                 self.score_popups.append((self.gift.x, self.gift.y - 20, "POWER GIFT!", 90, HOLY_GOLD))
                 self.gift = None
