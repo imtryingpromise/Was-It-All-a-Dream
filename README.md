@@ -134,4 +134,4 @@ python main.py
 
 ## Credits
 
-Created as an Imaging course assignment. Character sprites use the **Owlet Monster** sprite set.
+Developed with passion for retro-style platformers. Character sprites use the Owlet Monster sprite set.
